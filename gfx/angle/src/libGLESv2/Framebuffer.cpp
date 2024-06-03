@@ -23,7 +23,7 @@
 
 namespace rx
 {
-gl::Error GetAttachmentRenderTarget(gl::FramebufferAttachment *attachment, RenderTarget **outRT)
+RenderTarget *GetAttachmentRenderTarget(gl::FramebufferAttachment *attachment)
 {
     if (attachment->isTexture())
     {
@@ -32,17 +32,14 @@ gl::Error GetAttachmentRenderTarget(gl::FramebufferAttachment *attachment, Rende
         TextureD3D *textureD3D = TextureD3D::makeTextureD3D(texture->getImplementation());
         const gl::ImageIndex *index = attachment->getTextureImageIndex();
         ASSERT(index);
-        return textureD3D->getRenderTarget(*index, outRT);
+        return textureD3D->getRenderTarget(*index);
     }
-    else
-    {
-        gl::Renderbuffer *renderbuffer = attachment->getRenderbuffer();
-        ASSERT(renderbuffer);
 
-        // TODO: cast to RenderbufferD3D
-        *outRT = renderbuffer->getStorage()->getRenderTarget();
-        return gl::Error(GL_NO_ERROR);
-    }
+    gl::Renderbuffer *renderbuffer = attachment->getRenderbuffer();
+    ASSERT(renderbuffer);
+
+    // TODO: cast to RenderbufferD3D
+    return renderbuffer->getStorage()->getRenderTarget();
 }
 
 // Note: RenderTarget serials should ideally be in the RenderTargets themselves.
@@ -606,36 +603,33 @@ GLenum Framebuffer::completeness() const
     return GL_FRAMEBUFFER_COMPLETE;
 }
 
-Error Framebuffer::invalidate(const Caps &caps, GLsizei numAttachments, const GLenum *attachments)
+void Framebuffer::invalidate(const Caps &caps, GLsizei numAttachments, const GLenum *attachments)
 {
     GLuint maxDimension = caps.maxRenderbufferSize;
-    return invalidateSub(numAttachments, attachments, 0, 0, maxDimension, maxDimension);
+    invalidateSub(caps, numAttachments, attachments, 0, 0, maxDimension, maxDimension);
 }
 
-Error Framebuffer::invalidateSub(GLsizei numAttachments, const GLenum *attachments, GLint x, GLint y, GLsizei width, GLsizei height)
+void Framebuffer::invalidateSub(const Caps &caps, GLsizei numAttachments, const GLenum *attachments,
+                                GLint x, GLint y, GLsizei width, GLsizei height)
 {
     ASSERT(completeness() == GL_FRAMEBUFFER_COMPLETE);
     for (GLsizei attachIndex = 0; attachIndex < numAttachments; ++attachIndex)
     {
         GLenum attachmentTarget = attachments[attachIndex];
 
-        FramebufferAttachment *attachment = (attachmentTarget == GL_DEPTH_STENCIL_ATTACHMENT) ? getDepthOrStencilbuffer()
-                                                                                              : getAttachment(attachmentTarget);
+        gl::FramebufferAttachment *attachment =
+            (attachmentTarget == GL_DEPTH_STENCIL_ATTACHMENT) ? getDepthOrStencilbuffer() :
+                                                                getAttachment(attachmentTarget);
 
         if (attachment)
         {
-            rx::RenderTarget *renderTarget = NULL;
-            Error error = rx::GetAttachmentRenderTarget(attachment, &renderTarget);
-            if (error.isError())
+            rx::RenderTarget *renderTarget = rx::GetAttachmentRenderTarget(attachment);
+            if (renderTarget)
             {
-                return error;
+                renderTarget->invalidate(x, y, width, height);
             }
-
-            renderTarget->invalidate(x, y, width, height);
         }
     }
-
-    return Error(GL_NO_ERROR);
 }
 
 DefaultFramebuffer::DefaultFramebuffer(rx::Renderer *renderer, Colorbuffer *colorbuffer, DepthStencilbuffer *depthStencil)
@@ -644,23 +638,12 @@ DefaultFramebuffer::DefaultFramebuffer(rx::Renderer *renderer, Colorbuffer *colo
     Renderbuffer *colorRenderbuffer = new Renderbuffer(0, colorbuffer);
     mColorbuffers[0] = new RenderbufferAttachment(GL_BACK, colorRenderbuffer);
 
-    GLenum depthStencilActualFormat = depthStencil->getActualFormat();
-    const gl::InternalFormat &depthStencilFormatInfo = GetInternalFormatInfo(depthStencilActualFormat);
+    Renderbuffer *depthStencilBuffer = new Renderbuffer(0, depthStencil);
 
-    if (depthStencilFormatInfo.depthBits != 0 || depthStencilFormatInfo.stencilBits != 0)
-    {
-        Renderbuffer *depthStencilBuffer = new Renderbuffer(0, depthStencil);
-
-        // Make a new attachment objects to ensure we do not double-delete
-        // See angle issue 686
-        mDepthbuffer = (depthStencilFormatInfo.depthBits != 0 ? new RenderbufferAttachment(GL_DEPTH_ATTACHMENT, depthStencilBuffer) : NULL);
-        mStencilbuffer = (depthStencilFormatInfo.stencilBits != 0 ? new RenderbufferAttachment(GL_STENCIL_ATTACHMENT, depthStencilBuffer) : NULL);
-    }
-    else
-    {
-        // This method transfers ownership, so delete the unused storage if we don't keep it.
-        SafeDelete(depthStencil);
-    }
+    // Make a new attachment objects to ensure we do not double-delete
+    // See angle issue 686
+    mDepthbuffer = (depthStencilBuffer->getDepthSize() != 0 ? new RenderbufferAttachment(GL_DEPTH_ATTACHMENT, depthStencilBuffer) : NULL);
+    mStencilbuffer = (depthStencilBuffer->getStencilSize() != 0 ? new RenderbufferAttachment(GL_STENCIL_ATTACHMENT, depthStencilBuffer) : NULL);
 
     mDrawBufferStates[0] = GL_BACK;
     mReadBufferState = GL_BACK;

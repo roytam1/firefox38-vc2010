@@ -73,7 +73,6 @@ class Shader
     void getSource(GLsizei bufSize, GLsizei *length, char *buffer) const;
     int getTranslatedSourceLength() const;
     void getTranslatedSource(GLsizei bufSize, GLsizei *length, char *buffer) const;
-    void getTranslatedSourceWithDebugInfo(GLsizei bufSize, GLsizei *length, char *buffer) const;
 
     void compile();
     bool isCompiled() const { return mCompiled; }

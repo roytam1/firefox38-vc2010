@@ -542,8 +542,7 @@ bool ValidateES3TexImageParameters(Context *context, GLenum target, GLint level,
             return false;
         }
 
-        const gl::InternalFormat &formatInfo = gl::GetInternalFormatInfo(sizedFormat);
-        size_t copyBytes = formatInfo.computeBlockSize(type, width, height);
+        size_t copyBytes = widthSize * heightSize * depthSize * pixelBytes;
         size_t offset = reinterpret_cast<size_t>(pixels);
 
         if (!rx::IsUnsignedAdditionSafe(offset, copyBytes) ||
@@ -556,15 +555,12 @@ bool ValidateES3TexImageParameters(Context *context, GLenum target, GLint level,
 
         // ...data is not evenly divisible into the number of bytes needed to store in memory a datum
         // indicated by type.
-        if (!isCompressed)
-        {
-            size_t dataBytesPerPixel = static_cast<size_t>(gl::GetTypeInfo(type).bytes);
+        size_t dataBytesPerPixel = static_cast<size_t>(gl::GetTypeInfo(type).bytes);
 
-            if ((offset % dataBytesPerPixel) != 0)
-            {
-                context->recordError(Error(GL_INVALID_OPERATION));
-                return false;
-            }
+        if ((offset % dataBytesPerPixel) != 0)
+        {
+            context->recordError(Error(GL_INVALID_OPERATION));
+            return false;
         }
 
         // ...the buffer object's data store is currently mapped.

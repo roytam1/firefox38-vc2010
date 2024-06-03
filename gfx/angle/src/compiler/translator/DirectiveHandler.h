@@ -29,8 +29,7 @@ class TDirectiveHandler : public pp::DirectiveHandler
 
     virtual void handlePragma(const pp::SourceLocation& loc,
                               const std::string& name,
-                              const std::string& value,
-                              bool stdgl);
+                              const std::string& value);
 
     virtual void handleExtension(const pp::SourceLocation& loc,
                                  const std::string& name,

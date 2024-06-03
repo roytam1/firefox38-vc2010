@@ -391,9 +391,8 @@ void GenerateCaps(IDirect3D9 *d3d9, IDirect3DDevice9 *device, D3DDEVTYPE deviceT
 
     caps->maxVertexUniformBlocks = 0;
 
-    // SM3 only supports 11 output variables, with a special 12th register for PSIZE.
-    const size_t MAX_VERTEX_OUTPUT_VECTORS_SM3 = 9;
-    const size_t MAX_VERTEX_OUTPUT_VECTORS_SM2 = 7;
+    const size_t MAX_VERTEX_OUTPUT_VECTORS_SM3 = 10;
+    const size_t MAX_VERTEX_OUTPUT_VECTORS_SM2 = 8;
     caps->maxVertexOutputComponents = ((deviceCaps.VertexShaderVersion >= D3DVS_VERSION(3, 0)) ? MAX_VERTEX_OUTPUT_VECTORS_SM3
                                                                                                : MAX_VERTEX_OUTPUT_VECTORS_SM2) * 4;
 
@@ -461,7 +460,7 @@ void GenerateCaps(IDirect3D9 *d3d9, IDirect3DDevice9 *device, D3DDEVTYPE deviceT
         extensions->textureNPOT = !(deviceCaps.TextureCaps & D3DPTEXTURECAPS_POW2) &&
                                       !(deviceCaps.TextureCaps & D3DPTEXTURECAPS_CUBEMAP_POW2) &&
                                       !(deviceCaps.TextureCaps & D3DPTEXTURECAPS_NONPOW2CONDITIONAL) &&
-                                      !(!isWindowsVistaOrGreater() && adapterId.VendorId == VENDOR_ID_AMD);
+                                      !(isWindowsVistaOrGreater() && adapterId.VendorId == VENDOR_ID_AMD);
     }
     else
     {
@@ -533,23 +532,16 @@ void MakeValidSize(bool isImage, D3DFORMAT format, GLsizei *requestWidth, GLsize
     *levelOffset = upsampleCount;
 }
 
-gl::Error GetAttachmentRenderTarget(gl::FramebufferAttachment *attachment, RenderTarget9 **outRT)
+RenderTarget9 *GetAttachmentRenderTarget(gl::FramebufferAttachment *attachment)
 {
-    RenderTarget *renderTarget = NULL;
-    gl::Error error = rx::GetAttachmentRenderTarget(attachment, &renderTarget);
-    if (error.isError())
-    {
-        return error;
-    }
-    *outRT = RenderTarget9::makeRenderTarget9(renderTarget);
-    return gl::Error(GL_NO_ERROR);
+    RenderTarget *renderTarget = rx::GetAttachmentRenderTarget(attachment);
+    return RenderTarget9::makeRenderTarget9(renderTarget);
 }
 
 Workarounds GenerateWorkarounds()
 {
     Workarounds workarounds;
     workarounds.mrtPerfWorkaround = true;
-    workarounds.setDataFasterThanImageUpload = false;
     return workarounds;
 }
 

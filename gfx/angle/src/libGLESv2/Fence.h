@@ -4,13 +4,10 @@
 // found in the LICENSE file.
 //
 
-// Fence.h: Defines the gl::FenceNV and gl::FenceSync classes, which support the GL_NV_fence
-// extension and GLES3 sync objects.
+// Fence.h: Defines the gl::Fence class, which supports the GL_NV_fence extension.
 
 #ifndef LIBGLESV2_FENCE_H_
 #define LIBGLESV2_FENCE_H_
-
-#include "libGLESv2/Error.h"
 
 #include "common/angleutils.h"
 #include "common/RefCountObject.h"
@@ -18,8 +15,7 @@
 namespace rx
 {
 class Renderer;
-class FenceNVImpl;
-class FenceSyncImpl;
+class FenceImpl;
 }
 
 namespace gl
@@ -28,13 +24,14 @@ namespace gl
 class FenceNV
 {
   public:
-    explicit FenceNV(rx::FenceNVImpl *impl);
+    explicit FenceNV(rx::Renderer *renderer);
     virtual ~FenceNV();
 
     GLboolean isFence() const;
-    Error setFence(GLenum condition);
-    Error testFence(GLboolean *outResult);
-    Error finishFence();
+    void setFence(GLenum condition);
+    GLboolean testFence();
+    void finishFence();
+    GLint getFencei(GLenum pname);
 
     GLboolean getStatus() const { return mStatus; }
     GLuint getCondition() const { return mCondition; }
@@ -42,9 +39,7 @@ class FenceNV
   private:
     DISALLOW_COPY_AND_ASSIGN(FenceNV);
 
-    rx::FenceNVImpl *mFence;
-
-    bool mIsSet;
+    rx::FenceImpl *mFence;
 
     GLboolean mStatus;
     GLenum mCondition;
@@ -53,20 +48,21 @@ class FenceNV
 class FenceSync : public RefCountObject
 {
   public:
-    explicit FenceSync(rx::FenceSyncImpl *impl, GLuint id);
+    explicit FenceSync(rx::Renderer *renderer, GLuint id);
     virtual ~FenceSync();
 
-    Error set(GLenum condition);
-    Error clientWait(GLbitfield flags, GLuint64 timeout, GLenum *outResult);
-    Error serverWait(GLbitfield flags, GLuint64 timeout);
-    Error getStatus(GLint *outResult) const;
+    void set(GLenum condition);
+    GLenum clientWait(GLbitfield flags, GLuint64 timeout);
+    void serverWait();
+    GLenum getStatus() const;
 
     GLuint getCondition() const { return mCondition; }
 
   private:
     DISALLOW_COPY_AND_ASSIGN(FenceSync);
 
-    rx::FenceSyncImpl *mFence;
+    rx::FenceImpl *mFence;
+    LONGLONG mCounterFrequency;
 
     GLenum mCondition;
 };

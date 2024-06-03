@@ -61,9 +61,6 @@ class BlockLayoutEncoder
     static const size_t BytesPerComponent = 4u;
     static const unsigned int ComponentsPerRegister = 4u;
 
-    static size_t getBlockRegister(const BlockMemberInfo &info);
-    static size_t getBlockRegisterElement(const BlockMemberInfo &info);
-
   protected:
     size_t mCurrentOffset;
 

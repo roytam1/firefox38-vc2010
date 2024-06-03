@@ -17,7 +17,7 @@ namespace rx
 {
 
 // TODO: AddRef the incoming surface to take ownership instead of expecting that its ref is being given.
-RenderTarget9::RenderTarget9(Renderer *renderer, IDirect3DSurface9 *surface, GLenum internalFormatOverride)
+RenderTarget9::RenderTarget9(Renderer *renderer, IDirect3DSurface9 *surface)
 {
     mRenderer = Renderer9::makeRenderer9(renderer);
     mRenderTarget = surface;
@@ -35,10 +35,6 @@ RenderTarget9::RenderTarget9(Renderer *renderer, IDirect3DSurface9 *surface, GLe
         mInternalFormat = d3dFormatInfo.internalFormat;
         mActualFormat = d3dFormatInfo.internalFormat;
         mSamples = d3d9_gl::GetSamplesCount(description.MultiSampleType);
-
-        if (internalFormatOverride) {
-            mInternalFormat = internalFormatOverride;
-        }
     }
 }
 

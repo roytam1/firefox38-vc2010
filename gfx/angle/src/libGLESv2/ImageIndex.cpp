@@ -48,11 +48,6 @@ ImageIndex ImageIndex::Make3D(GLint mipIndex, GLint layerIndex)
     return ImageIndex(GL_TEXTURE_3D, mipIndex, layerIndex);
 }
 
-ImageIndex ImageIndex::MakeInvalid()
-{
-    return ImageIndex(GL_NONE, -1, -1);
-}
-
 ImageIndex::ImageIndex(GLenum typeIn, GLint mipIndexIn, GLint layerIndexIn)
     : type(typeIn),
       mipIndex(mipIndexIn),

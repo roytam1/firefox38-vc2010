@@ -14,7 +14,6 @@
 #include "libGLESv2/Buffer.h"
 #include "libGLESv2/ProgramBinary.h"
 #include "libGLESv2/VertexAttribute.h"
-#include "libGLESv2/State.h"
 
 namespace
 {
@@ -83,8 +82,8 @@ VertexDataManager::~VertexDataManager()
     }
 }
 
-gl::Error VertexDataManager::prepareVertexData(const gl::State &state, GLint start, GLsizei count,
-                                               TranslatedAttribute *translated, GLsizei instances)
+gl::Error VertexDataManager::prepareVertexData(const gl::VertexAttribute attribs[], const gl::VertexAttribCurrentValueData currentValues[],
+                                               gl::ProgramBinary *programBinary, GLint start, GLsizei count, TranslatedAttribute *translated, GLsizei instances)
 {
     if (!mStreamingBuffer)
     {
@@ -94,22 +93,20 @@ gl::Error VertexDataManager::prepareVertexData(const gl::State &state, GLint sta
     // Invalidate static buffers that don't contain matching attributes
     for (int attributeIndex = 0; attributeIndex < gl::MAX_VERTEX_ATTRIBS; attributeIndex++)
     {
-        translated[attributeIndex].active = (state.getCurrentProgramBinary()->getSemanticIndex(attributeIndex) != -1);
-        const gl::VertexAttribute &curAttrib = state.getVertexAttribState(attributeIndex);
+        translated[attributeIndex].active = (programBinary->getSemanticIndex(attributeIndex) != -1);
 
-        if (translated[attributeIndex].active && curAttrib.enabled)
+        if (translated[attributeIndex].active && attribs[attributeIndex].enabled)
         {
-            invalidateMatchingStaticData(curAttrib, state.getVertexAttribCurrentValue(attributeIndex));
+            invalidateMatchingStaticData(attribs[attributeIndex], currentValues[attributeIndex]);
         }
     }
 
     // Reserve the required space in the buffers
     for (int i = 0; i < gl::MAX_VERTEX_ATTRIBS; i++)
     {
-        const gl::VertexAttribute &curAttrib = state.getVertexAttribState(i);
-        if (translated[i].active && curAttrib.enabled)
+        if (translated[i].active && attribs[i].enabled)
         {
-            gl::Error error = reserveSpaceForAttrib(curAttrib, state.getVertexAttribCurrentValue(i), count, instances);
+            gl::Error error = reserveSpaceForAttrib(attribs[i], currentValues[i], count, instances);
             if (error.isError())
             {
                 return error;
@@ -120,14 +117,12 @@ gl::Error VertexDataManager::prepareVertexData(const gl::State &state, GLint sta
     // Perform the vertex data translations
     for (int i = 0; i < gl::MAX_VERTEX_ATTRIBS; i++)
     {
-        const gl::VertexAttribute &curAttrib = state.getVertexAttribState(i);
         if (translated[i].active)
         {
-            if (curAttrib.enabled)
+            if (attribs[i].enabled)
             {
-                gl::Error error = storeAttribute(curAttrib, state.getVertexAttribCurrentValue(i),
-                                                 &translated[i], start, count, instances);
-
+                gl::Error error = storeAttribute(attribs[i], currentValues[i], &translated[i],
+                                                 start, count, instances);
                 if (error.isError())
                 {
                     return error;
@@ -140,7 +135,7 @@ gl::Error VertexDataManager::prepareVertexData(const gl::State &state, GLint sta
                     mCurrentValueBuffer[i] = new StreamingVertexBufferInterface(mRenderer, CONSTANT_VERTEX_BUFFER_SIZE);
                 }
 
-                gl::Error error = storeCurrentValue(curAttrib, state.getVertexAttribCurrentValue(i), &translated[i],
+                gl::Error error = storeCurrentValue(attribs[i], currentValues[i], &translated[i],
                                                     &mCurrentValue[i], &mCurrentValueOffsets[i],
                                                     mCurrentValueBuffer[i]);
                 if (error.isError())
@@ -153,15 +148,14 @@ gl::Error VertexDataManager::prepareVertexData(const gl::State &state, GLint sta
 
     for (int i = 0; i < gl::MAX_VERTEX_ATTRIBS; i++)
     {
-        const gl::VertexAttribute &curAttrib = state.getVertexAttribState(i);
-        if (translated[i].active && curAttrib.enabled)
+        if (translated[i].active && attribs[i].enabled)
         {
-            gl::Buffer *buffer = curAttrib.buffer.get();
+            gl::Buffer *buffer = attribs[i].buffer.get();
 
             if (buffer)
             {
                 BufferD3D *bufferImpl = BufferD3D::makeBufferD3D(buffer->getImplementation());
-                bufferImpl->promoteStaticUsage(count * ComputeVertexAttributeTypeSize(curAttrib));
+                bufferImpl->promoteStaticUsage(count * ComputeVertexAttributeTypeSize(attribs[i]));
             }
         }
     }

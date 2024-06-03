@@ -86,7 +86,7 @@ class Buffer11::BufferStorage11
 
     virtual bool copyFromStorage(BufferStorage11 *source, size_t sourceOffset,
                                  size_t size, size_t destOffset) = 0;
-    virtual gl::Error resize(size_t size, bool preserveData) = 0;
+    virtual bool resize(size_t size, bool preserveData) = 0;
 
     virtual void *map(size_t offset, size_t length, GLbitfield access) = 0;
     virtual void unmap() = 0;
@@ -112,12 +112,12 @@ class Buffer11::NativeBuffer11 : public Buffer11::BufferStorage11
 
     virtual bool copyFromStorage(BufferStorage11 *source, size_t sourceOffset,
                                  size_t size, size_t destOffset);
-    virtual gl::Error resize(size_t size, bool preserveData);
+    virtual bool resize(size_t size, bool preserveData);
 
     virtual void *map(size_t offset, size_t length, GLbitfield access);
     virtual void unmap();
 
-    gl::Error setData(D3D11_MAP mapMode, const uint8_t *data, size_t size, size_t offset);
+    bool setData(D3D11_MAP mapMode, const uint8_t *data, size_t size, size_t offset);
 
   private:
     ID3D11Buffer *mNativeBuffer;
@@ -135,7 +135,7 @@ class Buffer11::PackStorage11 : public Buffer11::BufferStorage11
 
     virtual bool copyFromStorage(BufferStorage11 *source, size_t sourceOffset,
                                  size_t size, size_t destOffset);
-    virtual gl::Error resize(size_t size, bool preserveData);
+    virtual bool resize(size_t size, bool preserveData);
 
     virtual void *map(size_t offset, size_t length, GLbitfield access);
     virtual void unmap();
@@ -144,7 +144,7 @@ class Buffer11::PackStorage11 : public Buffer11::BufferStorage11
 
   private:
 
-    gl::Error flushQueuedPackCommand();
+    void flushQueuedPackCommand();
 
     ID3D11Texture2D *mStagingTexture;
     DXGI_FORMAT mTextureFormat;
@@ -195,14 +195,14 @@ gl::Error Buffer11::setData(const void *data, size_t size, GLenum usage)
     return error;
 }
 
-gl::Error Buffer11::getData(const uint8_t **outData)
+void *Buffer11::getData()
 {
     NativeBuffer11 *stagingBuffer = getStagingBuffer();
 
     if (!stagingBuffer)
     {
         // Out-of-memory
-        return gl::Error(GL_OUT_OF_MEMORY, "Failed to get internal staging buffer.");
+        return NULL;
     }
 
     if (stagingBuffer->getDataRevision() > mResolvedDataRevision)
@@ -211,7 +211,7 @@ gl::Error Buffer11::getData(const uint8_t **outData)
         {
             if (!mResolvedData.resize(stagingBuffer->getSize()))
             {
-                return gl::Error(GL_OUT_OF_MEMORY, "Failed to resize data resolve buffer.");
+                return gl::error(GL_OUT_OF_MEMORY, (void*)NULL);
             }
         }
 
@@ -221,7 +221,7 @@ gl::Error Buffer11::getData(const uint8_t **outData)
         HRESULT result = context->Map(stagingBuffer->getNativeBuffer(), 0, D3D11_MAP_READ, 0, &mappedResource);
         if (FAILED(result))
         {
-            return gl::Error(GL_OUT_OF_MEMORY, "Failed to map internal buffer, result: 0x%X.", result);
+            return gl::error(GL_OUT_OF_MEMORY, (void*)NULL);
         }
 
         memcpy(mResolvedData.data(), mappedResource.pData, stagingBuffer->getSize());
@@ -238,14 +238,13 @@ gl::Error Buffer11::getData(const uint8_t **outData)
     {
         if (!mResolvedData.resize(mSize))
         {
-            return gl::Error(GL_OUT_OF_MEMORY, "Failed to resize data resolve buffer.");
+            return gl::error(GL_OUT_OF_MEMORY, (void*)NULL);
         }
     }
 
     ASSERT(mResolvedData.size() >= mSize);
 
-    *outData = mResolvedData.data();
-    return gl::Error(GL_NO_ERROR);
+    return mResolvedData.data();
 }
 
 gl::Error Buffer11::setSubData(const void *data, size_t size, size_t offset)
@@ -266,17 +265,15 @@ gl::Error Buffer11::setSubData(const void *data, size_t size, size_t offset)
         if (stagingBuffer->getSize() < requiredSize)
         {
             bool preserveData = (offset > 0);
-            gl::Error error = stagingBuffer->resize(requiredSize, preserveData);
-            if (error.isError())
+            if (!stagingBuffer->resize(requiredSize, preserveData))
             {
-                return error;
+                return gl::Error(GL_OUT_OF_MEMORY, "Failed to resize internal staging buffer.");
             }
         }
 
-        gl::Error error = stagingBuffer->setData(D3D11_MAP_WRITE, reinterpret_cast<const uint8_t *>(data), size, offset);
-        if (error.isError())
+        if (!stagingBuffer->setData(D3D11_MAP_WRITE, reinterpret_cast<const uint8_t *>(data), size, offset))
         {
-            return error;
+            return gl::Error(GL_OUT_OF_MEMORY, "Failed to set data on internal staging buffer.");
         }
 
         stagingBuffer->setDataRevision(stagingBuffer->getDataRevision() + 1);
@@ -530,7 +527,7 @@ Buffer11::BufferStorage11 *Buffer11::getBufferStorage(BufferUsage usage)
     // resize buffer
     if (directBuffer->getSize() < mSize)
     {
-        if (directBuffer->resize(mSize, true).isError())
+        if (!directBuffer->resize(mSize, true))
         {
             // Out of memory error
             return NULL;
@@ -670,9 +667,6 @@ bool Buffer11::NativeBuffer11::copyFromStorage(BufferStorage11 *source, size_t s
         // Offset bounds are validated at the API layer
         ASSERT(sourceOffset + size <= destOffset + mBufferSize);
         memcpy(destPointer, sourcePointer, size);
-
-        context->Unmap(mNativeBuffer, 0);
-        source->unmap();
     }
     else
     {
@@ -695,7 +689,7 @@ bool Buffer11::NativeBuffer11::copyFromStorage(BufferStorage11 *source, size_t s
     return createBuffer;
 }
 
-gl::Error Buffer11::NativeBuffer11::resize(size_t size, bool preserveData)
+bool Buffer11::NativeBuffer11::resize(size_t size, bool preserveData)
 {
     ID3D11Device *device = mRenderer->getDevice();
     ID3D11DeviceContext *context = mRenderer->getDeviceContext();
@@ -708,7 +702,7 @@ gl::Error Buffer11::NativeBuffer11::resize(size_t size, bool preserveData)
 
     if (FAILED(result))
     {
-        return gl::Error(GL_OUT_OF_MEMORY, "Failed to create internal buffer, result: 0x%X.", result);
+        return gl::error(GL_OUT_OF_MEMORY, false);
     }
 
     if (mNativeBuffer && preserveData)
@@ -733,7 +727,7 @@ gl::Error Buffer11::NativeBuffer11::resize(size_t size, bool preserveData)
 
     mBufferSize = bufferDesc.ByteWidth;
 
-    return gl::Error(GL_NO_ERROR);
+    return true;
 }
 
 void Buffer11::NativeBuffer11::fillBufferDesc(D3D11_BUFFER_DESC* bufferDesc, Renderer *renderer,
@@ -801,7 +795,7 @@ void *Buffer11::NativeBuffer11::map(size_t offset, size_t length, GLbitfield acc
     return static_cast<GLubyte*>(mappedResource.pData) + offset;
 }
 
-gl::Error Buffer11::NativeBuffer11::setData(D3D11_MAP mapMode, const uint8_t *data, size_t size, size_t offset)
+bool Buffer11::NativeBuffer11::setData(D3D11_MAP mapMode, const uint8_t *data, size_t size, size_t offset)
 {
     ID3D11DeviceContext *context = mRenderer->getDeviceContext();
 
@@ -809,7 +803,7 @@ gl::Error Buffer11::NativeBuffer11::setData(D3D11_MAP mapMode, const uint8_t *da
     HRESULT result = context->Map(mNativeBuffer, 0, mapMode, 0, &mappedResource);
     if (FAILED(result))
     {
-        return gl::Error(GL_OUT_OF_MEMORY, "Failed to map internal buffer, result: 0x%X.", result);
+        return gl::error(GL_OUT_OF_MEMORY, false);
     }
 
     uint8_t *offsetBufferPointer = reinterpret_cast<uint8_t *>(mappedResource.pData) + offset;
@@ -817,7 +811,7 @@ gl::Error Buffer11::NativeBuffer11::setData(D3D11_MAP mapMode, const uint8_t *da
 
     context->Unmap(mNativeBuffer, 0);
 
-    return gl::Error(GL_NO_ERROR);
+    return true;
 }
 
 void Buffer11::NativeBuffer11::unmap()
@@ -851,18 +845,18 @@ bool Buffer11::PackStorage11::copyFromStorage(BufferStorage11 *source, size_t so
     return false;
 }
 
-gl::Error Buffer11::PackStorage11::resize(size_t size, bool preserveData)
+bool Buffer11::PackStorage11::resize(size_t size, bool preserveData)
 {
     if (size != mBufferSize)
     {
         if (!mMemoryBuffer.resize(size))
         {
-            return gl::Error(GL_OUT_OF_MEMORY, "Failed to resize internal buffer storage.");
+            return false;
         }
         mBufferSize = size;
     }
 
-    return gl::Error(GL_NO_ERROR);
+    return true;
 }
 
 void *Buffer11::PackStorage11::map(size_t offset, size_t length, GLbitfield access)
@@ -873,12 +867,7 @@ void *Buffer11::PackStorage11::map(size_t offset, size_t length, GLbitfield acce
     //  and if D3D packs the staging texture memory identically to how we would fill
     //  the pack buffer according to the current pack state.
 
-    gl::Error error = flushQueuedPackCommand();
-    if (error.isError())
-    {
-        return NULL;
-    }
-
+    flushQueuedPackCommand();
     mDataModified = (mDataModified || (access & GL_MAP_WRITE_BIT) != 0);
 
     return mMemoryBuffer.data() + offset;
@@ -891,12 +880,7 @@ void Buffer11::PackStorage11::unmap()
 
 gl::Error Buffer11::PackStorage11::packPixels(ID3D11Texture2D *srcTexure, UINT srcSubresource, const PackPixelsParams &params)
 {
-    gl::Error error = flushQueuedPackCommand();
-    if (error.isError())
-    {
-        return error;
-    }
-
+    flushQueuedPackCommand();
     mQueuedPackCommand = new PackPixelsParams(params);
 
     D3D11_TEXTURE2D_DESC textureDesc;
@@ -961,21 +945,15 @@ gl::Error Buffer11::PackStorage11::packPixels(ID3D11Texture2D *srcTexure, UINT s
     return gl::Error(GL_NO_ERROR);
 }
 
-gl::Error Buffer11::PackStorage11::flushQueuedPackCommand()
+void Buffer11::PackStorage11::flushQueuedPackCommand()
 {
     ASSERT(mMemoryBuffer.size() > 0);
 
     if (mQueuedPackCommand)
     {
-        gl::Error error = mRenderer->packPixels(mStagingTexture, *mQueuedPackCommand, mMemoryBuffer.data());
+        mRenderer->packPixels(mStagingTexture, *mQueuedPackCommand, mMemoryBuffer.data());
         SafeDelete(mQueuedPackCommand);
-        if (error.isError())
-        {
-            return error;
-        }
     }
-
-    return gl::Error(GL_NO_ERROR);
 }
 
 }

@@ -37,7 +37,6 @@ Shader::Shader(ResourceManager *manager, rx::ShaderImpl *impl, GLenum type, GLui
 
 Shader::~Shader()
 {
-    SafeDelete(mShader);
 }
 
 GLuint Shader::getHandle() const
@@ -116,12 +115,6 @@ void Shader::getSource(GLsizei bufSize, GLsizei *length, char *buffer) const
 void Shader::getTranslatedSource(GLsizei bufSize, GLsizei *length, char *buffer) const
 {
     getSourceImpl(mShader->getTranslatedSource(), bufSize, length, buffer);
-}
-
-void Shader::getTranslatedSourceWithDebugInfo(GLsizei bufSize, GLsizei *length, char *buffer) const
-{
-    std::string debugInfo(mShader->getDebugInfo());
-    getSourceImpl(debugInfo, bufSize, length, buffer);
 }
 
 void Shader::compile()

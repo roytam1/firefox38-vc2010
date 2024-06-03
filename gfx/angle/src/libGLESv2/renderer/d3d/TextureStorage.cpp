@@ -18,8 +18,11 @@
 namespace rx
 {
 
+unsigned int TextureStorage::mCurrentTextureSerial = 1;
+
 TextureStorage::TextureStorage()
-    : mFirstRenderTargetSerial(0),
+    : mTextureSerial(issueTextureSerial()),
+      mFirstRenderTargetSerial(0),
       mRenderTargetSerialsLayerStride(0)
 {}
 
@@ -33,6 +36,16 @@ unsigned int TextureStorage::getRenderTargetSerial(const gl::ImageIndex &index) 
 {
     unsigned int layerOffset = (index.hasLayer() ? (static_cast<unsigned int>(index.layerIndex) * mRenderTargetSerialsLayerStride) : 0);
     return mFirstRenderTargetSerial + static_cast<unsigned int>(index.mipIndex) + layerOffset;
+}
+
+unsigned int TextureStorage::getTextureSerial() const
+{
+    return mTextureSerial;
+}
+
+unsigned int TextureStorage::issueTextureSerial()
+{
+    return mCurrentTextureSerial++;
 }
 
 }

@@ -77,9 +77,9 @@ class Program
 
     void bindAttributeLocation(GLuint index, const char *name);
 
-    Error link(const Caps &caps);
+    bool link(const Caps &caps);
     bool isLinked();
-    Error setProgramBinary(GLenum binaryFormat, const void *binary, GLsizei length);
+    bool setProgramBinary(GLenum binaryFormat, const void *binary, GLsizei length);
     ProgramBinary *getProgramBinary() const;
 
     int getInfoLogLength() const;

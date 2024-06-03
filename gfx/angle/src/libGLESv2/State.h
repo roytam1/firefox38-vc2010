@@ -35,6 +35,8 @@ class State
     void initialize(const Caps& caps, GLuint clientVersion);
     void reset();
 
+    void setContext(Context *context) { mContext = context; }
+
     // State chunk getters
     const RasterizerState &getRasterizerState() const;
     const BlendState &getBlendState() const;
@@ -197,7 +199,6 @@ class State
     GLuint getIndexedTransformFeedbackBufferId(GLuint index) const;
     Buffer *getIndexedTransformFeedbackBuffer(GLuint index) const;
     GLuint getIndexedTransformFeedbackBufferOffset(GLuint index) const;
-    size_t getTransformFeedbackBufferIndexRange() const;
 
     // GL_COPY_[READ/WRITE]_BUFFER
     void setCopyReadBufferBinding(Buffer *buffer);
@@ -219,6 +220,7 @@ class State
                               bool normalized, bool pureInteger, GLsizei stride, const void *pointer);
     const VertexAttribute &getVertexAttribState(unsigned int attribNum) const;
     const VertexAttribCurrentValueData &getVertexAttribCurrentValue(unsigned int attribNum) const;
+    const VertexAttribCurrentValueData *getVertexAttribCurrentValues() const;
     const void *getVertexAttribPointer(unsigned int attribNum) const;
 
     // Pixel pack state manipulation
@@ -245,9 +247,7 @@ class State
   private:
     DISALLOW_COPY_AND_ASSIGN(State);
 
-    // Cached values from Context's caps
-    GLuint mMaxDrawBuffers;
-    GLuint mMaxCombinedTextureImageUnits;
+    Context *mContext;
 
     ColorF mColorClearValue;
     GLclampf mDepthClearValue;
@@ -283,8 +283,7 @@ class State
     GLuint mCurrentProgramId;
     BindingPointer<ProgramBinary> mCurrentProgramBinary;
 
-    typedef std::vector<VertexAttribCurrentValueData> VertexAttribVector;
-    VertexAttribVector mVertexAttribCurrentValues; // From glVertexAttrib
+    VertexAttribCurrentValueData mVertexAttribCurrentValues[MAX_VERTEX_ATTRIBS]; // From glVertexAttrib
     VertexArray *mVertexArray;
 
     // Texture and sampler bindings
@@ -301,12 +300,11 @@ class State
     ActiveQueryMap mActiveQueries;
 
     BindingPointer<Buffer> mGenericUniformBuffer;
-    typedef std::vector< OffsetBindingPointer<Buffer> > BufferVector;
-    BufferVector mUniformBuffers;
+    OffsetBindingPointer<Buffer> mUniformBuffers[IMPLEMENTATION_MAX_COMBINED_SHADER_UNIFORM_BUFFERS];
 
     BindingPointer<TransformFeedback> mTransformFeedback;
     BindingPointer<Buffer> mGenericTransformFeedbackBuffer;
-    BufferVector mTransformFeedbackBuffers;
+    OffsetBindingPointer<Buffer> mTransformFeedbackBuffers[IMPLEMENTATION_MAX_TRANSFORM_FEEDBACK_BUFFERS];
 
     BindingPointer<Buffer> mCopyReadBuffer;
     BindingPointer<Buffer> mCopyWriteBuffer;

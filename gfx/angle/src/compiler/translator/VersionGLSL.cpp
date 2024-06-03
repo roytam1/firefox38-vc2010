@@ -26,12 +26,18 @@ static const int GLSL_VERSION_120 = 120;
 //    GLSL 1.2 relaxed the restriction on arrays, section 5.8: "Variables that
 //    are built-in types, entire structures or arrays... are all l-values."
 //
-TVersionGLSL::TVersionGLSL(sh::GLenum type, const TPragma &pragma)
+// TODO(alokp): The following two cases of invariant decalaration get lost
+// during parsing - they do not get carried over to the intermediate tree.
+// Handle these cases:
+// 1. When a pragma is used to force all output variables to be invariant:
+//    - #pragma STDGL invariant(all)
+// 2. When a previously decalared or built-in variable is marked invariant:
+//    - invariant gl_Position;
+//    - varying vec3 color; invariant color;
+//
+TVersionGLSL::TVersionGLSL(sh::GLenum type)
+    : mVersion(GLSL_VERSION_110)
 {
-    if (pragma.stdgl.invariantAll)
-        mVersion = GLSL_VERSION_120;
-    else
-        mVersion = GLSL_VERSION_110;
 }
 
 void TVersionGLSL::visitSymbol(TIntermSymbol *node)

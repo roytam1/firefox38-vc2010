@@ -16,9 +16,8 @@
 
 namespace gl
 {
-class ProgramBinary;
-class State;
 struct VertexAttribute;
+class ProgramBinary;
 struct VertexAttribCurrentValueData;
 }
 
@@ -53,8 +52,8 @@ class VertexDataManager
     VertexDataManager(rx::Renderer *renderer);
     virtual ~VertexDataManager();
 
-    gl::Error prepareVertexData(const gl::State &state, GLint start, GLsizei count,
-                                TranslatedAttribute *outAttribs, GLsizei instances);
+    gl::Error prepareVertexData(const gl::VertexAttribute attribs[], const gl::VertexAttribCurrentValueData currentValues[],
+                                gl::ProgramBinary *programBinary, GLint start, GLsizei count, TranslatedAttribute *outAttribs, GLsizei instances);
 
   private:
     DISALLOW_COPY_AND_ASSIGN(VertexDataManager);

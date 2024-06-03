@@ -94,7 +94,6 @@ const char *GetOperatorString(TOperator op)
       case EOpLogicalXor: return "^^";
       case EOpLogicalAnd: return "&&";
       case EOpNegative: return "-";
-      case EOpPositive: return "+";
       case EOpVectorLogicalNot: return "not";
       case EOpLogicalNot: return "!";
       case EOpPostIncrement: return "++";

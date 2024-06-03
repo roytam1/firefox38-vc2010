@@ -4,10 +4,10 @@
 // found in the LICENSE file.
 //
 
-// Fence11.h: Defines the rx::FenceNV11 and rx::FenceSync11 classes which implement rx::FenceNVImpl and rx::FenceSyncImpl.
+// Fence11.h: Defines the rx::Fence11 class which implements rx::FenceImpl.
 
-#ifndef LIBGLESV2_RENDERER_FENCE11_H_
-#define LIBGLESV2_RENDERER_FENCE11_H_
+#ifndef LIBGLESV2_RENDERER_Fence11_H_
+#define LIBGLESV2_RENDERER_Fence11_H_
 
 #include "libGLESv2/renderer/FenceImpl.h"
 
@@ -15,46 +15,22 @@ namespace rx
 {
 class Renderer11;
 
-class FenceNV11 : public FenceNVImpl
+class Fence11 : public FenceImpl
 {
   public:
-    explicit FenceNV11(Renderer11 *renderer);
-    virtual ~FenceNV11();
+    explicit Fence11(rx::Renderer11 *renderer);
+    virtual ~Fence11();
 
-    gl::Error set();
-    gl::Error test(bool flushCommandBuffer, GLboolean *outFinished);
-    gl::Error finishFence(GLboolean *outFinished);
-
-  private:
-    DISALLOW_COPY_AND_ASSIGN(FenceNV11);
-
-    template<class T> friend gl::Error FenceSetHelper(T *fence);
-    template<class T> friend gl::Error FenceTestHelper(T *fence, bool flushCommandBuffer, GLboolean *outFinished);
-
-    Renderer11 *mRenderer;
-    ID3D11Query *mQuery;
-};
-
-class FenceSync11 : public FenceSyncImpl
-{
-  public:
-    explicit FenceSync11(Renderer11 *renderer);
-    virtual ~FenceSync11();
-
-    gl::Error set();
-    gl::Error clientWait(GLbitfield flags, GLuint64 timeout, GLenum *outResult);
-    gl::Error serverWait(GLbitfield flags, GLuint64 timeout);
-    gl::Error getStatus(GLint *outResult);
+    bool isSet() const;
+    void set();
+    bool test(bool flushCommandBuffer);
+    bool hasError() const;
 
   private:
-    DISALLOW_COPY_AND_ASSIGN(FenceSync11);
+    DISALLOW_COPY_AND_ASSIGN(Fence11);
 
-    template<class T> friend gl::Error FenceSetHelper(T *fence);
-    template<class T> friend gl::Error FenceTestHelper(T *fence, bool flushCommandBuffer, GLboolean *outFinished);
-
-    Renderer11 *mRenderer;
+    rx::Renderer11 *mRenderer;
     ID3D11Query *mQuery;
-    LONGLONG mCounterFrequency;
 };
 
 }

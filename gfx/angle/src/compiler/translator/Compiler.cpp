@@ -29,27 +29,24 @@
 
 bool IsWebGLBasedSpec(ShShaderSpec spec)
 {
-    return (spec == SH_WEBGL_SPEC ||
-            spec == SH_CSS_SHADERS_SPEC ||
-            spec == SH_WEBGL2_SPEC);
+     return spec == SH_WEBGL_SPEC || spec == SH_CSS_SHADERS_SPEC;
 }
 
 size_t GetGlobalMaxTokenSize(ShShaderSpec spec)
 {
     // WebGL defines a max token legnth of 256, while ES2 leaves max token
     // size undefined. ES3 defines a max size of 1024 characters.
-    switch (spec)
+    if (IsWebGLBasedSpec(spec))
     {
-      case SH_WEBGL_SPEC:
-      case SH_CSS_SHADERS_SPEC:
         return 256;
-      default:
+    }
+    else
+    {
         return 1024;
     }
 }
 
 namespace {
-
 class TScopedPoolAllocator
 {
   public:
@@ -85,24 +82,6 @@ class TScopedSymbolTableLevel
   private:
     TSymbolTable* mTable;
 };
-
-int MapSpecToShaderVersion(ShShaderSpec spec)
-{
-    switch (spec)
-    {
-      case SH_GLES2_SPEC:
-      case SH_WEBGL_SPEC:
-      case SH_CSS_SHADERS_SPEC:
-        return 100;
-      case SH_GLES3_SPEC:
-      case SH_WEBGL2_SPEC:
-        return 300;
-      default:
-        UNREACHABLE();
-        return 0;
-    }
-}
-
 }  // namespace
 
 TShHandleBase::TShHandleBase()
@@ -199,21 +178,9 @@ bool TCompiler::compile(const char* const shaderStrings[],
         (parseContext.treeRoot != NULL);
 
     shaderVersion = parseContext.getShaderVersion();
-    if (success && MapSpecToShaderVersion(shaderSpec) < shaderVersion)
-    {
-        infoSink.info.prefix(EPrefixError);
-        infoSink.info << "unsupported shader version";
-        success = false;
-    }
 
     if (success)
     {
-        mPragma = parseContext.pragma();
-        if (mPragma.stdgl.invariantAll)
-        {
-            symbolTable.setGlobalInvariant();
-        }
-
         TIntermNode* root = parseContext.treeRoot;
         success = intermediate.postProcess(root);
 
@@ -393,8 +360,7 @@ void TCompiler::setResourceString()
               << ":MaxVertexOutputVectors:" << compileResources.MaxVertexOutputVectors
               << ":MaxFragmentInputVectors:" << compileResources.MaxFragmentInputVectors
               << ":MinProgramTexelOffset:" << compileResources.MinProgramTexelOffset
-              << ":MaxProgramTexelOffset:" << compileResources.MaxProgramTexelOffset
-              << ":NV_draw_buffers:" << compileResources.NV_draw_buffers;
+              << ":MaxProgramTexelOffset:" << compileResources.MaxProgramTexelOffset;
 
     builtInResourcesString = strstream.str();
 }
@@ -411,6 +377,7 @@ void TCompiler::clearResults()
     uniforms.clear();
     expandedUniforms.clear();
     varyings.clear();
+    expandedVaryings.clear();
     interfaceBlocks.clear();
 
     builtInFunctionEmulator.Cleanup();
@@ -540,12 +507,13 @@ void TCompiler::collectVariables(TIntermNode* root)
                                  &uniforms,
                                  &varyings,
                                  &interfaceBlocks,
-                                 hashFunction,
-                                 symbolTable);
+                                 hashFunction);
     root->traverse(&collect);
 
-    // This is for enforcePackingRestriction().
-    sh::ExpandUniforms(uniforms, &expandedUniforms);
+    // For backwards compatiblity with ShGetVariableInfo, expand struct
+    // uniforms and varyings into separate variables for each field.
+    sh::ExpandVariables(uniforms, &expandedUniforms);
+    sh::ExpandVariables(varyings, &expandedVaryings);
 }
 
 bool TCompiler::enforcePackingRestrictions()
@@ -612,11 +580,4 @@ ShArrayIndexClampingStrategy TCompiler::getArrayIndexClampingStrategy() const
 const BuiltInFunctionEmulator& TCompiler::getBuiltInFunctionEmulator() const
 {
     return builtInFunctionEmulator;
-}
-
-void TCompiler::writePragma()
-{
-    TInfoSinkBase &sink = infoSink.obj;
-    if (mPragma.stdgl.invariantAll)
-        sink << "#pragma STDGL invariant(all)\n";
 }

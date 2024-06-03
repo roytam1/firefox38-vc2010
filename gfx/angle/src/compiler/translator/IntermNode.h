@@ -45,7 +45,6 @@ enum TOperator
     //
 
     EOpNegative,
-    EOpPositive,
     EOpLogicalNot,
     EOpVectorLogicalNot,
 
@@ -266,7 +265,6 @@ class TIntermTyped : public TIntermNode
     virtual bool hasSideEffects() const = 0;
 
     void setType(const TType &t) { mType = t; }
-    void setTypePreservePrecision(const TType &t);
     const TType &getType() const { return mType; }
     TType *getTypePointer() { return &mType; }
 
@@ -614,9 +612,6 @@ class TIntermAggregate : public TIntermOperator
     bool getUseEmulatedFunction() { return mUseEmulatedFunction; }
 
     virtual void enqueueChildren(std::queue<TIntermNode *> *nodeQueue) const;
-
-    void setPrecisionFromChildren();
-    void setBuiltInFunctionPrecision();
 
   protected:
     TIntermAggregate(const TIntermAggregate &); // disallow copy constructor

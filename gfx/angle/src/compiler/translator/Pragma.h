@@ -7,23 +7,13 @@
 #ifndef COMPILER_PRAGMA_H_
 #define COMPILER_PRAGMA_H_
 
-struct TPragma
-{
-    struct STDGL
-    {
-        STDGL() : invariantAll(false) { }
-
-        bool invariantAll;
-    };
-
-
+struct TPragma {
     // By default optimization is turned on and debug is turned off.
     TPragma() : optimize(true), debug(false) { }
     TPragma(bool o, bool d) : optimize(o), debug(d) { }
 
     bool optimize;
     bool debug;
-    STDGL stdgl;
 };
 
 #endif // COMPILER_PRAGMA_H_

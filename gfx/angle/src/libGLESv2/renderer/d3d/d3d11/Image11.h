@@ -11,7 +11,6 @@
 #define LIBGLESV2_RENDERER_IMAGE11_H_
 
 #include "libGLESv2/renderer/d3d/ImageD3D.h"
-#include "libGLESv2/ImageIndex.h"
 
 #include "common/debug.h"
 
@@ -34,11 +33,14 @@ class Image11 : public ImageD3D
 
     static Image11 *makeImage11(Image *img);
 
-    static gl::Error generateMipmap(Image11 *dest, Image11 *src);
+    static void generateMipmap(Image11 *dest, Image11 *src);
 
     virtual bool isDirty() const;
 
-    virtual gl::Error copyToStorage(TextureStorage *storage, const gl::ImageIndex &index, const gl::Box &region);
+    virtual gl::Error copyToStorage2D(TextureStorage *storage, int level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height);
+    virtual gl::Error copyToStorageCube(TextureStorage *storage, int face, int level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height);
+    virtual gl::Error copyToStorage3D(TextureStorage *storage, int level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth);
+    virtual gl::Error copyToStorage2DArray(TextureStorage *storage, int level, GLint xoffset, GLint yoffset, GLint arrayLayer, GLsizei width, GLsizei height);
 
     virtual bool redefine(Renderer *renderer, GLenum target, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, bool forceRelease);
 
@@ -49,26 +51,24 @@ class Image11 : public ImageD3D
     virtual gl::Error loadCompressedData(GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth,
                                          const void *input);
 
-    virtual gl::Error copy(GLint xoffset, GLint yoffset, GLint zoffset, const gl::Rectangle &sourceArea, RenderTarget *source);
-    virtual gl::Error copy(GLint xoffset, GLint yoffset, GLint zoffset, const gl::Rectangle &sourceArea,
-                           const gl::ImageIndex &sourceIndex, TextureStorage *source);
+    virtual void copy(GLint xoffset, GLint yoffset, GLint zoffset, GLint x, GLint y, GLsizei width, GLsizei height, gl::Framebuffer *source);
 
-    gl::Error recoverFromAssociatedStorage();
+    bool recoverFromAssociatedStorage();
     bool isAssociatedStorageValid(TextureStorage11* textureStorage) const;
     void disassociateStorage();
 
   protected:
-    gl::Error map(D3D11_MAP mapType, D3D11_MAPPED_SUBRESOURCE *map);
+    HRESULT map(D3D11_MAP mapType, D3D11_MAPPED_SUBRESOURCE *map);
     void unmap();
 
   private:
     DISALLOW_COPY_AND_ASSIGN(Image11);
 
-    gl::Error copyToStorageImpl(TextureStorage11 *storage11, const gl::ImageIndex &index, const gl::Box &region);
-    gl::Error copy(GLint xoffset, GLint yoffset, GLint zoffset, const gl::Rectangle &sourceArea, ID3D11Texture2D *source, UINT sourceSubResource);
+    gl::Error copyToStorageImpl(TextureStorage11 *storage11, int level, int layerTarget, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height);
 
-    gl::Error getStagingTexture(ID3D11Resource **outStagingTexture, unsigned int *outSubresourceIndex);
-    gl::Error createStagingTexture();
+    ID3D11Resource *getStagingTexture();
+    unsigned int getStagingSubresource();
+    void createStagingTexture();
     void releaseStagingTexture();
 
     Renderer11 *mRenderer;
@@ -79,7 +79,8 @@ class Image11 : public ImageD3D
 
     bool mRecoverFromStorage;
     TextureStorage11 *mAssociatedStorage;
-    gl::ImageIndex mAssociatedImageIndex;
+    int mAssociatedStorageLevel;
+    int mAssociatedStorageLayerTarget;
     unsigned int mRecoveredFromStorageCount;
 };
 

@@ -395,7 +395,6 @@ bool TOutputGLSLBase::visitUnary(Visit visit, TIntermUnary *node)
     switch (node->getOp())
     {
       case EOpNegative: preString = "(-"; break;
-      case EOpPositive: preString = "(+"; break;
       case EOpVectorLogicalNot: preString = "not("; break;
       case EOpLogicalNot: preString = "(!"; break;
 
@@ -650,18 +649,17 @@ bool TOutputGLSLBase::visitAggregate(Visit visit, TIntermAggregate *node)
             mDeclaringVariables = false;
         }
         break;
-      case EOpInvariantDeclaration:
-        // Invariant declaration.
-        ASSERT(visit == PreVisit);
-        {
+      case EOpInvariantDeclaration: {
+            // Invariant declaration.
+            ASSERT(visit == PreVisit);
             const TIntermSequence *sequence = node->getSequence();
             ASSERT(sequence && sequence->size() == 1);
             const TIntermSymbol *symbol = sequence->front()->getAsSymbolNode();
             ASSERT(symbol);
-            out << "invariant " << hashVariableName(symbol->getSymbol());
+            out << "invariant " << symbol->getSymbol() << ";";
+            visitChildren = false;
+            break;
         }
-        visitChildren = false;
-        break;
       case EOpConstructFloat:
         writeTriplet(visit, "float(", NULL, ")");
         break;
@@ -743,7 +741,7 @@ bool TOutputGLSLBase::visitAggregate(Visit visit, TIntermAggregate *node)
         writeBuiltInFunctionTriplet(visit, "notEqual(", useEmulatedFunction);
         break;
       case EOpComma:
-        writeTriplet(visit, "(", ", ", ")");
+        writeTriplet(visit, NULL, ", ", NULL);
         break;
 
       case EOpMod:

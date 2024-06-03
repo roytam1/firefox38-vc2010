@@ -10,13 +10,11 @@
 #ifndef LIBGLESV2_FRAMEBUFFER_H_
 #define LIBGLESV2_FRAMEBUFFER_H_
 
-#include "libGLESv2/Error.h"
+#include <vector>
 
 #include "common/angleutils.h"
 #include "common/RefCountObject.h"
 #include "Constants.h"
-
-#include <vector>
 
 namespace rx
 {
@@ -74,8 +72,9 @@ class Framebuffer
     virtual GLenum completeness() const;
     bool hasValidDepthStencil() const;
 
-    Error invalidate(const Caps &caps, GLsizei numAttachments, const GLenum *attachments);
-    Error invalidateSub(GLsizei numAttachments, const GLenum *attachments, GLint x, GLint y, GLsizei width, GLsizei height);
+    void invalidate(const Caps &caps, GLsizei numAttachments, const GLenum *attachments);
+    void invalidateSub(const Caps &caps, GLsizei numAttachments, const GLenum *attachments,
+                       GLint x, GLint y, GLsizei width, GLsizei height);
 
     // Use this method to retrieve the color buffer map when doing rendering.
     // It will apply a workaround for poor shader performance on some systems
@@ -119,7 +118,7 @@ namespace rx
 class RenderTarget;
 
 // TODO: place this in FramebufferD3D.h
-gl::Error GetAttachmentRenderTarget(gl::FramebufferAttachment *attachment, RenderTarget **outRT);
+RenderTarget *GetAttachmentRenderTarget(gl::FramebufferAttachment *attachment);
 unsigned int GetAttachmentSerial(gl::FramebufferAttachment *attachment);
 
 }

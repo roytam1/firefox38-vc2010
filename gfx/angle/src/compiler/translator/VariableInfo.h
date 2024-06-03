@@ -11,8 +11,6 @@
 
 #include "compiler/translator/IntermNode.h"
 
-class TSymbolTable;
-
 namespace sh
 {
 
@@ -25,8 +23,7 @@ class CollectVariables : public TIntermTraverser
                      std::vector<Uniform> *uniforms,
                      std::vector<Varying> *varyings,
                      std::vector<InterfaceBlock> *interfaceBlocks,
-                     ShHashFunction64 hashFunction,
-                     const TSymbolTable &symbolTable);
+                     ShHashFunction64 hashFunction);
 
     virtual void visitSymbol(TIntermSymbol *symbol);
     virtual bool visitAggregate(Visit, TIntermAggregate *node);
@@ -51,17 +48,13 @@ class CollectVariables : public TIntermTraverser
     bool mFrontFacingAdded;
     bool mFragCoordAdded;
 
-    bool mPositionAdded;
-    bool mPointSizeAdded;
-
     ShHashFunction64 mHashFunction;
-
-    const TSymbolTable &mSymbolTable;
 };
 
-// Expand struct uniforms to flattened lists of split variables
-void ExpandUniforms(const std::vector<Uniform> &compact,
-                    std::vector<ShaderVariable> *expanded);
+// Expand struct variables to flattened lists of split variables
+template <typename VarT>
+void ExpandVariables(const std::vector<VarT> &compact,
+                     std::vector<ShaderVariable> *expanded);
 
 }
 

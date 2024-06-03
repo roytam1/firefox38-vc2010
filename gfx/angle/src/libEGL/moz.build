@@ -55,8 +55,9 @@ DISABLE_STL_WRAPPING = True
 
 LOCAL_INCLUDES += [ '../../include', '../../src' ]
 USE_LIBS += [ 'libGLESv2' ]
+EXTRA_DSO_LDOPTS += [ '../libGLESv2/libGLESv2.lib' ]
 
-GeckoSharedLibrary('libEGL', linkage=None)
+SharedLibrary('libEGL')
 
 RCFILE = SRCDIR + '/libEGL.rc'
 DEFFILE = SRCDIR + '/libEGL.def'

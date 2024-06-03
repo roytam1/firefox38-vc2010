@@ -86,7 +86,7 @@ class Context
     GLuint createRenderbuffer();
     GLuint createSampler();
     GLuint createTransformFeedback();
-    GLsync createFenceSync();
+    GLsync createFenceSync(GLenum condition);
 
     void deleteBuffer(GLuint buffer);
     void deleteShader(GLuint shader);
@@ -130,8 +130,8 @@ class Context
     void bindPixelPackBuffer(GLuint buffer);
     void bindPixelUnpackBuffer(GLuint buffer);
     void useProgram(GLuint program);
-    Error linkProgram(GLuint program);
-    Error setProgramBinary(GLuint program, GLenum binaryFormat, const void *binary, GLint length);
+    void linkProgram(GLuint program);
+    void setProgramBinary(GLuint program, GLenum binaryFormat, const void *binary, GLint length);
     void bindTransformFeedback(GLuint transformFeedback);
 
     Error beginQuery(GLenum target, GLuint query);
@@ -193,7 +193,7 @@ class Context
     Error drawElements(GLenum mode, GLsizei count, GLenum type,
                        const GLvoid *indices, GLsizei instances,
                        const rx::RangeUI &indexRange);
-    Error sync(bool block);   // flush/finish
+    void sync(bool block);   // flush/finish
 
     void recordError(const Error &error);
 

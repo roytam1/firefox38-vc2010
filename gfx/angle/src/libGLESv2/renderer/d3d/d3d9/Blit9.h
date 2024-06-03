@@ -30,8 +30,6 @@ class Blit9
     explicit Blit9(Renderer9 *renderer);
     ~Blit9();
 
-    gl::Error initialize();
-
     // Copy from source surface to dest surface.
     // sourceRect, xoffset, yoffset are in D3D coordinates (0,0 in upper-left)
     gl::Error copy2D(gl::Framebuffer *framebuffer, const RECT &sourceRect, GLenum destFormat, GLint xoffset, GLint yoffset, TextureStorage *storage, GLint level);
@@ -49,9 +47,10 @@ class Blit9
   private:
     rx::Renderer9 *mRenderer;
 
-    bool mGeometryLoaded;
     IDirect3DVertexBuffer9 *mQuadVertexBuffer;
     IDirect3DVertexDeclaration9 *mQuadVertexDeclaration;
+
+    void initGeometry();
 
     gl::Error setFormatConvertShaders(GLenum destFormat);
 
@@ -77,7 +76,7 @@ class Blit9
 
     template <class D3DShaderType>
     gl::Error setShader(ShaderId source, const char *profile,
-                        gl::Error (Renderer9::*createShader)(const DWORD *, size_t length, D3DShaderType **outShader),
+                        D3DShaderType *(Renderer9::*createShader)(const DWORD *, size_t length),
                         HRESULT (WINAPI IDirect3DDevice9::*setShader)(D3DShaderType*));
 
     gl::Error setVertexShader(ShaderId shader);
