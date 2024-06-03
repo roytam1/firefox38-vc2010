@@ -25,6 +25,7 @@ struct JsepCodecDescription;
 class JsepTrackNegotiatedDetails
 {
 public:
+  inline JsepTrackNegotiatedDetails() {}
   virtual ~JsepTrackNegotiatedDetails() {}
 
   virtual mozilla::SdpMediaSection::Protocol GetProtocol() const = 0;

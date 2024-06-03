@@ -28,7 +28,7 @@ class AudioEncoderOpus : public AudioEncoder {
   };
 
   explicit AudioEncoderOpus(const Config& config);
-  virtual ~AudioEncoderOpus() OVERRIDE;
+  virtual ~AudioEncoderOpus();
 
   virtual int sample_rate_hz() const OVERRIDE;
   virtual int num_channels() const OVERRIDE;

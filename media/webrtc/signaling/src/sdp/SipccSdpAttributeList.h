@@ -129,8 +129,8 @@ private:
 
   SdpAttribute* mAttributes[kNumAttributeTypes];
 
-  SipccSdpAttributeList(const SipccSdpAttributeList& orig) = delete;
-  SipccSdpAttributeList& operator=(const SipccSdpAttributeList& rhs) = delete;
+  SipccSdpAttributeList(const SipccSdpAttributeList& orig) MOZ_DELETE;
+  SipccSdpAttributeList& operator=(const SipccSdpAttributeList& rhs) MOZ_DELETE;
 };
 
 } // namespace mozilla

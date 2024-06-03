@@ -690,7 +690,8 @@ JsepSessionImpl::GetMsids(
         std::string trackId;
         nsresult rv = ParseMsid(i->attribute, &streamId, &trackId);
         NS_ENSURE_SUCCESS(rv, rv);
-        msids->push_back({streamId, trackId});
+        SdpMsidAttributeList::Msid value = { streamId, trackId };
+        msids->push_back(value);
       }
     }
   }

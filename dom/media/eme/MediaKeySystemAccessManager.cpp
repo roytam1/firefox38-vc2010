@@ -223,7 +223,8 @@ MediaKeySystemAccessManager::Observe(nsISupports* aSubject,
   if (!strcmp(aTopic, "gmp-path-added")) {
     nsTArray<PendingRequest> requests(Move(mRequests));
     // Retry all pending requests, but this time fail if the CDM is not installed.
-    for (PendingRequest& request : requests) {
+    for (size_t i = 0; i < requests.Length(); i++) {
+      PendingRequest& request = requests[i];
       RetryRequest(request);
     }
   } else if (!strcmp(aTopic, "timer-callback")) {
@@ -262,7 +263,8 @@ MediaKeySystemAccessManager::Shutdown()
 {
   EME_LOG("MediaKeySystemAccessManager::Shutdown");
   nsTArray<PendingRequest> requests(Move(mRequests));
-  for (PendingRequest& request : requests) {
+  for (size_t i = 0; i < requests.Length(); i++) {
+    PendingRequest& request = requests[i];
     // Cancel all requests; we're shutting down.
     request.CancelTimer();
     request.RejectPromise();

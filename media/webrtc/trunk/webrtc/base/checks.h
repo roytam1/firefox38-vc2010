@@ -14,6 +14,10 @@
 #include <sstream>
 #include <string>
 
+#ifdef _MSC_VER
+#define COMPILER_MSVC 1
+#endif
+
 #ifdef WEBRTC_CHROMIUM_BUILD
 // Include logging.h in a Chromium build to enable the overrides mechanism for
 // using Chromium's macros. Otherwise, don't depend on logging.h.

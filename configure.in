@@ -503,6 +503,9 @@ case "$target" in
             MSVS_VERSION=2010
             MSVC_C_RUNTIME_DLL=msvcr100.dll
             MSVC_CXX_RUNTIME_DLL=msvcp100.dll
+            # C4355: 'this' : used in base member initializer list
+            CFLAGS="$CFLAGS -wd4355"
+            CXXFLAGS="$CXXFLAGS -wd4355"
         elif test "$_CC_MAJOR_VERSION" = "18" -a "$_CC_BUILD_VERSION" -ge "30723"; then
             _CC_SUITE=12
             MSVS_VERSION=2013
@@ -2243,10 +2246,12 @@ ia64*-hpux*)
         _DEFINES_CXXFLAGS='-FI $(DEPTH)/dist/include/mozilla-config.h -DMOZILLA_CLIENT'
         CFLAGS="$CFLAGS -W3 -Gy"
         CXXFLAGS="$CXXFLAGS -W3 -Gy"
+        if test "$_CC_SUITE" -ge "11"; then
         if test "$CPU_ARCH" = "x86"; then
             dnl VS2012+ defaults to -arch:SSE2.
             CFLAGS="$CFLAGS -arch:IA32"
             CXXFLAGS="$CXXFLAGS -arch:IA32"
+        fi
         fi
         if test "$_CC_SUITE" -ge "12"; then
         dnl VS2013+ requires -FS when parallel building by make -jN.
@@ -5914,6 +5919,9 @@ fi
 
 if test -n "$MOZ_WEBGL"; then
   AC_DEFINE(MOZ_WEBGL)
+  AC_DEFINE(MOZ_ANGLE_RENDERER)
+  AC_SUBST(MOZ_WEBGL)
+  AC_SUBST(MOZ_ANGLE_RENDERER)
 fi
 
 # This is potentially set in external mozconfig files; if it's set,
@@ -5921,6 +5929,7 @@ fi
 # for conformant implementations.
 if test -n "$MOZ_WEBGL_CONFORMANT"; then
   AC_DEFINE(MOZ_WEBGL_CONFORMANT)
+  AC_SUBST(MOZ_WEBGL_CONFORMANT)
 fi
 
 dnl ========================================================

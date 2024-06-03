@@ -363,7 +363,8 @@ nsresult PeerConnectionMedia::UpdateMediaPipelines(
     }
   }
 
-  for (auto& stream : mRemoteSourceStreams) {
+  for (size_t i = 0; i < mRemoteSourceStreams.Length(); i++) {
+    auto& stream = mRemoteSourceStreams[i];
     stream->StartReceiving();
   }
 

@@ -32,6 +32,7 @@
 // Warning C4722: destructor never returns, potential memory leak.
 // FatalMessage's dtor very intentionally aborts.
 #pragma warning(disable:4722)
+#define COMPILER_MSVC 1
 #endif
 
 namespace rtc {

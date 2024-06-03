@@ -401,7 +401,7 @@ class AudioCodingImpl : public AudioCoding {
     playout_frequency_hz_ = config.playout_frequency_hz;
   }
 
-  virtual ~AudioCodingImpl() OVERRIDE {};
+  virtual ~AudioCodingImpl() {};
 
   virtual bool RegisterSendCodec(AudioEncoder* send_codec) OVERRIDE;
 

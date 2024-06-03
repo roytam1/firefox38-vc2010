@@ -276,8 +276,8 @@ public:
 
 private:
 
-  WebrtcVideoConduit(const WebrtcVideoConduit& other) = delete;
-  void operator=(const WebrtcVideoConduit& other) = delete;
+  WebrtcVideoConduit(const WebrtcVideoConduit& other) MOZ_DELETE;
+  void operator=(const WebrtcVideoConduit& other) MOZ_DELETE;
 
   //Local database of currently applied receive codecs
   typedef std::vector<VideoCodecConfig* > RecvCodecList;

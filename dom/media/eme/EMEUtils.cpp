@@ -100,7 +100,8 @@ ParseKeySystem(const nsAString& aInputKeySystem,
                nsAString& aOutKeySystem,
                int32_t& aOutCDMVersion)
 {
-  for (const char16_t* keySystem : sKeySystems) {
+  for (size_t i = 0; i < sizeof(sKeySystems); i++) {
+    const char16_t* keySystem = sKeySystems[i];
     int32_t minCDMVersion = NO_CDM_VERSION;
     if (ParseKeySystem(nsDependentString(keySystem),
                        aInputKeySystem,

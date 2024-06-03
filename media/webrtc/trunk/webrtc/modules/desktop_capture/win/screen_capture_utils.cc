@@ -73,7 +73,7 @@ DesktopRect GetScreenRect(ScreenId screen, const std::wstring& device_key) {
   // sure we are capturing the same device when devices are added or removed.
   // DeviceKey is documented as reserved, but it actually contains the registry
   // key for the device and is unique for each monitor, while DeviceID is not.
-  if (device_key != device.DeviceKey)
+  if (device_key.c_str() != device.DeviceKey)
     return DesktopRect();
 
   DEVMODE device_mode;

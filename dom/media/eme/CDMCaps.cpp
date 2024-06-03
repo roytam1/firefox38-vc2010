@@ -226,7 +226,8 @@ void
 CDMCaps::AutoLock::GetSessionIdsForKeyId(const CencKeyId& aKeyId,
                                          nsTArray<nsCString>& aOutSessionIds)
 {
-  for (const auto& keyStatus : mData.mKeyStatuses) {
+  for (size_t i = 0; i < mData.mKeyStatuses.Length(); i++) {
+    const auto& keyStatus = mData.mKeyStatuses[i];
     if (keyStatus.mId == aKeyId) {
       aOutSessionIds.AppendElement(NS_ConvertUTF16toUTF8(keyStatus.mSessionId));
     }
