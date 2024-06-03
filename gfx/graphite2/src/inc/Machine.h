@@ -110,9 +110,7 @@ enum opcode {
     PUSH_PROC_STATE,                PUSH_VERSION,
     PUT_SUBS,                       PUT_SUBS2,          PUT_SUBS3,
     PUT_GLYPH,                      PUSH_GLYPH_ATTR,    PUSH_ATT_TO_GLYPH_ATTR,
-    BITOR,                          BITAND,             BITNOT,
-    BITSET,                         SET_FEAT,
-    MAX_OPCODE,                     
+    MAX_OPCODE,
     // private opcodes for internal use only, comes after all other on disk opcodes
     TEMP_COPY = MAX_OPCODE
 };
@@ -140,8 +138,7 @@ public:
         stack_underflow,
         stack_not_empty,
         stack_overflow,
-        slot_offset_out_bounds,
-        died_early
+        slot_offset_out_bounds
     };
 
     Machine(SlotMap &) throw();
@@ -151,7 +148,7 @@ public:
 
     SlotMap   & slotMap() const throw();
     status_t    status() const throw();
-//    operator bool () const throw();
+    operator bool () const throw();
 
 private:
     void    check_final_stack(const stack_t * const sp);
@@ -184,7 +181,7 @@ inline Machine::status_t Machine::status() const throw()
     return _status;
 }
 
-inline void Machine::check_final_stack(const stack_t * const sp)
+inline void Machine::check_final_stack(const int32 * const sp)
 {
     stack_t const * const base  = _stack + STACK_GUARD,
                   * const limit = base + STACK_MAX;

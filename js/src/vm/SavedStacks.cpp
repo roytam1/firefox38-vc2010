@@ -28,6 +28,7 @@
 #include "jscntxtinlines.h"
 
 #include "vm/NativeObject-inl.h"
+#include "mozilla/DebugOnly.h"
 
 using mozilla::AddToHash;
 using mozilla::HashString;
@@ -443,8 +444,8 @@ SavedFrame::toStringMethod(JSContext* cx, unsigned argc, Value* vp)
 {
     THIS_SAVEDFRAME(cx, argc, vp, "toString", StringValue(cx->runtime()->emptyString), args, frame);
     StringBuffer sb(cx);
-    DebugOnly<JSSubsumesOp> subsumes = cx->runtime()->securityCallbacks->subsumes;
-    DebugOnly<JSPrincipals*> principals = cx->compartment()->principals;
+	mozilla::DebugOnly<JSSubsumesOp> subsumes = cx->runtime()->securityCallbacks->subsumes;
+	mozilla::DebugOnly<JSPrincipals*> principals = cx->compartment()->principals;
 
     RootedSavedFrame parent(cx);
     do {

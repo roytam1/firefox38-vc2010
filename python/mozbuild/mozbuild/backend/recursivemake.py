@@ -719,11 +719,9 @@ class RecursiveMakeBackend(CommonBackend):
         non_unified_var = var[len('UNIFIED_'):]
 
         if obj.have_unified_mapping:
-            self._add_unified_build_rules(backend_file,
-                                          obj.unified_source_mapping,
-                                          unified_files_makefile_variable=var,
-                                          include_curdir_build_rules=False)
-            backend_file.write('%s += $(%s)\n' % (non_unified_var, var))
+			source_files = list(sorted(obj.files))
+			backend_file.write('%s += %s\n' % (
+					non_unified_var, ' '.join(source_files)))
         else:
             # Sorted so output is consistent and we don't bump mtimes.
             source_files = list(sorted(obj.files))

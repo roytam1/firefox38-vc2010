@@ -27,7 +27,7 @@ namespace {
 
 class AutoEntryHolder {
     typedef WatchpointMap::Map Map;
-    Generation gen;
+    uint32_t gen;
     Map& map;
     Map::Ptr p;
     RootedObject obj;

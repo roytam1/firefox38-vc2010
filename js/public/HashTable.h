@@ -33,8 +33,6 @@ namespace detail {
 
 /*****************************************************************************/
 
-using Generation = mozilla::Opaque<uint64_t>;
-
 // A JS-friendly, STL-like container providing a hash-based map from keys to
 // values. In particular, HashMap calls constructors and destructors of all
 // objects added so non-PODs may be used safely.
@@ -208,9 +206,7 @@ class HashMap
 
     // If |generation()| is the same before and after a HashMap operation,
     // pointers into the table remain valid.
-    Generation generation() const {
-        return impl.generation();
-    }
+    uint32_t generation() const                       { return impl.generation(); }
 
     /************************************************** Shorthand operations */
 
@@ -276,8 +272,8 @@ class HashMap
 
   private:
     // HashMap is not copyable or assignable
-    HashMap(const HashMap& hm) = delete;
-    HashMap& operator=(const HashMap& hm) = delete;
+    HashMap(const HashMap& hm) MOZ_DELETE;
+    HashMap& operator=(const HashMap& hm) MOZ_DELETE;
 
     friend class Impl::Enum;
 };
@@ -441,9 +437,7 @@ class HashSet
 
     // If |generation()| is the same before and after a HashSet operation,
     // pointers into the table remain valid.
-    Generation generation() const {
-        return impl.generation();
-    }
+    uint32_t generation() const                       { return impl.generation(); }
 
     /************************************************** Shorthand operations */
 
@@ -506,8 +500,8 @@ class HashSet
 
   private:
     // HashSet is not copyable or assignable
-    HashSet(const HashSet& hs) = delete;
-    HashSet& operator=(const HashSet& hs) = delete;
+    HashSet(const HashSet& hs) MOZ_DELETE;
+    HashSet& operator=(const HashSet& hs) MOZ_DELETE;
 
     friend class Impl::Enum;
 };
@@ -665,8 +659,8 @@ class HashMapEntry
     Value & value() { return value_; }
 
   private:
-    HashMapEntry(const HashMapEntry&) = delete;
-    void operator=(const HashMapEntry&) = delete;
+    HashMapEntry(const HashMapEntry&) MOZ_DELETE;
+    void operator=(const HashMapEntry&) MOZ_DELETE;
 };
 
 } // namespace js
@@ -708,9 +702,9 @@ class HashTableEntry
         return hash > sRemovedKey;
     }
 
-    HashTableEntry(const HashTableEntry&) = delete;
-    void operator=(const HashTableEntry&) = delete;
-    ~HashTableEntry() = delete;
+    HashTableEntry(const HashTableEntry&) MOZ_DELETE;
+    void operator=(const HashTableEntry&) MOZ_DELETE;
+    ~HashTableEntry() MOZ_DELETE;
 
   public:
     // NB: HashTableEntry is treated as a POD: no constructor or destructor calls.
@@ -805,7 +799,7 @@ class HashTable : private AllocPolicy
             return entry_->isLive();
         }
 
-        explicit operator bool() const {
+        MOZ_EXPLICIT_CONVERSION operator bool() const {
             return found();
         }
 
@@ -947,8 +941,8 @@ class HashTable : private AllocPolicy
         bool removed;
 
         /* Not copyable. */
-        Enum(const Enum&) = delete;
-        void operator=(const Enum&) = delete;
+        Enum(const Enum&) MOZ_DELETE;
+        void operator=(const Enum&) MOZ_DELETE;
 
       public:
         template<class Map> explicit
@@ -1017,8 +1011,8 @@ class HashTable : private AllocPolicy
 
   private:
     // HashTable is not copyable or assignable
-    HashTable(const HashTable&) = delete;
-    void operator=(const HashTable&) = delete;
+    HashTable(const HashTable&) MOZ_DELETE;
+    void operator=(const HashTable&) MOZ_DELETE;
 
   private:
     static const size_t CAP_BITS = 24;
@@ -1536,10 +1530,10 @@ class HashTable : private AllocPolicy
         return JS_BIT(sHashBits - hashShift);
     }
 
-    Generation generation() const
+    uint32_t generation() const
     {
         MOZ_ASSERT(table);
-        return Generation(gen);
+        return gen;
     }
 
     size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const

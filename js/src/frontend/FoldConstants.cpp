@@ -17,6 +17,8 @@
 #include "jscntxtinlines.h"
 #include "jsobjinlines.h"
 
+#include "mozilla/TypedEnum.h"
+
 using namespace js;
 using namespace js::frontend;
 
@@ -577,7 +579,7 @@ Boolish(ParseNode* pn)
 
 // Expressions that appear in a few specific places are treated specially
 // during constant folding. This enum tells where a parse node appears.
-enum class SyntacticContext : int {
+MOZ_BEGIN_ENUM_CLASS(SyntacticContext, int)
     // pn is an expression, and it appears in a context where only its side
     // effects and truthiness matter: the condition of an if statement,
     // conditional expression, while loop, or for(;;) loop; or an operand of &&
@@ -589,7 +591,7 @@ enum class SyntacticContext : int {
 
     // Any other syntactic context.
     Other
-};
+MOZ_END_ENUM_CLASS(SyntacticContext)
 
 static SyntacticContext
 condIf(const ParseNode* pn, ParseNodeKind kind)

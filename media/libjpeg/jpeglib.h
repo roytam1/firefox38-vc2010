@@ -28,6 +28,8 @@
 #endif
 #include "jmorecfg.h"           /* seldom changed options */
 
+#include "jinclude.h"
+
 
 #ifdef __cplusplus
 #ifndef DONT_USE_EXTERN_C

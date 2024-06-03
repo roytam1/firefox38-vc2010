@@ -13,6 +13,7 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/Range.h"
 #include "mozilla/RangedPtr.h"
+#include "mozilla/TypedEnum.h"
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -302,8 +303,8 @@ class AutoHashMapRooter : protected AutoGCRooter
     friend void AutoGCRooter::trace(JSTracer* trc);
 
   private:
-    AutoHashMapRooter(const AutoHashMapRooter& hmr) = delete;
-    AutoHashMapRooter& operator=(const AutoHashMapRooter& hmr) = delete;
+    AutoHashMapRooter(const AutoHashMapRooter& hmr) MOZ_DELETE;
+    AutoHashMapRooter& operator=(const AutoHashMapRooter& hmr) MOZ_DELETE;
 
     HashMapImpl map;
 
@@ -407,8 +408,8 @@ class AutoHashSetRooter : protected AutoGCRooter
     friend void AutoGCRooter::trace(JSTracer* trc);
 
   private:
-    AutoHashSetRooter(const AutoHashSetRooter& hmr) = delete;
-    AutoHashSetRooter& operator=(const AutoHashSetRooter& hmr) = delete;
+    AutoHashSetRooter(const AutoHashSetRooter& hmr) MOZ_DELETE;
+    AutoHashSetRooter& operator=(const AutoHashSetRooter& hmr) MOZ_DELETE;
 
     HashSetImpl set;
 
@@ -854,8 +855,8 @@ class MOZ_STACK_CLASS SourceBufferHolder final
     }
 
   private:
-    SourceBufferHolder(SourceBufferHolder&) = delete;
-    SourceBufferHolder& operator=(SourceBufferHolder&) = delete;
+    SourceBufferHolder(SourceBufferHolder&) MOZ_DELETE;
+    SourceBufferHolder& operator=(SourceBufferHolder&) MOZ_DELETE;
 
     const char16_t* data_;
     size_t length_;
@@ -1960,8 +1961,8 @@ class AutoIdArray : private AutoGCRooter
     MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER
 
     /* No copy or assignment semantics. */
-    AutoIdArray(AutoIdArray& ida) = delete;
-    void operator=(AutoIdArray& ida) = delete;
+    AutoIdArray(AutoIdArray& ida) MOZ_DELETE;
+    void operator=(AutoIdArray& ida) MOZ_DELETE;
 };
 
 } /* namespace JS */
@@ -3349,7 +3350,7 @@ class JS_FRIEND_API(ReadOnlyCompileOptions)
 
   private:
     static JSObject * const nullObjectPtr;
-    void operator=(const ReadOnlyCompileOptions&) = delete;
+    void operator=(const ReadOnlyCompileOptions&) MOZ_DELETE;
 };
 
 /*
@@ -3439,7 +3440,7 @@ class JS_FRIEND_API(OwningCompileOptions) : public ReadOnlyCompileOptions
     }
 
   private:
-    void operator=(const CompileOptions& rhs) = delete;
+    void operator=(const CompileOptions& rhs) MOZ_DELETE;
 };
 
 /*
@@ -3525,7 +3526,7 @@ class MOZ_STACK_CLASS JS_FRIEND_API(CompileOptions) : public ReadOnlyCompileOpti
     }
 
   private:
-    void operator=(const CompileOptions& rhs) = delete;
+    void operator=(const CompileOptions& rhs) MOZ_DELETE;
 };
 
 /*
@@ -4162,11 +4163,11 @@ JS_PUBLIC_API(JSString*)
 GetSymbolDescription(HandleSymbol symbol);
 
 /* Well-known symbols. */
-enum class SymbolCode : uint32_t {
+MOZ_BEGIN_ENUM_CLASS(SymbolCode, uint32_t)
     iterator,                       // well-known Symbol.iterator
     InSymbolRegistry = 0xfffffffe,  // created by Symbol.for() or JS::GetSymbolFor()
     UniqueSymbol = 0xffffffff       // created by Symbol() or JS::NewSymbol()
-};
+MOZ_END_ENUM_CLASS(SymbolCode)
 
 /* For use in loops that iterate over the well-known symbols. */
 const size_t WellKnownSymbolLimit = 1;
@@ -4762,8 +4763,8 @@ class MOZ_STACK_CLASS JS_PUBLIC_API(AutoFilename)
 {
     void* scriptSource_;
 
-    AutoFilename(const AutoFilename&) = delete;
-    void operator=(const AutoFilename&) = delete;
+    AutoFilename(const AutoFilename&) MOZ_DELETE;
+    void operator=(const AutoFilename&) MOZ_DELETE;
 
   public:
     AutoFilename() : scriptSource_(nullptr) {}
@@ -4959,8 +4960,8 @@ class MOZ_STACK_CLASS JS_PUBLIC_API(ForOfIterator) {
 
     static const uint32_t NOT_ARRAY = UINT32_MAX;
 
-    ForOfIterator(const ForOfIterator&) = delete;
-    ForOfIterator& operator=(const ForOfIterator&) = delete;
+    ForOfIterator(const ForOfIterator&) MOZ_DELETE;
+    ForOfIterator& operator=(const ForOfIterator&) MOZ_DELETE;
 
   public:
     explicit ForOfIterator(JSContext* cx) : cx_(cx), iterator(cx_), index(NOT_ARRAY) { }

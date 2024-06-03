@@ -16,6 +16,7 @@
 #ifdef XP_WIN
 #include "mozilla/TimeStamp_windows.h"
 #endif
+#include "mozilla/TypedEnum.h"
 #include "mozilla/TypeTraits.h"
 #include "mozilla/IntegerTypeTraits.h"
 
@@ -128,7 +129,18 @@ struct EnumSerializer {
 template <typename E,
           E MinLegal,
           E HighBound>
-class ContiguousEnumValidator
+struct ContiguousEnumValidator
+{
+  static bool IsLegalValue(E e)
+  {
+    return MinLegal <= e && e < HighBound;
+  }
+};
+
+template <typename E,
+          MOZ_TEMPLATE_ENUM_CLASS_ENUM_TYPE(E) MinLegal,
+          MOZ_TEMPLATE_ENUM_CLASS_ENUM_TYPE(E) HighBound>
+class ContiguousTypedEnumValidator
 {
   // Silence overzealous -Wtype-limits bug in GCC fixed in GCC 4.8:
   // "comparison of unsigned expression >= 0 is always true"
@@ -139,13 +151,25 @@ class ContiguousEnumValidator
 public:
   static bool IsLegalValue(E e)
   {
-    return IsLessThanOrEqual(MinLegal, e) && e < HighBound;
+    typedef MOZ_TEMPLATE_ENUM_CLASS_ENUM_TYPE(E) ActualEnumType;
+    return IsLessThanOrEqual(MinLegal, ActualEnumType(e)) &&
+           ActualEnumType(e) < HighBound;
   }
 };
 
 template <typename E,
           E AllBits>
 struct BitFlagsEnumValidator
+{
+  static bool IsLegalValue(E e)
+  {
+    return (e & AllBits) == e;
+  }
+};
+
+template <typename E,
+          MOZ_TEMPLATE_ENUM_CLASS_ENUM_TYPE(E) AllBits>
+struct BitFlagsTypedEnumValidator
 {
   static bool IsLegalValue(E e)
   {
@@ -178,6 +202,19 @@ struct ContiguousEnumSerializer
 {};
 
 /**
+ * Similar to ContiguousEnumSerializer, but for MFBT typed enums
+ * as constructed by MOZ_BEGIN_ENUM_CLASS. This can go away when
+ * we drop MOZ_BEGIN_ENUM_CLASS and use C++11 enum classes directly.
+ */
+template <typename E,
+          MOZ_TEMPLATE_ENUM_CLASS_ENUM_TYPE(E) MinLegal,
+          MOZ_TEMPLATE_ENUM_CLASS_ENUM_TYPE(E) HighBound>
+struct ContiguousTypedEnumSerializer
+  : EnumSerializer<E,
+                   ContiguousTypedEnumValidator<E, MinLegal, HighBound>>
+{};
+
+/**
  * Specialization of EnumSerializer for enums representing bit flags.
  *
  * Provide one value: AllBits. An enum value x will be
@@ -202,6 +239,18 @@ template <typename E,
 struct BitFlagsEnumSerializer
   : EnumSerializer<E,
                    BitFlagsEnumValidator<E, AllBits>>
+{};
+
+/**
+ * Similar to BitFlagsEnumSerializer, but for MFBT typed enums
+ * as constructed by MOZ_BEGIN_ENUM_CLASS. This can go away when
+ * we drop MOZ_BEGIN_ENUM_CLASS and use C++11 enum classes directly.
+ */
+template <typename E,
+          MOZ_TEMPLATE_ENUM_CLASS_ENUM_TYPE(E) AllBits>
+struct BitFlagsTypedEnumSerializer
+  : EnumSerializer<E,
+                   BitFlagsTypedEnumValidator<E, AllBits>>
 {};
 
 template <>

@@ -15,6 +15,7 @@
 
 #include "nsDataHashtable.h"
 #include "nsIStyleRuleProcessor.h"
+#include "nsCSSPseudoElements.h"
 
 class nsRuleWalker;
 struct MiscContainer;
@@ -68,8 +69,8 @@ public:
 private: 
   ~nsHTMLCSSStyleSheet();
 
-  nsHTMLCSSStyleSheet(const nsHTMLCSSStyleSheet& aCopy) = delete;
-  nsHTMLCSSStyleSheet& operator=(const nsHTMLCSSStyleSheet& aCopy) = delete;
+  nsHTMLCSSStyleSheet(const nsHTMLCSSStyleSheet& aCopy) MOZ_DELETE;
+  nsHTMLCSSStyleSheet& operator=(const nsHTMLCSSStyleSheet& aCopy) MOZ_DELETE;
 
 protected:
   nsDataHashtable<nsStringHashKey, MiscContainer*> mCachedStyleAttrs;

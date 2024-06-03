@@ -632,11 +632,90 @@ class ICStub
     void updateCode(JitCode* stubCode);
     void trace(JSTracer* trc);
 
-    template <typename T, typename... Args>
-    static T* New(ICStubSpace* space, JitCode* code, Args&&... args) {
+	template <typename T>
+    static T* New(ICStubSpace* space, JitCode* code) {
         if (!code)
             return nullptr;
-        return space->allocate<T>(code, mozilla::Forward<Args>(args)...);
+        return space->allocate<T>(code);
+    }
+
+	template <typename T, typename A>
+    static T* New(ICStubSpace* space, JitCode* code, A&& a) {
+        if (!code)
+            return nullptr;
+        return space->allocate<T>(code, mozilla::Forward<A>(a));
+    }
+
+    template <typename T, typename A, typename B>
+    static T* New(ICStubSpace* space, JitCode* code, A&& a, B&& b) {
+        if (!code)
+            return nullptr;
+		return space->allocate<T>(code, mozilla::Forward<A>(a), mozilla::Forward<B>(b));
+    }
+
+	template <typename T, typename A, typename B, typename C>
+    static T* New(ICStubSpace* space, JitCode* code, A&& a, B&& b, C&& c) {
+        if (!code)
+            return nullptr;
+        return space->allocate<T>(code, mozilla::Forward<A>(a), 
+			mozilla::Forward<B>(b), mozilla::Forward<C>(c));
+    }
+
+	template <typename T, typename A, typename B, typename C, typename D>
+    static T* New(ICStubSpace* space, JitCode* code, A&& a, B&& b, C&& c, D&& d) {
+        if (!code)
+            return nullptr;
+        return space->allocate<T>(code, mozilla::Forward<A>(a), 
+			mozilla::Forward<B>(b), mozilla::Forward<C>(c), 
+			mozilla::Forward<D>(d));
+    }
+
+	template <typename T, typename A, typename B, typename C, typename D, typename E>
+    static T* New(ICStubSpace* space, JitCode* code, A&& a, B&& b, C&& c, D&& d, E&& e) {
+        if (!code)
+            return nullptr;
+        return space->allocate<T>(code, mozilla::Forward<A>(a), 
+			mozilla::Forward<B>(b), mozilla::Forward<C>(c), 
+			mozilla::Forward<D>(d), mozilla::Forward<E>(e));
+    }
+
+	template <typename T, typename A, typename B, typename C, typename D, typename E, typename F>
+    static T* New(ICStubSpace* space, JitCode* code, A&& a, B&& b, C&& c, D&& d, E&& e, F&& f) {
+        if (!code)
+            return nullptr;
+        return space->allocate<T>(code, mozilla::Forward<A>(a), 
+			mozilla::Forward<B>(b), mozilla::Forward<C>(c), 
+			mozilla::Forward<D>(d), mozilla::Forward<E>(e), mozilla::Forward<F>(f));
+    }
+
+	template <typename T, typename A, typename B, typename C, typename D, typename E, typename F, typename G>
+    static T* New(ICStubSpace* space, JitCode* code, A&& a, B&& b, C&& c, D&& d, E&& e, F&& f, G&& g) {
+        if (!code)
+            return nullptr;
+        return space->allocate<T>(code, mozilla::Forward<A>(a), 
+			mozilla::Forward<B>(b), mozilla::Forward<C>(c), 
+			mozilla::Forward<D>(d), mozilla::Forward<E>(e), mozilla::Forward<F>(f),
+			mozilla::Forward<G>(g));
+    }
+
+	template <typename T, typename A, typename B, typename C, typename D, typename E, typename F, typename G, typename H>
+    static T* New(ICStubSpace* space, JitCode* code, A&& a, B&& b, C&& c, D&& d, E&& e, F&& f, G&& g, H&& h) {
+        if (!code)
+            return nullptr;
+        return space->allocate<T>(code, mozilla::Forward<A>(a), 
+			mozilla::Forward<B>(b), mozilla::Forward<C>(c), 
+			mozilla::Forward<D>(d), mozilla::Forward<E>(e), mozilla::Forward<F>(f),
+			mozilla::Forward<G>(g), mozilla::Forward<H>(h));
+    }
+
+	template <typename T, typename A, typename B, typename C, typename D, typename E, typename F, typename G, typename H, typename P>
+    static T* New(ICStubSpace* space, JitCode* code, A&& a, B&& b, C&& c, D&& d, E&& e, F&& f, G&& g, H&& h, P&& p) {
+        if (!code)
+            return nullptr;
+        return space->allocate<T>(code, mozilla::Forward<A>(a), 
+			mozilla::Forward<B>(b), mozilla::Forward<C>(c), 
+			mozilla::Forward<D>(d), mozilla::Forward<E>(e), mozilla::Forward<F>(f),
+			mozilla::Forward<G>(g), mozilla::Forward<H>(h), mozilla::Forward<P>(p));
     }
 
   protected:

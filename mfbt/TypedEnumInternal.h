@@ -4,15 +4,46 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-/*
- * MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS allows using a typed enum as bit flags.
- */
+/* Internal stuff needed by TypedEnum.h and TypedEnumBits.h. */
 
-#ifndef mozilla_TypedEnumBits_h
-#define mozilla_TypedEnumBits_h
+// NOTE: When we can assume C++11 enum class support and TypedEnum.h goes away,
+// we should then consider folding TypedEnumInternal.h into TypedEnumBits.h.
+
+#ifndef mozilla_TypedEnumInternal_h
+#define mozilla_TypedEnumInternal_h
 
 #include "mozilla/Attributes.h"
-#include "mozilla/IntegerTypeTraits.h"
+
+#if defined(__cplusplus)
+
+#if defined(__clang__)
+   /*
+    * Per Clang documentation, "Note that marketing version numbers should not
+    * be used to check for language features, as different vendors use different
+    * numbering schemes. Instead, use the feature checking macros."
+    */
+#  ifndef __has_extension
+#    define __has_extension __has_feature /* compatibility, for older versions of clang */
+#  endif
+#  if __has_extension(cxx_strong_enums)
+#    define MOZ_HAVE_CXX11_ENUM_TYPE
+#    define MOZ_HAVE_CXX11_STRONG_ENUMS
+#  endif
+#elif defined(__GNUC__)
+#  if defined(__GXX_EXPERIMENTAL_CXX0X__) || __cplusplus >= 201103L
+#    if MOZ_GCC_VERSION_AT_LEAST(4, 6, 3)
+#      define MOZ_HAVE_CXX11_ENUM_TYPE
+#      define MOZ_HAVE_CXX11_STRONG_ENUMS
+#    endif
+#  endif
+#elif defined(_MSC_VER)
+#  if _MSC_VER >= 1400
+#    define MOZ_HAVE_CXX11_ENUM_TYPE
+#  endif
+#  if _MSC_VER >= 1700
+#    define MOZ_HAVE_CXX11_STRONG_ENUMS
+#  endif
+#endif
 
 namespace mozilla {
 
@@ -58,7 +89,27 @@ public:
   operator DestinationType() const { return DestinationType(mValue); }
 
   MOZ_CONSTEXPR bool operator !() const { return !bool(mValue); }
+
+#ifndef MOZ_HAVE_CXX11_STRONG_ENUMS
+  // This get() method is used to implement a constructor in the
+  // non-c++11 fallback path for MOZ_BEGIN_ENUM_CLASS, taking a
+  // CastableTypedEnumResult. If we try to implement it using the
+  // above conversion operator E(), then at least clang 3.3
+  // (when forced to take the non-c++11 fallback path) compiles
+  // this constructor to an infinite recursion. So we introduce this
+  // get() method, that does exactly the same as the conversion operator,
+  // to work around this.
+  MOZ_CONSTEXPR E get() const { return mValue; }
+#endif
 };
+
+} // namespace mozilla
+
+#endif // __cplusplus
+
+#include "mozilla/IntegerTypeTraits.h"
+
+namespace mozilla {
 
 #define MOZ_CASTABLETYPEDENUMRESULT_BINOP(Op, OtherType, ReturnType) \
 template<typename E> \
@@ -113,6 +164,32 @@ MOZ_CASTABLETYPEDENUMRESULT_COMPOUND_ASSIGN_OP(^=)
 
 #undef MOZ_CASTABLETYPEDENUMRESULT_BINOP
 
+#ifndef MOZ_HAVE_CXX11_STRONG_ENUMS
+
+#define MOZ_CASTABLETYPEDENUMRESULT_BINOP_EXTRA_NON_CXX11(Op, ReturnType) \
+template<typename E> \
+MOZ_CONSTEXPR ReturnType \
+operator Op(typename E::Enum aE, const CastableTypedEnumResult<E>& aR) \
+{ \
+  return ReturnType(aE Op E(aR)); \
+} \
+template<typename E> \
+MOZ_CONSTEXPR ReturnType \
+operator Op(const CastableTypedEnumResult<E>& aR, typename E::Enum aE) \
+{ \
+  return ReturnType(E(aR) Op aE); \
+}
+
+MOZ_CASTABLETYPEDENUMRESULT_BINOP_EXTRA_NON_CXX11(|, CastableTypedEnumResult<E>)
+MOZ_CASTABLETYPEDENUMRESULT_BINOP_EXTRA_NON_CXX11(&, CastableTypedEnumResult<E>)
+MOZ_CASTABLETYPEDENUMRESULT_BINOP_EXTRA_NON_CXX11(^, CastableTypedEnumResult<E>)
+MOZ_CASTABLETYPEDENUMRESULT_BINOP_EXTRA_NON_CXX11(==, bool)
+MOZ_CASTABLETYPEDENUMRESULT_BINOP_EXTRA_NON_CXX11(!=, bool)
+
+#undef MOZ_CASTABLETYPEDENUMRESULT_BINOP_EXTRA_NON_CXX11
+
+#endif // not MOZ_HAVE_CXX11_STRONG_ENUMS
+
 namespace detail {
 template<typename E>
 struct UnsignedIntegerTypeForEnum
@@ -137,11 +214,7 @@ struct UnsignedIntegerTypeForEnum
      return a = a Op b; \
    }
 
-/**
- * MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS generates standard bitwise operators
- * for the given enum type. Use this to enable using an enum type as bit-field.
- */
-#define MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(Name) \
+#define MOZ_MAKE_ENUM_CLASS_OPS_IMPL(Name) \
    MOZ_MAKE_ENUM_CLASS_BINOP_IMPL(Name, |) \
    MOZ_MAKE_ENUM_CLASS_BINOP_IMPL(Name, &) \
    MOZ_MAKE_ENUM_CLASS_BINOP_IMPL(Name, ^) \
@@ -153,4 +226,54 @@ struct UnsignedIntegerTypeForEnum
      return Result(Name(~(U(a)))); \
    }
 
-#endif // mozilla_TypedEnumBits_h
+#ifndef MOZ_HAVE_CXX11_STRONG_ENUMS
+#  define MOZ_MAKE_ENUM_CLASS_BITWISE_BINOP_EXTRA_NON_CXX11(Name, Op) \
+     inline MOZ_CONSTEXPR mozilla::CastableTypedEnumResult<Name> \
+     operator Op(Name a, Name::Enum b) \
+     { \
+       return a Op Name(b); \
+     } \
+ \
+     inline MOZ_CONSTEXPR mozilla::CastableTypedEnumResult<Name> \
+     operator Op(Name::Enum a, Name b) \
+     { \
+       return Name(a) Op b; \
+     } \
+ \
+     inline MOZ_CONSTEXPR mozilla::CastableTypedEnumResult<Name> \
+     operator Op(Name::Enum a, Name::Enum b) \
+     { \
+       return Name(a) Op Name(b); \
+     } \
+ \
+     inline Name& \
+     operator Op##=(Name& a, Name::Enum b) \
+     { \
+       return a = a Op Name(b); \
+    }
+
+#  define MOZ_MAKE_ENUM_CLASS_OPS_EXTRA_NON_CXX11(Name) \
+     MOZ_MAKE_ENUM_CLASS_BITWISE_BINOP_EXTRA_NON_CXX11(Name, |) \
+     MOZ_MAKE_ENUM_CLASS_BITWISE_BINOP_EXTRA_NON_CXX11(Name, &) \
+     MOZ_MAKE_ENUM_CLASS_BITWISE_BINOP_EXTRA_NON_CXX11(Name, ^) \
+     inline MOZ_CONSTEXPR mozilla::CastableTypedEnumResult<Name> \
+     operator~(Name::Enum a) \
+     { \
+       return ~(Name(a)); \
+     }
+#endif
+
+/**
+ * MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS generates standard bitwise operators
+ * for the given enum type. Use this to enable using an enum type as bit-field.
+ */
+#ifdef MOZ_HAVE_CXX11_STRONG_ENUMS
+#  define MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(Name) \
+     MOZ_MAKE_ENUM_CLASS_OPS_IMPL(Name)
+#else
+#  define MOZ_MAKE_ENUM_CLASS_BITWISE_OPERATORS(Name) \
+     MOZ_MAKE_ENUM_CLASS_OPS_IMPL(Name) \
+     MOZ_MAKE_ENUM_CLASS_OPS_EXTRA_NON_CXX11(Name)
+#endif
+
+#endif // mozilla_TypedEnumInternal_h

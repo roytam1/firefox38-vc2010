@@ -299,6 +299,7 @@ private:
   // O(log n) time, though this would require rebalancing and other overhead.
   nsTArray<RangeData> mRanges;
 
+  nsRefPtr<nsRange> entry;
   nsRefPtr<nsRange> mAnchorFocusRange;
   nsRefPtr<nsFrameSelection> mFrameSelection;
   nsRefPtr<nsAutoScrollTimer> mAutoScrollTimer;

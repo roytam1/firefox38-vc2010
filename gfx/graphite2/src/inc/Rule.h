@@ -41,8 +41,8 @@ struct Rule {
   uint16           rule_idx;
 #endif
 
-  Rule();
-  ~Rule() {}
+  Rule() : constraint(0), action(0), sort(0), preContext(0) {}
+  ~Rule();
 
   CLASS_NEW_DELETE;
 
@@ -51,16 +51,10 @@ private:
   Rule & operator = (const Rule &);
 };
 
-inline
-Rule::Rule()
-: constraint(0),
-  action(0),
-  sort(0),
-  preContext(0)
+inline Rule::~Rule()
 {
-#ifndef NDEBUG
-  rule_idx = 0;
-#endif
+  delete constraint;
+  delete action;
 }
 
 
@@ -102,7 +96,7 @@ class SlotMap
 {
 public:
   enum {MAX_SLOTS=64};
-  SlotMap(Segment & seg, uint8 direction, int maxSize);
+  SlotMap(Segment & seg);
   
   Slot       * * begin();
   Slot       * * end();
@@ -113,15 +107,12 @@ public:
   Slot * const & operator[](int n) const;
   Slot       * & operator [] (int);
   void           pushSlot(Slot * const slot);
-  void           collectGarbage(Slot *& aSlot);
+  void           collectGarbage();
 
   Slot         * highwater() { return m_highwater; }
   void           highwater(Slot *s) { m_highwater = s; m_highpassed = false; }
   bool           highpassed() const { return m_highpassed; }
   void           highpassed(bool v) { m_highpassed = v; }
-
-  uint8          dir() const { return m_dir; }
-  int            decMax() { return --m_maxSize; }
 
   Segment &    segment;
 private:
@@ -129,8 +120,6 @@ private:
   unsigned short m_size;
   unsigned short m_precontext;
   Slot         * m_highwater;
-  int            m_maxSize;
-  uint8          m_dir;
   bool           m_highpassed;
 };
 
@@ -244,9 +233,8 @@ void FiniteStateMachine::Rules::accumulate_rules(const State &state)
 }
 
 inline
-SlotMap::SlotMap(Segment & seg, uint8 direction, int maxSize)
-: segment(seg), m_size(0), m_precontext(0), m_highwater(0),
-    m_maxSize(maxSize), m_dir(direction), m_highpassed(false)
+SlotMap::SlotMap(Segment & seg)
+: segment(seg), m_size(0), m_precontext(0), m_highwater(0), m_highpassed(false)
 {
     m_slot_map[0] = 0;
 }

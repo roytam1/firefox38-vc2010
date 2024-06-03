@@ -10,6 +10,8 @@
 
 #include "jscntxtinlines.h"
 
+#include "mozilla/TypedEnum.h"
+
 using namespace js;
 using namespace js::frontend;
 
@@ -97,7 +99,10 @@ class NodeStack {
 
 } /* anonymous namespace */
 
-enum class PushResult { Recyclable, CleanUpLater };
+MOZ_BEGIN_ENUM_CLASS(PushResult) 
+Recyclable, 
+CleanUpLater 
+MOZ_END_ENUM_CLASS(PushResult)
 
 static PushResult
 PushCodeNodeChildren(ParseNode* node, NodeStack* stack)

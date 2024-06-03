@@ -2071,8 +2071,8 @@ struct SharedScriptData
     }
 
   private:
-    SharedScriptData() = delete;
-    SharedScriptData(const SharedScriptData&) = delete;
+    SharedScriptData() MOZ_DELETE;
+    SharedScriptData(const SharedScriptData&) MOZ_DELETE;
 };
 
 struct ScriptBytecodeHasher

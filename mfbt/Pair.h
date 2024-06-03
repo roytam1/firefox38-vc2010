@@ -169,7 +169,7 @@ public:
   void swap(Pair& aOther) { Base::swap(aOther); }
 
 private:
-  Pair(const Pair&) = delete;
+  Pair(const Pair&)	MOZ_DELETE;
 };
 
 template<typename A, class B>

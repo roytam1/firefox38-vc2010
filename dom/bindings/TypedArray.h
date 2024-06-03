@@ -53,7 +53,7 @@ public:
   }
 
 private:
-  TypedArrayObjectStorage(const TypedArrayObjectStorage&) = delete;
+  TypedArrayObjectStorage(const TypedArrayObjectStorage&) MOZ_DELETE;
 };
 
 /*
@@ -133,7 +133,7 @@ public:
   }
 
 private:
-  TypedArray_base(const TypedArray_base&) = delete;
+  TypedArray_base(const TypedArray_base&) MOZ_DELETE;
 };
 
 template<typename T,
@@ -187,7 +187,7 @@ private:
     return obj;
   }
 
-  TypedArray(const TypedArray&) = delete;
+  TypedArray(const TypedArray&) MOZ_DELETE;
 };
 
 typedef TypedArray<int8_t, js::UnwrapInt8Array, JS_GetInt8ArrayData,

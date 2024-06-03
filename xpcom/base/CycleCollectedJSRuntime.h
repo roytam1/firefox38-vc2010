@@ -15,6 +15,7 @@
 #include "nsDataHashtable.h"
 #include "nsHashKeys.h"
 #include "nsTArray.h"
+#include "mozilla/TypedEnum.h"
 
 class nsCycleCollectionNoteRootCallback;
 class nsIException;
@@ -212,7 +213,7 @@ private:
 public:
   // Two conditions, JSOutOfMemory and JSLargeAllocationFailure, are noted in
   // crash reports. Here are the values that can appear in the reports:
-  enum class OOMState : uint32_t {
+  MOZ_BEGIN_NESTED_ENUM_CLASS(OOMState, uint32_t)
     // The condition has never happened. No entry appears in the crash report.
     OK,
 
@@ -240,7 +241,7 @@ public:
     // GC is taken as a proxy for "we've been banging on the heap a good bit
     // now and haven't crashed; the OOM was probably handled correctly".
     Recovered
-  };
+  MOZ_END_NESTED_ENUM_CLASS(OOMState)
 
 private:
   void AnnotateAndSetOutOfMemory(OOMState* aStatePtr, OOMState aNewState);

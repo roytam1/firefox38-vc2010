@@ -1007,7 +1007,6 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
                                      T* value,
                                      JS::MutableHandle<JS::Value> rval)
 {
-  static_assert(IsRefcounted<T>::value, "Don't pass owned classes in here.");
   MOZ_ASSERT(value);
   // We try to wrap in the compartment of the underlying object of "scope"
   JS::Rooted<JSObject*> obj(cx);
@@ -1038,57 +1037,8 @@ WrapNewBindingNonWrapperCachedObject(JSContext* cx,
   return JS_WrapValue(cx, rval);
 }
 
-// Create a JSObject wrapping "value", for cases when "value" is a
-// non-wrapper-cached owned object using WebIDL bindings.  "value" must implement a
-// WrapObject() method taking a JSContext, a scope, and a boolean outparam that
-// is true if the JSObject took ownership
-template <class T>
-inline bool
-WrapNewBindingNonWrapperCachedObject(JSContext* cx,
-                                     JS::Handle<JSObject*> scopeArg,
-                                     nsAutoPtr<T>& value,
-                                     JS::MutableHandle<JS::Value> rval)
-{
-  static_assert(!IsRefcounted<T>::value, "Only pass owned classes in here.");
-  // We do a runtime check on value, because otherwise we might in
-  // fact end up wrapping a null and invoking methods on it later.
-  if (!value) {
-    NS_RUNTIMEABORT("Don't try to wrap null objects");
-  }
-  // We try to wrap in the compartment of the underlying object of "scope"
-  JS::Rooted<JSObject*> obj(cx);
-  {
-    // scope for the JSAutoCompartment so that we restore the compartment
-    // before we call JS_WrapValue.
-    Maybe<JSAutoCompartment> ac;
-    // Maybe<Handle> doesn't so much work, and in any case, adding
-    // more Maybe (one for a Rooted and one for a Handle) adds more
-    // code (and branches!) than just adding a single rooted.
-    JS::Rooted<JSObject*> scope(cx, scopeArg);
-    if (js::IsWrapper(scope)) {
-      scope = js::CheckedUnwrap(scope, /* stopAtOuter = */ false);
-      if (!scope)
-        return false;
-      ac.emplace(cx, scope);
-    }
-
-    MOZ_ASSERT(js::IsObjectInContextCompartment(scope, cx));
-    if (!value->WrapObject(cx, &obj)) {
-      return false;
-    }
-
-    value.forget();
-  }
-
-  // We can end up here in all sorts of compartments, per above.  Make
-  // sure to JS_WrapValue!
-  rval.set(JS::ObjectValue(*obj));
-  return JS_WrapValue(cx, rval);
-}
-
 // Helper for smart pointers (nsRefPtr/nsCOMPtr).
-template <template <typename> class SmartPtr, typename T,
-          typename U=typename EnableIf<IsRefcounted<T>::value, T>::Type>
+template <template <typename> class SmartPtr, typename T>
 inline bool
 WrapNewBindingNonWrapperCachedObject(JSContext* cx, JS::Handle<JSObject*> scope,
                                      const SmartPtr<T>& value,
@@ -1947,8 +1897,8 @@ private:
   static const size_t sInlineCapacity = 64;
   nsString::char_type mInlineStorage[sInlineCapacity];
 
-  FakeString(const FakeString& other) = delete;
-  void operator=(const FakeString& other) = delete;
+  FakeString(const FakeString& other) MOZ_DELETE;
+  void operator=(const FakeString& other) MOZ_DELETE;
 
   void SetData(nsString::char_type* aData) {
     MOZ_ASSERT(mFlags == nsString::F_TERMINATED);
@@ -2087,14 +2037,14 @@ template<typename T,
          bool isOwningUnion=IsBaseOf<AllOwningUnionBase, T>::value>
 class SequenceTracer
 {
-  explicit SequenceTracer() = delete; // Should never be instantiated
+  explicit SequenceTracer() MOZ_DELETE; // Should never be instantiated
 };
 
 // sequence<object> or sequence<object?>
 template<>
 class SequenceTracer<JSObject*, false, false, false>
 {
-  explicit SequenceTracer() = delete; // Should never be instantiated
+  explicit SequenceTracer() MOZ_DELETE; // Should never be instantiated
 
 public:
   static void TraceSequence(JSTracer* trc, JSObject** objp, JSObject** end) {
@@ -2108,7 +2058,7 @@ public:
 template<>
 class SequenceTracer<JS::Value, false, false, false>
 {
-  explicit SequenceTracer() = delete; // Should never be instantiated
+  explicit SequenceTracer() MOZ_DELETE; // Should never be instantiated
 
 public:
   static void TraceSequence(JSTracer* trc, JS::Value* valp, JS::Value* end) {
@@ -2122,7 +2072,7 @@ public:
 template<typename T>
 class SequenceTracer<Sequence<T>, false, false, false>
 {
-  explicit SequenceTracer() = delete; // Should never be instantiated
+  explicit SequenceTracer() MOZ_DELETE; // Should never be instantiated
 
 public:
   static void TraceSequence(JSTracer* trc, Sequence<T>* seqp, Sequence<T>* end) {
@@ -2136,7 +2086,7 @@ public:
 template<typename T>
 class SequenceTracer<nsTArray<T>, false, false, false>
 {
-  explicit SequenceTracer() = delete; // Should never be instantiated
+  explicit SequenceTracer() MOZ_DELETE; // Should never be instantiated
 
 public:
   static void TraceSequence(JSTracer* trc, nsTArray<T>* seqp, nsTArray<T>* end) {
@@ -2150,7 +2100,7 @@ public:
 template<typename T>
 class SequenceTracer<T, true, false, false>
 {
-  explicit SequenceTracer() = delete; // Should never be instantiated
+  explicit SequenceTracer() MOZ_DELETE; // Should never be instantiated
 
 public:
   static void TraceSequence(JSTracer* trc, T* dictp, T* end) {
@@ -2164,7 +2114,7 @@ public:
 template<typename T>
 class SequenceTracer<T, false, true, false>
 {
-  explicit SequenceTracer() = delete; // Should never be instantiated
+  explicit SequenceTracer() MOZ_DELETE; // Should never be instantiated
 
 public:
   static void TraceSequence(JSTracer* trc, T* arrayp, T* end) {
@@ -2178,7 +2128,7 @@ public:
 template<typename T>
 class SequenceTracer<T, false, false, true>
 {
-  explicit SequenceTracer() = delete; // Should never be instantiated
+  explicit SequenceTracer() MOZ_DELETE; // Should never be instantiated
 
 public:
   static void TraceSequence(JSTracer* trc, T* arrayp, T* end) {
@@ -2192,7 +2142,7 @@ public:
 template<typename T>
 class SequenceTracer<Nullable<T>, false, false, false>
 {
-  explicit SequenceTracer() = delete; // Should never be instantiated
+  explicit SequenceTracer() MOZ_DELETE; // Should never be instantiated
 
 public:
   static void TraceSequence(JSTracer* trc, Nullable<T>* seqp,
@@ -2232,7 +2182,7 @@ void TraceMozMap(JSTracer* trc, MozMap<T>& map)
 template<typename T>
 class SequenceTracer<MozMap<T>, false, false, false>
 {
-  explicit SequenceTracer() = delete; // Should never be instantiated
+  explicit SequenceTracer() MOZ_DELETE; // Should never be instantiated
 
 public:
   static void TraceSequence(JSTracer* trc, MozMap<T>* seqp, MozMap<T>* end) {
@@ -3240,18 +3190,16 @@ StrongOrRawPtr(already_AddRefed<S>&& aPtr)
   return aPtr.template downcast<T>();
 }
 
-template<class T,
-         class ReturnType=typename Conditional<IsRefcounted<T>::value, T*,
-                                               nsAutoPtr<T>>::Type>
-inline ReturnType
+template<class T>
+inline T*
 StrongOrRawPtr(T* aPtr)
 {
-  return ReturnType(aPtr);
+  return aPtr;
 }
 
 template<class T, template<typename> class SmartPtr, class S>
 inline void
-StrongOrRawPtr(SmartPtr<S>&& aPtr) = delete;
+StrongOrRawPtr(SmartPtr<S>&& aPtr) MOZ_DELETE;
 
 template<class T>
 struct StrongPtrForMember

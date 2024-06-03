@@ -3176,14 +3176,15 @@ void HTMLMediaElement::MetadataLoaded(const MediaInfo* aInfo,
   }
 
   // Expose the tracks to JS directly.
-  for (OutputMediaStream& out : mOutputStreams) {
+  for (uint32_t i = 0; i < mOutputStreams.Length(); ++i) {
+    OutputMediaStream* out = &mOutputStreams[i];
     if (aInfo->HasAudio()) {
       TrackID audioTrackId = aInfo->mAudio.mTrackInfo.mOutputId;
-      out.mStream->CreateDOMTrack(audioTrackId, MediaSegment::AUDIO);
+      out->mStream->CreateDOMTrack(audioTrackId, MediaSegment::AUDIO);
     }
     if (aInfo->HasVideo()) {
       TrackID videoTrackId = aInfo->mVideo.mTrackInfo.mOutputId;
-      out.mStream->CreateDOMTrack(videoTrackId, MediaSegment::VIDEO);
+      out->mStream->CreateDOMTrack(videoTrackId, MediaSegment::VIDEO);
     }
   }
 

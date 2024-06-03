@@ -92,21 +92,7 @@ WMFDecoderModule::CreateAudioDecoder(const mp4_demuxer::AudioDecoderConfig& aCon
 bool
 WMFDecoderModule::ShouldUseDXVA(const mp4_demuxer::VideoDecoderConfig& aConfig) const
 {
-  static bool isAMD = false;
-  static bool initialized = false;
-  if (!initialized) {
-    nsCOMPtr<nsIGfxInfo> gfxInfo = do_GetService("@mozilla.org/gfx/info;1");
-    nsAutoString vendor;
-    gfxInfo->GetAdapterVendorID(vendor);
-    isAMD = vendor.Equals(widget::GfxDriverInfo::GetDeviceVendor(widget::VendorAMD), nsCaseInsensitiveStringComparator()) ||
-            vendor.Equals(widget::GfxDriverInfo::GetDeviceVendor(widget::VendorATI), nsCaseInsensitiveStringComparator());
-    initialized = true;
-  }
-  if (!isAMD) {
-    return true;
-  }
-  // Don't use DXVA for 4k videos or above, since it seems to perform poorly.
-  return aConfig.display_height <= 1920 && aConfig.display_height <= 1200;
+  return NS_ERROR_NOT_IMPLEMENTED;
 }
 
 bool

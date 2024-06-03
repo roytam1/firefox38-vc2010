@@ -8,6 +8,7 @@
 #include "platform.h"
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
+#include "mozilla/UniquePtr.h"
 
 // JS
 #include "jsapi.h"
@@ -97,7 +98,7 @@ void* ProfileEntry::get_tagPtr() {
 // BEGIN ProfileBuffer
 
 ProfileBuffer::ProfileBuffer(int aEntrySize)
-  : mEntries(MakeUnique<ProfileEntry[]>(aEntrySize))
+: mEntries(mozilla::MakeUnique<ProfileEntry[]>(aEntrySize))
   , mWritePos(0)
   , mReadPos(0)
   , mEntrySize(aEntrySize)

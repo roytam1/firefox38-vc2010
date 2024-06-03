@@ -375,8 +375,8 @@ public:
     nsAutoCString pathPrefix;
 
 private:
-    ZoneStatsExtras(const ZoneStatsExtras& other) = delete;
-    ZoneStatsExtras& operator=(const ZoneStatsExtras& other) = delete;
+    ZoneStatsExtras(const ZoneStatsExtras& other) MOZ_DELETE;
+    ZoneStatsExtras& operator=(const ZoneStatsExtras& other) MOZ_DELETE;
 };
 
 // ReportJSRuntimeExplicitTreeStats will expect this in the |extra| member
@@ -391,8 +391,8 @@ public:
     nsCOMPtr<nsIURI> location;
 
 private:
-    CompartmentStatsExtras(const CompartmentStatsExtras& other) = delete;
-    CompartmentStatsExtras& operator=(const CompartmentStatsExtras& other) = delete;
+    CompartmentStatsExtras(const CompartmentStatsExtras& other) MOZ_DELETE;
+    CompartmentStatsExtras& operator=(const CompartmentStatsExtras& other) MOZ_DELETE;
 };
 
 // This reports all the stats in |rtStats| that belong in the "explicit" tree,

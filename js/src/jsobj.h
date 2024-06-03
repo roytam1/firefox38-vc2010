@@ -585,9 +585,9 @@ class JSObject : public js::gc::Cell
     static const size_t MAX_BYTE_SIZE = 4 * sizeof(void*) + 16 * sizeof(JS::Value);
 
   private:
-    JSObject() = delete;
-    JSObject(const JSObject& other) = delete;
-    void operator=(const JSObject& other) = delete;
+    JSObject() MOZ_DELETE;
+    JSObject(const JSObject& other) MOZ_DELETE;
+    void operator=(const JSObject& other) MOZ_DELETE;
 };
 
 template <class U>
@@ -1273,10 +1273,10 @@ Throw(JSContext* cx, jsid id, unsigned errorNumber);
 extern bool
 Throw(JSContext* cx, JSObject* obj, unsigned errorNumber);
 
-enum class IntegrityLevel {
+MOZ_BEGIN_ENUM_CLASS(IntegrityLevel)
     Sealed,
     Frozen
-};
+MOZ_END_ENUM_CLASS(IntegrityLevel)
 
 /*
  * ES6 rev 29 (6 Dec 2014) 7.3.13. Mark obj as non-extensible, and adjust each

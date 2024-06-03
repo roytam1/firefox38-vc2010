@@ -10,6 +10,7 @@
 #include "nsIScreen.h"
 #include "nsCOMPtr.h"
 #include "nsRefPtr.h"
+#include "mozilla/TypedEnum.h"
 
 #include "mozilla/gfx/2D.h"
 #include "mozilla/EnumeratedArray.h"
@@ -17,10 +18,10 @@
 namespace mozilla {
 namespace gfx {
 
-enum class VRHMDType : uint16_t {
+MOZ_BEGIN_ENUM_CLASS(VRHMDType, uint16_t)
   Oculus,
   NumHMDTypes
-};
+MOZ_END_ENUM_CLASS(VRHMDType)
 
 struct VRFieldOfView {
   static VRFieldOfView FromCSSPerspectiveInfo(double aPerspectiveDistance,

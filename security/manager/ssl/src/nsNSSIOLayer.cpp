@@ -50,6 +50,7 @@
 #include "sslerr.h"
 #include "secder.h"
 #include "keyhi.h"
+#include "nsIWebProgressListener.h"
 
 #include <algorithm>
 

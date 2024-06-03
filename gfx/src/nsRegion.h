@@ -39,12 +39,12 @@ class gfx3DMatrix;
  * projects including Qt, Gtk, Wine. It should perform reasonably well.
  */
 
-enum class VisitSide {
+MOZ_BEGIN_ENUM_CLASS(VisitSide)
 	TOP,
 	BOTTOM,
 	LEFT,
 	RIGHT
-};
+MOZ_END_ENUM_CLASS(VisitSide)
 
 class nsRegionRectIterator;
 

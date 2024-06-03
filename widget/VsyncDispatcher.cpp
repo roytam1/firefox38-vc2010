@@ -63,7 +63,7 @@ CompositorVsyncDispatcher::AssertOnCompositorThread()
     return;
   }
 
-  Compositor::AssertOnCompositorThread();
+  CompositorVsyncDispatcher::AssertOnCompositorThread();
 }
 
 void

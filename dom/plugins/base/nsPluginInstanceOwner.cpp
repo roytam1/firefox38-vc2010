@@ -59,6 +59,7 @@ using mozilla::DefaultXDisplay;
 #include "nsFrameSelection.h"
 #include "PuppetWidget.h"
 #include "nsPIWindowRoot.h"
+#include "mozilla/plugins/PluginAsyncSurrogate.h"
 
 #include "nsContentCID.h"
 #include "nsWidgetsCID.h"
@@ -1494,7 +1495,7 @@ nsPluginInstanceOwner::NotifyDestroyPending()
   if (NS_FAILED(mInstance->GetNPP(&npp)) || !npp) {
     return;
   }
-  PluginAsyncSurrogate::NotifyDestroyPending(npp);
+  NotifyDestroyPending();
 }
 
 nsresult nsPluginInstanceOwner::DispatchFocusToPlugin(nsIDOMEvent* aFocusEvent)

@@ -252,11 +252,9 @@ TableBackgroundPainter::TranslateContext(nscoord aDX,
                                          nscoord aDY)
 {
   mRenderPt += nsPoint(aDX, aDY);
-  for (auto& col : mCols) {
-    col.mCol.mRect.MoveBy(-aDX, -aDY);
-  }
-  for (auto& colGroup : mColGroups) {
-    colGroup.mRect.MoveBy(-aDX, -aDY);
+    for (uint32_t i = 0; i < mNumCols; i++) {
+      mCols[i].mCol.mRect.MoveBy(-aDX, -aDY);
+        mCols[i].mColGroup.mRect.MoveBy(-aDX, -aDY);
   }
 }
 
@@ -297,7 +295,6 @@ TableBackgroundPainter::PaintTable(nsTableFrame*   aTableFrame,
     NS_ASSERTION(colGroupList.FirstChild(), "table should have at least one colgroup");
 
     // Collect all col group frames first so that we know how many there are.
-    nsTArray<nsTableColGroupFrame*> colGroupFrames;
     for (nsTableColGroupFrame* cgFrame = static_cast<nsTableColGroupFrame*>(colGroupList.FirstChild());
          cgFrame; cgFrame = static_cast<nsTableColGroupFrame*>(cgFrame->GetNextSibling())) {
 
@@ -305,9 +302,11 @@ TableBackgroundPainter::PaintTable(nsTableFrame*   aTableFrame,
         //No columns, no cells, so no need for data
         continue;
       }
+	  nsTArray<nsTableColGroupFrame*> colGroupFrames;
       colGroupFrames.AppendElement(cgFrame);
     }
 
+	nsTArray<nsTableColGroupFrame*> colGroupFrames;
     // Ensure that mColGroups won't reallocate during the loop below, because
     // we grab references to its contents and need those to stay valid until
     // mColGroups is destroyed as part of TablePainter destruction.
@@ -319,7 +318,8 @@ TableBackgroundPainter::PaintTable(nsTableFrame*   aTableFrame,
     //Start with table's left border.
     nscoord lastLeftBorder = aTableFrame->GetContinuousLeftBCBorderWidth();
 
-    for (nsTableColGroupFrame* cgFrame : colGroupFrames) {
+    for (nsTableColGroupFrame* cgFrame = static_cast<nsTableColGroupFrame*>(colGroupList.FirstChild());
+         cgFrame; cgFrame = static_cast<nsTableColGroupFrame*>(cgFrame->GetNextSibling())) {
       /*Create data struct for column group*/
       TableBackgroundData& cgData = *mColGroups.AppendElement(TableBackgroundData(cgFrame));
       if (mIsBorderCollapse && cgData.ShouldSetBCBorder()) {

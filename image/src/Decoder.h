@@ -13,12 +13,9 @@
 #include "ImageMetadata.h"
 #include "Orientation.h"
 #include "SourceBuffer.h"
+#include "mozilla/Telemetry.h"
 
 namespace mozilla {
-
-namespace Telemetry {
-  enum ID : uint32_t;
-}
 
 namespace image {
 
@@ -266,7 +263,7 @@ public:
     return mImageMetadata.GetSize();
   }
 
-  virtual Telemetry::ID SpeedHistogram();
+  virtual Telemetry::ID SpeedHistogram() { return Telemetry::HistogramCount; }
 
   ImageMetadata& GetImageMetadata() { return mImageMetadata; }
 

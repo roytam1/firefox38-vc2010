@@ -17,6 +17,7 @@
 #include "nsTextFrame.h"
 #include "mozilla/Maybe.h"
 #include "mozilla/DebugOnly.h"
+#include "nsRenderingContext.h"
 
 using namespace mozilla;
 

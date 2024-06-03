@@ -128,9 +128,9 @@ class nsLayoutUtils
   typedef mozilla::gfx::Matrix4x4 Matrix4x4;
   typedef mozilla::gfx::RectCornerRadii RectCornerRadii;
   typedef mozilla::gfx::StrokeOptions StrokeOptions;
+  public:
   typedef mozilla::image::DrawResult DrawResult;
 
-public:
   typedef mozilla::layers::FrameMetrics FrameMetrics;
   typedef FrameMetrics::ViewID ViewID;
   typedef mozilla::CSSPoint CSSPoint;
@@ -165,10 +165,10 @@ public:
    */
   static bool GetDisplayPort(nsIContent* aContent, nsRect *aResult = nullptr);
 
-  enum class RepaintMode : uint8_t {
+  MOZ_BEGIN_NESTED_ENUM_CLASS(RepaintMode, uint8_t)
     Repaint,
     DoNotRepaint
-  };
+  MOZ_END_NESTED_ENUM_CLASS(RepaintMode)
 
   /**
    * Set the display port margins for a content element to be used with a

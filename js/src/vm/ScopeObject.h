@@ -728,7 +728,7 @@ class ScopeIter
     void settle();
 
     // No value semantics.
-    ScopeIter(const ScopeIter& si) = delete;
+    ScopeIter(const ScopeIter& si) MOZ_DELETE;
 
   public:
     // Constructing from a copy of an existing ScopeIter.

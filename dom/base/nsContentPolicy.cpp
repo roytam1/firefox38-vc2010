@@ -19,6 +19,10 @@
 #include "nsIDOMWindow.h"
 #include "nsIContent.h"
 #include "nsCOMArray.h"
+#include "nsILoadContext.h"
+#include "nsIDocShell.h"
+#include "nsCOMPtr.h"
+#include "nsIDOMElement.h"
 
 NS_IMPL_ISUPPORTS(nsContentPolicy, nsIContentPolicy)
 

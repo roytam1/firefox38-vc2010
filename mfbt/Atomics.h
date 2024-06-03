@@ -42,7 +42,7 @@
 #  elif MOZ_USING_LIBCXX && defined(__clang__)
 #    define MOZ_HAVE_CXX11_ATOMICS
 #  endif
-#elif defined(_MSC_VER)
+#elif defined(_MSC_VER) && _MSC_VER >= 1800
 #  define MOZ_HAVE_CXX11_ATOMICS
 #endif
 
@@ -1050,7 +1050,7 @@ public:
   }
 
 private:
-  Atomic(Atomic<T, Order>& aOther) = delete;
+  Atomic(Atomic<T, Order>& aOther) MOZ_DELETE;
 };
 
 /**
@@ -1083,7 +1083,7 @@ public:
   }
 
 private:
-  Atomic(Atomic<T*, Order>& aOther) = delete;
+  Atomic(Atomic<T*, Order>& aOther) MOZ_DELETE;
 };
 
 /**
@@ -1106,7 +1106,7 @@ public:
   using Base::operator=;
 
 private:
-  Atomic(Atomic<T, Order>& aOther) = delete;
+  Atomic(Atomic<T, Order>& aOther) MOZ_DELETE;
 };
 
 /**
@@ -1157,7 +1157,7 @@ public:
   }
 
 private:
-  Atomic(Atomic<bool, Order>& aOther) = delete;
+  Atomic(Atomic<bool, Order>& aOther) MOZ_DELETE;
 };
 
 } // namespace mozilla

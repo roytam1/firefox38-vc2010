@@ -12,8 +12,8 @@ from pprint import pprint
 from StringIO import StringIO
 
 PLATFORMS= [
-  'x86-win32-vs12',
-  'x86_64-win64-vs12',
+  'x86-win32-vs8',
+  'x86_64-win64-vs8',
   'x86-linux-gcc',
   'x86_64-linux-gcc',
   'generic-gnu',
@@ -358,7 +358,6 @@ def prepare_upstream(prefix, commit=None):
         configure = ['../../configure', '--target=%s' % target,
             '--disable-examples', '--disable-install-docs',
             '--enable-multi-res-encoding',
-            '--size-limit=4000x3000'
         ]
 
         if 'darwin9' in target:
@@ -533,10 +532,6 @@ def apply_patches():
     os.system("patch -p0 < stdint.patch")
     # Patch to allow older versions of Apple's clang to build libvpx.
     os.system("patch -p3 < apple-clang.patch")
-    # Patch to allow MSVC 2015 to compile libvpx
-    os.system("patch -p3 < msvc2015.patch")
-    # Patch to fix a crash caused by MSVC 2013
-    os.system("patch -p3 < bug1137614.patch")
 
 def update_readme(commit):
     with open('README_MOZILLA') as f:

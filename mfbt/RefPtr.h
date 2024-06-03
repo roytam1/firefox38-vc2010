@@ -346,8 +346,8 @@ private:
 
   mutable T* MOZ_OWNING_REF mPtr;
 
-  TemporaryRef() = delete;
-  void operator=(const TemporaryRef&) = delete;
+  TemporaryRef() MOZ_DELETE;
+  void operator=(const TemporaryRef&) MOZ_DELETE;
 };
 
 /**
@@ -384,8 +384,8 @@ private:
   RefPtr<T>& mRefPtr;
   T* mTmp;
 
-  OutParamRef() = delete;
-  OutParamRef& operator=(const OutParamRef&) = delete;
+  OutParamRef() MOZ_DELETE;
+  OutParamRef& operator=(const OutParamRef&) MOZ_DELETE;
 };
 
 /**

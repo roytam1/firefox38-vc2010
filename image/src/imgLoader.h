@@ -23,6 +23,7 @@
 #include "nsIThreadRetargetableStreamListener.h"
 #include "imgIRequest.h"
 #include "mozilla/net/ReferrerPolicy.h"
+#include "mozilla/TypedEnum.h"
 
 class imgLoader;
 class imgRequestProxy;
@@ -206,10 +207,10 @@ private:
   uint32_t mSize;
 };
 
-enum class AcceptedMimeTypes : uint8_t {
+MOZ_BEGIN_ENUM_CLASS(AcceptedMimeTypes, uint8_t)
   IMAGES,
   IMAGES_AND_DOCUMENTS,
-};
+MOZ_END_ENUM_CLASS(AcceptedMimeTypes)
 
 class imgLoader final : public imgILoader,
                             public nsIContentSniffer,

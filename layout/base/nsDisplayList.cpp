@@ -2562,7 +2562,7 @@ nsDisplayBackgroundImage::ConfigureLayer(ImageLayer* aLayer, const nsIntPoint& a
   if (imageSize.width > 0 && imageSize.height > 0) {
     // We're actually using the ImageContainer. Let our frame know that it
     // should consider itself to have painted successfully.
-    nsDisplayBackgroundGeometry::UpdateDrawResult(this, DrawResult::SUCCESS);
+	  nsDisplayBackgroundGeometry::UpdateDrawResult(this, nsLayoutUtils::DrawResult::SUCCESS);
   }
 
   gfxPoint p = mDestRect.TopLeft() + aOffset;
@@ -2733,7 +2733,7 @@ nsDisplayBackgroundImage::PaintInternal(nsDisplayListBuilder* aBuilder,
   uint32_t flags = aBuilder->GetBackgroundPaintFlags();
   CheckForBorderItem(this, flags);
 
-  DrawResult result =
+  nsLayoutUtils::DrawResult result =
     nsCSSRendering::PaintBackground(mFrame->PresContext(), *aCtx, mFrame,
                                     aBounds,
                                     nsRect(offset, mFrame->GetSize()),

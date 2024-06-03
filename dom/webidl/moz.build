@@ -540,8 +540,6 @@ WEBIDL_FILES = [
     'VTTRegion.webidl',
     'WaveShaperNode.webidl',
     'WebComponents.webidl',
-    'WebGL2RenderingContext.webidl',
-    'WebGLRenderingContext.webidl',
     'WebSocket.webidl',
     'WheelEvent.webidl',
     'WifiOptions.webidl',
@@ -569,6 +567,12 @@ WEBIDL_FILES = [
 if CONFIG['MOZ_AUDIO_CHANNEL_MANAGER']:
     WEBIDL_FILES += [
         'AudioChannelManager.webidl',
+    ]
+    
+if CONFIG['MOZ_WEBGL']:
+    WEBIDL_FILES += [
+        'WebGL2RenderingContext.webidl',
+        'WebGLRenderingContext.webidl',
     ]
 
 if CONFIG['MOZ_WEBRTC']:
