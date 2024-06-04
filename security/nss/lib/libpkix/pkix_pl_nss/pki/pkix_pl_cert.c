@@ -1515,7 +1515,6 @@ PKIX_PL_Cert_Create(
         SECItem *derCertItem = NULL;
         void *derBytes = NULL;
         PKIX_UInt32 derLength;
-        PKIX_Boolean copyDER;
         PKIX_PL_Cert *cert = NULL;
         CERTCertDBHandle *handle;
 
@@ -1542,7 +1541,6 @@ PKIX_PL_Cert_Create(
          * allowing us to free our copy without worrying about whether NSS
          * is still using it
          */
-        copyDER = PKIX_TRUE;
         handle  = CERT_GetDefaultCertDB();
         nssCert = CERT_NewTempCertificate(handle, derCertItem,
 					  /* nickname */ NULL, 
@@ -2916,7 +2914,8 @@ PKIX_PL_Cert_CheckValidity(
         requiredUsages = ((PKIX_PL_NssContext*)plContext)->certificateUsage;
         allowOverride =
             (PRBool)((requiredUsages & certificateUsageSSLServer) ||
-                     (requiredUsages & certificateUsageSSLServerWithStepUp));
+                     (requiredUsages & certificateUsageSSLServerWithStepUp) ||
+                     (requiredUsages & certificateUsageIPsec));
         val = CERT_CheckCertValidTimes(cert->nssCert, timeToCheck, allowOverride);
         if (val != secCertTimeValid){
                 PKIX_ERROR(PKIX_CERTCHECKCERTVALIDTIMESFAILED);
@@ -3003,8 +3002,17 @@ PKIX_PL_Cert_VerifyCertAndKeyType(
     if (CERT_CheckKeyUsage(cert->nssCert, requiredKeyUsage) != SECSuccess) {
         PKIX_ERROR(PKIX_CERTCHECKKEYUSAGEFAILED);
     }
-    if (!(certType & requiredCertType)) {
-        PKIX_ERROR(PKIX_CERTCHECKCERTTYPEFAILED);
+    if (certUsage != certUsageIPsec) {
+        if (!(certType & requiredCertType)) {
+            PKIX_ERROR(PKIX_CERTCHECKCERTTYPEFAILED);
+        }
+    } else {
+        PRBool isCritical;
+        PRBool allowed = cert_EKUAllowsIPsecIKE(cert->nssCert, &isCritical);
+        /* If the extension isn't critical, we allow any EKU value. */
+        if (isCritical && !allowed) {
+            PKIX_ERROR(PKIX_CERTCHECKCERTTYPEFAILED);
+        }
     }
 cleanup:
     PKIX_DECREF(basicConstraints);

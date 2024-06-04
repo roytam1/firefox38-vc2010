@@ -260,6 +260,7 @@ NSS_InitWithMerge
 NSS_IsInitialized
 NSS_NoDB_Init
 NSS_SecureMemcmp
+NSS_SecureMemcmpZero
 NSS_SetAlgorithmPolicy
 NSS_SetDomesticPolicy
 NSS_Shutdown
@@ -267,6 +268,7 @@ NSSSMIME_GetVersion
 NSS_SMIMESignerInfo_SaveSMIMEProfile
 NSS_SMIMEUtil_FindBulkAlgForRecipients
 NSSSSL_GetVersion
+_NSSUTIL_Access
 NSSUTIL_ArgDecodeNumber
 NSSUTIL_ArgFetchValue
 NSSUTIL_ArgGetLabel
@@ -288,6 +290,7 @@ NSSUTIL_MkModuleSpec
 NSSUTIL_MkNSSString
 NSSUTIL_MkSlotString
 NSSUTIL_Quote
+_NSSUTIL_UTF8ToWide
 PK11_AlgtagToMechanism
 PK11_Authenticate
 PK11_ChangePW
@@ -440,12 +443,14 @@ PORT_ArenaStrdup_Util
 PORT_ArenaUnmark_Util
 PORT_ArenaZAlloc
 PORT_ArenaZAlloc_Util
+PORT_DestroyCheapArena
 PORT_Free
 PORT_FreeArena
 PORT_FreeArena_Util
 PORT_Free_Util
 PORT_GetError
 PORT_GetError_Util
+PORT_InitCheapArena
 PORT_NewArena
 PORT_NewArena_Util
 PORT_Realloc_Util
@@ -460,6 +465,8 @@ PORT_UCS2_ASCIIConversion_Util
 PORT_UCS2_UTF8Conversion
 PORT_UCS2_UTF8Conversion_Util
 PORT_ZAlloc
+PORT_ZAllocAlignedOffset
+PORT_ZAllocAlignedOffset_Util
 PORT_ZAlloc_Util
 PORT_ZFree_Util
 SEC_AnyTemplate_Util DATA
@@ -651,6 +658,7 @@ SSL_HandshakeCallback
 SSL_HandshakeNegotiatedExtension
 SSL_ImplementedCiphers DATA
 SSL_ImportFD
+SSL_NamedGroupConfig
 SSL_NumImplementedCiphers DATA
 SSL_OptionSet
 SSL_OptionSetDefault
