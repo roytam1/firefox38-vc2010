@@ -638,6 +638,24 @@ static const CipherPref sCipherPrefs[] = {
    TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, true },
  { "security.ssl3.ecdhe_ecdsa_aes_128_gcm_sha256",
    TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, true },
+
+ { "security.ssl3.ecdhe_ecdsa_chacha20_poly1305_sha256",
+   TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256, true },
+ { "security.ssl3.ecdhe_rsa_chacha20_poly1305_sha256",
+   TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256, true },
+
+ { "security.tls13.aes_128_gcm_sha256",
+   TLS_AES_128_GCM_SHA256, true },
+ { "security.tls13.chacha20_poly1305_sha256",
+   TLS_CHACHA20_POLY1305_SHA256, true },
+ { "security.tls13.aes_256_gcm_sha384",
+   TLS_AES_256_GCM_SHA384, true },
+
+ { "security.ssl3.ecdhe_ecdsa_aes_256_gcm_sha384",
+   TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, false },  // disabled for performance
+ { "security.ssl3.ecdhe_rsa_aes_256_gcm_sha384",
+   TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, false },    // disabled for performance
+
  { "security.ssl3.ecdhe_rsa_aes_128_sha",
    TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, true },
  { "security.ssl3.ecdhe_ecdsa_aes_128_sha",
@@ -654,24 +672,54 @@ static const CipherPref sCipherPrefs[] = {
  { "security.ssl3.dhe_rsa_aes_256_sha",
    TLS_DHE_RSA_WITH_AES_256_CBC_SHA, true },
 
- { "security.ssl3.ecdhe_rsa_rc4_128_sha",
-   TLS_ECDHE_RSA_WITH_RC4_128_SHA, true, true }, // deprecated (RC4)
- { "security.ssl3.ecdhe_ecdsa_rc4_128_sha",
-   TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, true, true }, // deprecated (RC4)
-
+ // Deprecated (RSA key exchange):
+ { "security.ssl3.rsa_aes_256_gcm_sha384",
+   TLS_RSA_WITH_AES_256_GCM_SHA384, true }, 
+ { "security.ssl3.rsa_aes_256_sha256",
+   TLS_RSA_WITH_AES_256_CBC_SHA256, true }, 
+ {"security.ssl3.rsa_camellia_128_sha",
+   TLS_RSA_WITH_CAMELLIA_128_CBC_SHA, true },
+ {"security.ssl3.rsa_camellia_256_sha",
+   TLS_RSA_WITH_CAMELLIA_256_CBC_SHA, true },
  { "security.ssl3.rsa_aes_128_sha",
-   TLS_RSA_WITH_AES_128_CBC_SHA, true }, // deprecated (RSA key exchange)
+   TLS_RSA_WITH_AES_128_CBC_SHA, true },
  { "security.ssl3.rsa_aes_256_sha",
-   TLS_RSA_WITH_AES_256_CBC_SHA, true }, // deprecated (RSA key exchange)
- { "security.ssl3.rsa_des_ede3_sha",
-   TLS_RSA_WITH_3DES_EDE_CBC_SHA, true }, // deprecated (RSA key exchange, 3DES)
-
- { "security.ssl3.rsa_rc4_128_sha",
-   TLS_RSA_WITH_RC4_128_SHA, true, true }, // deprecated (RSA key exchange, RC4)
- { "security.ssl3.rsa_rc4_128_md5",
-   TLS_RSA_WITH_RC4_128_MD5, true, true }, // deprecated (RSA key exchange, RC4, HMAC-MD5)
+   TLS_RSA_WITH_AES_256_CBC_SHA, true },
 
  // All the rest are disabled by default
+
+ // As per RFC
+ { "security.ssl3.ecdhe_rsa_rc4_128_sha",
+   TLS_ECDHE_RSA_WITH_RC4_128_SHA, false, true }, // RC4
+ { "security.ssl3.ecdhe_ecdsa_rc4_128_sha",
+   TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, false, true }, // RC4
+ { "security.ssl3.rsa_rc4_128_sha",
+   TLS_RSA_WITH_RC4_128_SHA, false, true }, // RC4
+ { "security.ssl3.rsa_rc4_128_md5",
+   TLS_RSA_WITH_RC4_128_MD5, false, true }, // RC4, HMAC-MD5
+ {"security.ssl3.ecdh_ecdsa_rc4_128_sha", 
+   TLS_ECDH_ECDSA_WITH_RC4_128_SHA, false, true }, // RC4
+ {"security.ssl3.ecdh_rsa_rc4_128_sha", 
+   TLS_ECDH_RSA_WITH_RC4_128_SHA, false, true }, // RC4
+ // Expensive/deprecated
+ {"security.ssl3.rsa_fips_des_ede3_sha", SSL_RSA_FIPS_WITH_3DES_EDE_CBC_SHA, false, true },
+ {"security.ssl3.dhe_dss_camellia_256_sha", TLS_DHE_DSS_WITH_CAMELLIA_256_CBC_SHA, false, false },
+ {"security.ssl3.dhe_dss_camellia_128_sha", TLS_DHE_DSS_WITH_CAMELLIA_128_CBC_SHA, false, false },
+ {"security.ssl3.rsa_camellia_128_sha", TLS_RSA_WITH_CAMELLIA_128_CBC_SHA, false, false }, // RSA
+ {"security.ssl3.rsa_camellia_256_sha", TLS_RSA_WITH_CAMELLIA_256_CBC_SHA, false, false }, // RSA
+ {"security.ssl3.rsa_aes_128_gcm_sha256", TLS_RSA_WITH_AES_128_GCM_SHA256, false, false },
+ {"security.ssl3.rsa_aes_128_sha256", TLS_RSA_WITH_AES_128_CBC_SHA256, false, false },
+ // Vulnerable
+ {"security.ssl3.rsa_des_ede3_sha", TLS_RSA_WITH_3DES_EDE_CBC_SHA, false, true }, // (3DES)
+ // Non-ephemeral
+ {"security.ssl3.ecdh_ecdsa_aes_256_sha", TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA, false, false },
+ {"security.ssl3.ecdh_ecdsa_aes_128_sha", TLS_ECDH_ECDSA_WITH_AES_128_CBC_SHA, false, false },
+ {"security.ssl3.ecdh_ecdsa_des_ede3_sha", TLS_ECDH_ECDSA_WITH_3DES_EDE_CBC_SHA, false, false },
+ {"security.ssl3.ecdh_rsa_aes_256_sha", TLS_ECDH_RSA_WITH_AES_256_CBC_SHA, false, false },
+ {"security.ssl3.ecdh_rsa_aes_128_sha", TLS_ECDH_RSA_WITH_AES_128_CBC_SHA, false, false },
+ {"security.ssl3.ecdh_rsa_des_ede3_sha", TLS_ECDH_RSA_WITH_3DES_EDE_CBC_SHA, false, false },
+ // Obsolete
+ {"security.ssl3.rsa_seed_sha", TLS_RSA_WITH_SEED_CBC_SHA, false, false },
 
  { nullptr, 0 } // end marker
 };
@@ -679,8 +727,8 @@ static const CipherPref sCipherPrefs[] = {
 // Bit flags indicating what weak ciphers are enabled.
 // The bit index will correspond to the index in sCipherPrefs.
 // Wrtten by the main thread, read from any threads.
-static Atomic<uint32_t> sEnabledWeakCiphers;
-static_assert(MOZ_ARRAY_LENGTH(sCipherPrefs) - 1 <= sizeof(uint32_t) * CHAR_BIT,
+static uint64_t sEnabledWeakCiphers;
+static_assert(MOZ_ARRAY_LENGTH(sCipherPrefs) - 1 <= sizeof(uint64_t) * CHAR_BIT,
               "too many cipher suites");
 
 /*static*/ bool
@@ -692,10 +740,10 @@ nsNSSComponent::AreAnyWeakCiphersEnabled()
 /*static*/ void
 nsNSSComponent::UseWeakCiphersOnSocket(PRFileDesc* fd)
 {
-  const uint32_t enabledWeakCiphers = sEnabledWeakCiphers;
+  const uint64_t enabledWeakCiphers = sEnabledWeakCiphers;
   const CipherPref* const cp = sCipherPrefs;
   for (size_t i = 0; cp[i].pref; ++i) {
-    if (enabledWeakCiphers & ((uint32_t)1 << i)) {
+    if (enabledWeakCiphers & ((uint64_t)1 << i)) {
       SSL_CipherPrefSet(fd, cp[i].id, true);
     }
   }
@@ -737,6 +785,7 @@ static const bool REQUIRE_SAFE_NEGOTIATION_DEFAULT = false;
 static const bool FALSE_START_ENABLED_DEFAULT = true;
 static const bool NPN_ENABLED_DEFAULT = true;
 static const bool ALPN_ENABLED_DEFAULT = false;
+static const bool ENABLED_0RTT_DATA_DEFAULT = false;
 
 static void
 ConfigureTLSSessionIdentifiers()
@@ -824,9 +873,9 @@ CipherSuiteChangeObserver::Observe(nsISupports* aSubject,
           // Only the main thread will change sEnabledWeakCiphers.
           uint32_t enabledWeakCiphers = sEnabledWeakCiphers;
           if (cipherEnabled) {
-            enabledWeakCiphers |= ((uint32_t)1 << i);
+            enabledWeakCiphers |= ((uint64_t)1 << i);
           } else {
-            enabledWeakCiphers &= ~((uint32_t)1 << i);
+            enabledWeakCiphers &= ~((uint64_t)1 << i);
           }
           sEnabledWeakCiphers = enabledWeakCiphers;
         } else {
@@ -891,7 +940,7 @@ nsNSSComponent::setEnabledTLSVersions()
   // keep these values in sync with security-prefs.js
   // 0 means SSL 3.0, 1 means TLS 1.0, 2 means TLS 1.1, etc.
   static const uint32_t PSM_DEFAULT_MIN_TLS_VERSION = 1;
-  static const uint32_t PSM_DEFAULT_MAX_TLS_VERSION = 3;
+  static const uint32_t PSM_DEFAULT_MAX_TLS_VERSION = 4;
 
   uint32_t minFromPrefs = Preferences::GetUint("security.tls.version.min",
                                                PSM_DEFAULT_MIN_TLS_VERSION);
@@ -1069,6 +1118,10 @@ nsNSSComponent::InitializeNSS()
   SSL_OptionSetDefault(SSL_ENABLE_ALPN,
                        Preferences::GetBool("security.ssl.enable_alpn",
                                             ALPN_ENABLED_DEFAULT));
+
+  SSL_OptionSetDefault(SSL_ENABLE_0RTT_DATA,
+                       Preferences::GetBool("security.tls.enable_0rtt_data",
+                                            ENABLED_0RTT_DATA_DEFAULT));
 
   if (NS_FAILED(InitializeCipherSuite())) {
     PR_LOG(gPIPNSSLog, PR_LOG_ERROR, ("Unable to initialize cipher suite settings\n"));
@@ -1342,6 +1395,10 @@ nsNSSComponent::Observe(nsISupports* aSubject, const char* aTopic,
       SSL_OptionSetDefault(SSL_ENABLE_ALPN,
                            Preferences::GetBool("security.ssl.enable_alpn",
                                                 ALPN_ENABLED_DEFAULT));
+    } else if (prefName.EqualsLiteral("security.tls.enable_0rtt_data")) {
+      SSL_OptionSetDefault(SSL_ENABLE_0RTT_DATA,
+                           Preferences::GetBool("security.tls.enable_0rtt_data",
+                                                ENABLED_0RTT_DATA_DEFAULT));
     } else if (prefName.Equals("security.ssl.disable_session_identifiers")) {
       ConfigureTLSSessionIdentifiers();
     } else if (prefName.EqualsLiteral("security.OCSP.enabled") ||
@@ -1678,7 +1735,7 @@ InitializeCipherSuite()
   }
 
   // Now only set SSL/TLS ciphers we knew about at compile time
-  uint32_t enabledWeakCiphers = 0;
+  uint64_t enabledWeakCiphers = 0;
   const CipherPref* const cp = sCipherPrefs;
   for (size_t i = 0; cp[i].pref; ++i) {
     bool cipherEnabled = Preferences::GetBool(cp[i].pref,
@@ -1687,7 +1744,7 @@ InitializeCipherSuite()
       // Weak ciphers are not used by default. See the comment
       // in CipherSuiteChangeObserver::Observe for details.
       if (cipherEnabled) {
-        enabledWeakCiphers |= ((uint32_t)1 << i);
+        enabledWeakCiphers |= ((uint64_t)1 << i);
       }
     } else {
       SSL_CipherPrefSetDefault(cp[i].id, cipherEnabled);
