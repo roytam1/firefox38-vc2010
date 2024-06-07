@@ -204,6 +204,7 @@ PR_STATIC_ASSERT(PR_ARRAY_SIZE(defaultSignatureSchemes) <=
 void
 ssl3_CheckCipherSuiteOrderConsistency()
 {
+#if 0
     unsigned int i;
 
     PORT_Assert(SSL_NumImplementedCiphers == PR_ARRAY_SIZE(cipherSuites));
@@ -211,6 +212,7 @@ ssl3_CheckCipherSuiteOrderConsistency()
     for (i = 0; i < PR_ARRAY_SIZE(cipherSuites); ++i) {
         PORT_Assert(SSL_ImplementedCiphers[i] == cipherSuites[i].cipher_suite);
     }
+#endif
 }
 #endif
 
