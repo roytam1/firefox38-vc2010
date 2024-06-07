@@ -619,8 +619,8 @@
 @RESPATH@/components/InputMethod.manifest
 
 #ifdef MOZ_DEBUG
-@RESPATH@/components/TestInterfaceJS.js
-@RESPATH@/components/TestInterfaceJS.manifest
+;@RESPATH@/components/TestInterfaceJS.js
+;@RESPATH@/components/TestInterfaceJS.manifest
 #endif
 
 ; Modules

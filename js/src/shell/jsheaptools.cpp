@@ -102,8 +102,8 @@ class HeapReverser : public JSTracer, public JS::CustomAutoRooter
         bool marked;
 
       private:
-        Node(const Node&) = delete;
-        Node& operator=(const Node&) = delete;
+        Node(const Node&) MOZ_DELETE;
+        Node& operator=(const Node&) MOZ_DELETE;
     };
 
     /* Metadata for a heap edge we have traversed. */
@@ -272,7 +272,7 @@ HeapReverser::traverseEdge(void* cell, JSGCTraceKind kind)
          * visited from the main loop.
          */
         Node n(kind);
-        Generation generation = map.generation();
+        uint32_t generation = map.generation();
         if (!map.add(a, cell, Move(n)) ||
             !work.append(Child(cell, kind)))
             return false;

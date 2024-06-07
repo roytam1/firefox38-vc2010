@@ -772,7 +772,7 @@ class HashTable : private AllocPolicy
         Entry* entry_;
 #ifdef JS_DEBUG
         const HashTable* table_;
-        Generation generation;
+        uint32_t generation;
 #endif
 
       protected:
@@ -879,7 +879,7 @@ class HashTable : private AllocPolicy
 #ifdef JS_DEBUG
         const HashTable* table_;
         uint64_t mutationCount;
-        Generation generation;
+        uint32_t generation;
         bool validEntry;
 #endif
 
