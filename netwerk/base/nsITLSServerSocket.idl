@@ -73,7 +73,7 @@ interface nsITLSServerSocket : nsIServerSocket
  * method of the security observer has been called (see
  * |nsITLSServerSecurityObserver| below).
  */
-[scriptable, uuid(19668ea4-e5ad-4182-9698-7e890d48f327)]
+[scriptable, uuid(205e273d-2439-449b-bfc5-fc555c87dbc4)]
 interface nsITLSClientStatus : nsISupports
 {
   /**
