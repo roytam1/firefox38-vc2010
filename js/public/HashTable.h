@@ -33,6 +33,8 @@ namespace detail {
 
 /*****************************************************************************/
 
+typedef mozilla::Opaque<uint64_t> Generation;
+
 // A JS-friendly, STL-like container providing a hash-based map from keys to
 // values. In particular, HashMap calls constructors and destructors of all
 // objects added so non-PODs may be used safely.
@@ -206,7 +208,9 @@ class HashMap
 
     // If |generation()| is the same before and after a HashMap operation,
     // pointers into the table remain valid.
-    uint32_t generation() const                       { return impl.generation(); }
+    Generation generation() const {
+        return impl.generation();
+    }
 
     /************************************************** Shorthand operations */
 
@@ -437,7 +441,9 @@ class HashSet
 
     // If |generation()| is the same before and after a HashSet operation,
     // pointers into the table remain valid.
-    uint32_t generation() const                       { return impl.generation(); }
+    Generation generation() const {
+        return impl.generation();
+    }
 
     /************************************************** Shorthand operations */
 
@@ -772,7 +778,7 @@ class HashTable : private AllocPolicy
         Entry* entry_;
 #ifdef JS_DEBUG
         const HashTable* table_;
-        uint32_t generation;
+        Generation generation;
 #endif
 
       protected:
@@ -879,7 +885,7 @@ class HashTable : private AllocPolicy
 #ifdef JS_DEBUG
         const HashTable* table_;
         uint64_t mutationCount;
-        uint32_t generation;
+        Generation generation;
         bool validEntry;
 #endif
 
@@ -1530,10 +1536,10 @@ class HashTable : private AllocPolicy
         return JS_BIT(sHashBits - hashShift);
     }
 
-    uint32_t generation() const
+    Generation generation() const
     {
         MOZ_ASSERT(table);
-        return gen;
+        return Generation(gen);
     }
 
     size_t sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf) const

@@ -35,7 +35,7 @@ typedef HashSet<Shape*> ShapeSet;
 /* Detects cycles when traversing an object graph. */
 class AutoCycleDetector
 {
-    uint32_t hashsetGenerationAtInit;
+    Generation hashsetGenerationAtInit;
     JSContext* cx;
     RootedObject obj;
     ObjectSet::AddPtr hashsetAddPointer;
