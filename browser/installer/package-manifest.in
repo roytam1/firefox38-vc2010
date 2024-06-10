@@ -243,7 +243,9 @@
 #ifdef MOZ_GAMEPAD
 @RESPATH@/components/dom_gamepad.xpt
 #endif
+#ifdef MOZ_PAY
 @RESPATH@/components/dom_payment.xpt
+#endif
 @RESPATH@/components/dom_presentation.xpt
 @RESPATH@/components/downloads.xpt
 @RESPATH@/components/editor.xpt
@@ -495,10 +497,7 @@
 #ifdef MOZ_ENABLE_GNOME_COMPONENT
 @RESPATH@/components/@DLL_PREFIX@mozgnome@DLL_SUFFIX@
 #endif
-#ifdef MOZ_ENABLE_GNOMEVFS
-@RESPATH@/components/@DLL_PREFIX@nkgnomevfs@DLL_SUFFIX@
-#endif
-#if defined(MOZ_ENABLE_DBUS) || defined(MOZ_ENABLE_GNOME_COMPONENT) || defined(MOZ_ENABLE_GNOMEVFS)
+#if defined(MOZ_ENABLE_DBUS) || defined(MOZ_ENABLE_GNOME_COMPONENT)
 @RESPATH@/components/components.manifest
 #endif
 @RESPATH@/components/nsINIProcessor.manifest
@@ -590,9 +589,11 @@
 @RESPATH@/components/ActivityMessageConfigurator.js
 #endif
 
+#ifdef MOZ_PAY
 @RESPATH@/components/Payment.js
 @RESPATH@/components/PaymentFlowInfo.js
 @RESPATH@/components/Payment.manifest
+#endif
 
 #ifdef MOZ_WEBRTC
 @RESPATH@/components/PeerConnection.js
@@ -619,8 +620,8 @@
 @RESPATH@/components/InputMethod.manifest
 
 #ifdef MOZ_DEBUG
-;@RESPATH@/components/TestInterfaceJS.js
-;@RESPATH@/components/TestInterfaceJS.manifest
+@RESPATH@/components/TestInterfaceJS.js
+@RESPATH@/components/TestInterfaceJS.manifest
 #endif
 
 ; Modules

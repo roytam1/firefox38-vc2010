@@ -85,15 +85,20 @@ SOURCES += [
     'src/compiler/translator/glslang_tab.cpp',
 ]
 
-
+# Suppress warnings in third-party code.
 if CONFIG['GNU_CXX']:
     CXXFLAGS += [
         '-Wno-attributes',
+        '-Wno-shadow',
         '-Wno-sign-compare',
         '-Wno-unknown-pragmas',
+        '-Wno-unreachable-code',
     ]
-    if CONFIG['CLANG_CXX']:
-        CXXFLAGS += ['-Wno-unused-private-field']
+if CONFIG['CLANG_CXX']:
+    CXXFLAGS += [
+        '-Wno-inconsistent-missing-override',
+        '-Wno-unused-private-field',
+    ]
 
 if CONFIG['MOZ_DIRECTX_SDK_PATH'] and not CONFIG['MOZ_HAS_WINSDK_WITH_D3D']:
     CXXFLAGS += ['-I\'%s/include/\'' % CONFIG['MOZ_DIRECTX_SDK_PATH']]

@@ -438,6 +438,8 @@ nsStyleContext::GetUniqueStyleData(const nsStyleStructID& aSID)
 
   UNIQUE_CASE(Display)
   UNIQUE_CASE(Text)
+  UNIQUE_CASE(TextReset)
+  UNIQUE_CASE(Visibility)
 
 #undef UNIQUE_CASE
 
@@ -532,6 +534,23 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
 
   if ((mParent && mParent->HasPseudoElementData()) || mPseudoTag) {
     mBits |= NS_STYLE_HAS_PSEUDO_ELEMENT_DATA;
+  }
+
+  // CSS 2.1 10.1: Propagate the root element's 'direction' to the ICB.
+  // (PageContentFrame/CanvasFrame etc will inherit 'direction')
+  if (mPseudoTag == nsCSSAnonBoxes::viewport) {
+    nsPresContext* presContext = PresContext();
+    mozilla::dom::Element* docElement = presContext->Document()->GetRootElement();
+    if (docElement) {
+      nsRefPtr<nsStyleContext> rootStyle =
+        presContext->StyleSet()->ResolveStyleFor(docElement, nullptr);
+      auto dir = rootStyle->StyleVisibility()->mDirection;
+      if (dir != StyleVisibility()->mDirection) {
+        nsStyleVisibility* uniqueVisibility = 
+          (nsStyleVisibility*)GetUniqueStyleData(eStyleStruct_Visibility);
+        uniqueVisibility->mDirection = dir;
+      }
+    }
   }
 
   // Correct tables.
@@ -655,6 +674,24 @@ nsStyleContext::ApplyStyleFixups(bool aSkipParentDisplayBasedStyleFixup)
       disp->mDisplay == NS_STYLE_DISPLAY_RUBY_TEXT_CONTAINER) {
     CreateEmptyStyleData(eStyleStruct_Border);
     CreateEmptyStyleData(eStyleStruct_Padding);
+  }
+  if (disp->IsRubyDisplayType()) {
+    // Per CSS Ruby spec section Bidi Reordering, for all ruby boxes,
+    // the 'normal' and 'embed' values of 'unicode-bidi' should compute to
+    // 'isolate', and 'bidi-override' should compute to 'isolate-override'.
+    const nsStyleTextReset* textReset = StyleTextReset();
+    uint8_t unicodeBidi = textReset->mUnicodeBidi;
+    if (unicodeBidi == NS_STYLE_UNICODE_BIDI_NORMAL ||
+        unicodeBidi == NS_STYLE_UNICODE_BIDI_EMBED) {
+      unicodeBidi = NS_STYLE_UNICODE_BIDI_ISOLATE;
+    } else if (unicodeBidi == NS_STYLE_UNICODE_BIDI_OVERRIDE) {
+      unicodeBidi = NS_STYLE_UNICODE_BIDI_ISOLATE_OVERRIDE;
+    }
+    if (unicodeBidi != textReset->mUnicodeBidi) {
+      auto mutableTextReset = static_cast<nsStyleTextReset*>(
+        GetUniqueStyleData(eStyleStruct_TextReset));
+      mutableTextReset->mUnicodeBidi = unicodeBidi;
+    }
   }
 
   // Compute User Interface style, to trigger loads of cursors
