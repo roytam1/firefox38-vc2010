@@ -3498,6 +3498,16 @@ Selection::AddItem(nsRange* aItem, int32_t* aOutIndex)
 
   NS_ASSERTION(aOutIndex, "aOutIndex can't be null");
 
+/* XXX: The following code block splits selections up into selection ranges
+ * excluding nodes that are unselectable because of -moz-user-select CSS
+ * keywords. The resulting array of ranges causes a huge performance hit in
+ * layout for minor display enhancements for selected text (the text actually
+ * copied to clipboard etc. is correct).
+ * For now, this behavior has been disabled until a better/acceptable solution
+ * is available.
+ * See also BMO bugs 619273, 739396, 1216001 and 1258476
+ */
+#if 0 
   if (mApplyUserSelectStyle) {
     nsAutoTArray<nsRefPtr<nsRange>, 4> rangesToAdd;
     aItem->ExcludeNonSelectableNodes(&rangesToAdd);
@@ -3527,6 +3537,7 @@ Selection::AddItem(nsRange* aItem, int32_t* aOutIndex)
     }
     return NS_OK;
   }
+#endif
   return AddItemInternal(aItem, aOutIndex);
 }
 

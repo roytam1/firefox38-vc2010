@@ -92,7 +92,7 @@
         this._initialized = true;
 
         this.searchService.init((function search_init_cb(aStatus) {
-          // Bail out if the binding's been destroyed
+          // Bail out if the binding has been destroyed
           if (!this._initialized)
             return;
 

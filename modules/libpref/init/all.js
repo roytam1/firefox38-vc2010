@@ -452,12 +452,6 @@ pref("media.mediasource.enabled", true);
 pref("media.mediasource.enabled", false);
 #endif
 
-#ifdef RELEASE_BUILD
-pref("media.mediasource.whitelist", true);
-#else
-pref("media.mediasource.whitelist", false);
-#endif // RELEASE_BUILD
-
 pref("media.mediasource.mp4.enabled", true);
 pref("media.mediasource.webm.enabled", false);
 
@@ -474,6 +468,8 @@ pref("media.encoder.omx.enabled", true);
 
 // Whether to autostart a media element with an |autoplay| attribute
 pref("media.autoplay.enabled", true);
+// Whether to autostart a media element with an autoplaying script event
+pref("media.autoplay.allowscripted", true);
 
 // The default number of decoded video frames that are enqueued in
 // MediaDecoderReader's mVideoQueue.
@@ -597,11 +593,7 @@ pref("gfx.color_management.enablev4", true);
 
 pref("gfx.downloadable_fonts.enabled", true);
 pref("gfx.downloadable_fonts.fallback_delay", 3000);
-#ifdef RELEASE_BUILD
-pref("gfx.downloadable_fonts.woff2.enabled", false);
-#else
 pref("gfx.downloadable_fonts.woff2.enabled", true);
-#endif
 
 #ifdef ANDROID
 pref("gfx.bundled_fonts.enabled", true);
@@ -1062,6 +1054,7 @@ pref("javascript.options.mem.max", -1);
 pref("javascript.options.mem.gc_per_compartment", true);
 pref("javascript.options.mem.gc_incremental", true);
 pref("javascript.options.mem.gc_incremental_slice_ms", 20);
+pref("javascript.options.mem.gc_generational", false);
 pref("javascript.options.mem.gc_compacting", true);
 pref("javascript.options.mem.log", false);
 pref("javascript.options.mem.notify", false);
@@ -2376,8 +2369,8 @@ pref("dom.ipc.plugins.java.enabled", false);
 pref("dom.ipc.plugins.flash.disable-protected-mode", false);
 
 // How long we wait before unloading an idle plugin process.
-// Defaults to 30 seconds.
-pref("dom.ipc.plugins.unloadTimeoutSecs", 30);
+// Defaults to 1 minute.
+pref("dom.ipc.plugins.unloadTimeoutSecs", 60);
 
 pref("dom.ipc.plugins.asyncInit", false);
 
@@ -3833,6 +3826,10 @@ pref("image.multithreaded_decoding.limit", -1);
 // cache.
 pref("canvas.image.cache.limit", 0);
 
+// Allow track-fobics to deliberately poison canvas data for
+// toDataURL() and getImageData()
+pref("canvas.poisondata", false);
+
 // How many images to eagerly decode on a given page. 0 means "no limit".
 pref("image.onload.decode.limit", 0);
 
@@ -4082,7 +4079,7 @@ pref("dom.vibrator.max_vibrate_ms", 10000);
 pref("dom.vibrator.max_vibrate_list_len", 128);
 
 // Battery API
-pref("dom.battery.enabled", true);
+pref("dom.battery.enabled", false);
 
 // Image srcset
 pref("dom.image.srcset.enabled", true);
