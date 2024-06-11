@@ -577,6 +577,7 @@ nsContextMenu.prototype = {
     this.linkURL           = "";
     this.linkURI           = null;
     this.linkProtocol      = "";
+    this.linkDownload      = "";
     this.linkHasNoReferrer = false;
     this.onMathML          = false;
     this.inFrame           = false;
@@ -740,6 +741,18 @@ nsContextMenu.prototype = {
           this.linkProtocol = this.getLinkProtocol();
           this.onMailtoLink = (this.linkProtocol == "mailto");
           this.onSaveableLink = this.isLinkSaveable( this.link );
+          try {
+            if (elem.download) {
+              // Ignore download attribute on cross-origin links?
+              // This shoudn't be an issue because the download link presents
+              // the originating URL domain and protocol to help user understand
+              // from where file is downloaded and make right decision.
+              // If we decide we want this restriction:
+              // this.principal.checkMayLoad(this.linkURI, false, true);
+              this.linkDownload = elem.download;
+            }
+          }
+          catch (ex) {}          
           this.linkHasNoReferrer = BrowserUtils.linkHasNoReferrer(elem);
         }
 
@@ -1149,7 +1162,8 @@ nsContextMenu.prototype = {
 
   // Helper function to wait for appropriate MIME-type headers and
   // then prompt the user with a file picker
-  saveHelper: function(linkURL, linkText, dialogTitle, bypassCache, doc) {
+  saveHelper: function(linkURL, linkText, dialogTitle, bypassCache, doc,
+                       linkDownload) {
     // canonical def in nsURILoader.h
     const NS_ERROR_SAVE_LINK_AS_TIMEOUT = 0x805d0020;
 
@@ -1255,6 +1269,8 @@ nsContextMenu.prototype = {
                                                null, // aTriggeringPrincipal
                                                Ci.nsILoadInfo.SEC_NORMAL,
                                                Ci.nsIContentPolicy.TYPE_OTHER);
+    if (linkDownload)
+      channel.contentDispositionFilename = linkDownload;
     if (channel instanceof Ci.nsIPrivateBrowsingChannel) {
       let docIsPrivate = PrivateBrowsingUtils.isBrowserPrivate(gBrowser.selectedBrowser);
       channel.setPrivate(docIsPrivate);
@@ -1299,7 +1315,8 @@ nsContextMenu.prototype = {
       linkText = this.linkText();
     urlSecurityCheck(this.linkURL, this.principal);
 
-    this.saveHelper(this.linkURL, linkText, null, true, doc);
+    this.saveHelper(this.linkURL, linkText, null, true, doc,
+                    this.linkDownload);
   },
 
   // Backwards-compatibility wrapper
@@ -1324,7 +1341,7 @@ nsContextMenu.prototype = {
     else if (this.onVideo || this.onAudio) {
       urlSecurityCheck(this.mediaURL, this.principal);
       var dialogTitle = this.onVideo ? "SaveVideoTitle" : "SaveAudioTitle";
-      this.saveHelper(this.mediaURL, null, dialogTitle, false, doc);
+      this.saveHelper(this.mediaURL, null, dialogTitle, false, doc, "");
     }
   },
 

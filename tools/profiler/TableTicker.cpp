@@ -10,7 +10,6 @@
 #include <sstream>
 #include "GeckoProfiler.h"
 #include "SaveProfileTask.h"
-#include "ProfileEntry.h"
 #include "SyncProfile.h"
 #include "platform.h"
 #include "nsThreadUtils.h"
@@ -35,7 +34,6 @@
 #include "nsDirectoryServiceDefs.h"
 #include "nsIObserverService.h"
 #include "mozilla/Services.h"
-#include "PlatformMacros.h"
 #include "nsTArray.h"
 
 #if defined(SPS_OS_android) && !defined(MOZ_WIDGET_GONK)
@@ -63,14 +61,6 @@ typedef ucontext_t tickcontext_t;
 #if defined(LINUX) || defined(XP_MACOSX)
 #include <sys/types.h>
 pid_t gettid();
-#endif
-
-#if defined(SPS_ARCH_arm) && defined(MOZ_WIDGET_GONK)
- // Should also work on other Android and ARM Linux, but not tested there yet.
- #define USE_EHABI_STACKWALK
-#endif
-#ifdef USE_EHABI_STACKWALK
- #include "EHABIStackWalk.h"
 #endif
 
 using std::string;
@@ -394,7 +384,7 @@ void addDynamicTag(ThreadProfile &aProfile, char aTagName, const char *aStr)
 
 static
 void addPseudoEntry(volatile StackEntry &entry, ThreadProfile &aProfile,
-                    PseudoStack *stack, void *lastpc)
+                    ProfileStack *stack, void *lastpc)
 {
   // Pseudo-frames with the BEGIN_PSEUDO_JS flag are just annotations
   // and should not be recorded in the profile.
@@ -478,9 +468,9 @@ struct AutoWalkJSStack {
 static
 void mergeStacksIntoProfile(ThreadProfile& aProfile, TickSample* aSample, NativeStack& aNativeStack)
 {
-  PseudoStack* pseudoStack = aProfile.GetPseudoStack();
-  volatile StackEntry *pseudoFrames = pseudoStack->mStack;
-  uint32_t pseudoCount = pseudoStack->stackSize();
+  ProfileStack* profileStack = aProfile.GetStack();
+  volatile StackEntry *pseudoFrames = profileStack->mStack;
+  uint32_t profileCount = profileStack->stackSize();
 
   // Make a copy of the JS stack into a JSFrame array. This is necessary since,
   // like the native stack, the JS stack is iterated youngest-to-oldest and we
@@ -667,74 +657,6 @@ void TableTicker::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSample
 }
 #endif
 
-#ifdef USE_EHABI_STACKWALK
-void TableTicker::doNativeBacktrace(ThreadProfile &aProfile, TickSample* aSample)
-{
-  void *pc_array[1000];
-  void *sp_array[1000];
-  NativeStack nativeStack = {
-    pc_array,
-    sp_array,
-    mozilla::ArrayLength(pc_array),
-    0
-  };
-
-  const mcontext_t *mcontext = &reinterpret_cast<ucontext_t *>(aSample->context)->uc_mcontext;
-  mcontext_t savedContext;
-  PseudoStack *pseudoStack = aProfile.GetPseudoStack();
-
-  nativeStack.count = 0;
-  // The pseudostack contains an "EnterJIT" frame whenever we enter
-  // JIT code with profiling enabled; the stack pointer value points
-  // the saved registers.  We use this to unwind resume unwinding
-  // after encounting JIT code.
-  for (uint32_t i = pseudoStack->stackSize(); i > 0; --i) {
-    // The pseudostack grows towards higher indices, so we iterate
-    // backwards (from callee to caller).
-    volatile StackEntry &entry = pseudoStack->mStack[i - 1];
-    if (!entry.isJs() && strcmp(entry.label(), "EnterJIT") == 0) {
-      // Found JIT entry frame.  Unwind up to that point (i.e., force
-      // the stack walk to stop before the block of saved registers;
-      // note that it yields nondecreasing stack pointers), then restore
-      // the saved state.
-      uint32_t *vSP = reinterpret_cast<uint32_t*>(entry.stackAddress());
-
-      nativeStack.count += EHABIStackWalk(*mcontext,
-                                          /* stackBase = */ vSP,
-                                          sp_array + nativeStack.count,
-                                          pc_array + nativeStack.count,
-                                          nativeStack.size - nativeStack.count);
-
-      memset(&savedContext, 0, sizeof(savedContext));
-      // See also: struct EnterJITStack in js/src/jit/arm/Trampoline-arm.cpp
-      savedContext.arm_r4 = *vSP++;
-      savedContext.arm_r5 = *vSP++;
-      savedContext.arm_r6 = *vSP++;
-      savedContext.arm_r7 = *vSP++;
-      savedContext.arm_r8 = *vSP++;
-      savedContext.arm_r9 = *vSP++;
-      savedContext.arm_r10 = *vSP++;
-      savedContext.arm_fp = *vSP++;
-      savedContext.arm_lr = *vSP++;
-      savedContext.arm_sp = reinterpret_cast<uint32_t>(vSP);
-      savedContext.arm_pc = savedContext.arm_lr;
-      mcontext = &savedContext;
-    }
-  }
-
-  // Now unwind whatever's left (starting from either the last EnterJIT
-  // frame or, if no EnterJIT was found, the original registers).
-  nativeStack.count += EHABIStackWalk(*mcontext,
-                                      aProfile.GetStackTop(),
-                                      sp_array + nativeStack.count,
-                                      pc_array + nativeStack.count,
-                                      nativeStack.size - nativeStack.count);
-
-  mergeStacksIntoProfile(aProfile, aSample, nativeStack);
-}
-
-#endif
-
 static
 void doSampleStackTrace(ThreadProfile &aProfile, TickSample *aSample, bool aAddLeafAddresses)
 {
@@ -769,7 +691,7 @@ void TableTicker::InplaceTick(TickSample* sample)
 
   PseudoStack* stack = currThreadProfile.GetPseudoStack();
 
-#if defined(USE_NS_STACKWALK) || defined(USE_EHABI_STACKWALK)
+#if defined(USE_NS_STACKWALK)
   if (mUseStackWalk) {
     doNativeBacktrace(currThreadProfile, sample);
   } else {
@@ -827,7 +749,7 @@ namespace {
 
 SyncProfile* NewSyncProfile()
 {
-  PseudoStack* stack = tlsPseudoStack.get();
+  ProfileStack *stack = tlsStack.get();
   if (!stack) {
     MOZ_ASSERT(stack);
     return nullptr;
@@ -873,7 +795,7 @@ SyncProfile* TableTicker::GetBacktrace()
   return profile;
 }
 
-static void print_callback(const ProfileEntry& entry, const char* tagStringData)
+void print_callback(const ProfileEntry& entry, const char* tagStringData) {
 {
   switch (entry.getTagName()) {
     case 's':

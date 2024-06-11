@@ -20,11 +20,21 @@ const Windows8WindowFrameColor = {
 
     const HKCU = Ci.nsIWindowsRegKey.ROOT_KEY_CURRENT_USER;
     const dwmKey = "Software\\Microsoft\\Windows\\DWM";
+
+    // Window frame base color component values when Color Intensity is at 0.
+    let frameBaseColor = 217;
+
     let customizationColor = Registry.readRegKey(HKCU, dwmKey,
                                                  "ColorizationColor");
-    if (!customizationColor) {
-      // Seems to be the default color (hardcoded because of bug 1065998)
-      return [158, 158, 158];
+    let win10ColorPrevalence = WindowsRegistry.readRegKey(HKCU, dwmKey,
+                                                          "ColorPrevalence");
+    if (typeof win10ColorPrevalence === "undefined") {
+      // Key doesn't exist, meaning we are on Win 8.x, where this is always true.
+      win10ColorPrevalence = 1;
+    }
+    if (typeof customizationColor === "undefined" || !win10ColorPrevalence) {
+      // Return the default color if unset or colorization not used
+      return this._windowFrameColor = [frameBaseColor, frameBaseColor, frameBaseColor];
     }
     // The color returned from the Registry is in decimal form.
     let customizationColorHex = customizationColor.toString(16);
@@ -33,9 +43,11 @@ const Windows8WindowFrameColor = {
     let customizationColorArray = customizationColorHex.match(/../g);
     let [unused, fgR, fgG, fgB] = customizationColorArray.map(function(val) parseInt(val, 16));
     let colorizationColorBalance = Registry.readRegKey(HKCU, dwmKey,
-                                                       "ColorizationColorBalance") || 78;
-     // Window frame base color when Color Intensity is at 0, see bug 1004576.
-    let frameBaseColor = 217;
+                                                             "ColorizationColorBalance");
+    // Default to balance=78 if reg key isn't defined
+    if (typeof colorizationColorBalance === "undefined") {
+      colorizationColorBalance = 78;
+    }
     let alpha = colorizationColorBalance / 100;
 
     // Alpha-blend the foreground color with the frame base color.

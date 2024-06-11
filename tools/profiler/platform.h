@@ -26,9 +26,6 @@
 // OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 // SUCH DAMAGE.
 
-#ifndef TOOLS_PLATFORM_H_
-#define TOOLS_PLATFORM_H_
-
 #ifdef ANDROID
 #include <android/log.h>
 #else
@@ -45,7 +42,6 @@
 #include "mozilla/unused.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/Mutex.h"
-#include "PlatformMacros.h"
 #include "ThreadResponsiveness.h"
 #include "v8-support.h"
 #include <vector>
@@ -56,29 +52,22 @@
 
 #define ASSERT(a) MOZ_ASSERT(a)
 
-bool moz_profiler_verbose();
-
 #ifdef ANDROID
 # if defined(__arm__) || defined(__thumb__)
 #  define ENABLE_SPS_LEAF_DATA
 #  define ENABLE_ARM_LR_SAVING
 # endif
 # define LOG(text) \
-    do { if (moz_profiler_verbose()) \
-           __android_log_write(ANDROID_LOG_ERROR, "Profiler", text); \
-    } while (0)
+    __android_log_write(ANDROID_LOG_ERROR, "profiler", text)
 # define LOGF(format, ...) \
-    do { if (moz_profiler_verbose()) \
-           __android_log_print(ANDROID_LOG_ERROR, "Profiler", format, \
-                               __VA_ARGS__); \
-    } while (0)
-
+    __android_log_print(ANDROID_LOG_ERROR, "profiler", format, __VA_ARGS__)
 #else
+extern bool moz_profiler_verbose();
 # define LOG(text) \
-    do { if (moz_profiler_verbose()) fprintf(stderr, "Profiler: %s\n", text); \
+    do { if (moz_profiler_verbose()) printf("Profiler: %s\n", text); \
     } while (0)
 # define LOGF(format, ...) \
-    do { if (moz_profiler_verbose()) fprintf(stderr, "Profiler: " format \
+    do { if (moz_profiler_verbose()) printf("Profiler: " format         \
                                              "\n", __VA_ARGS__);        \
     } while (0)
 
@@ -240,8 +229,6 @@ extern int     sUnwindStackScan;  /* max # of dubious frames allowed */
 
 extern int     sProfileEntries;   /* how many entries do we store? */
 
-void set_tls_stack_top(void* stackTop);
-
 // ----------------------------------------------------------------------------
 // Sampler
 //
@@ -351,7 +338,7 @@ class Sampler {
 
   static bool RegisterCurrentThread(const char* aName,
                                     PseudoStack* aPseudoStack,
-                                    bool aIsMainThread, void* stackTop);
+                                    bool aIsMainThread);
   static void UnregisterCurrentThread();
 
   static void Startup();
@@ -401,7 +388,7 @@ class Sampler {
 
 class ThreadInfo {
  public:
-  ThreadInfo(const char* aName, int aThreadId, bool aIsMainThread, PseudoStack* aPseudoStack, void* aStackTop);
+  ThreadInfo(const char* aName, int aThreadId, bool aIsMainThread, PseudoStack* aPseudoStack);
 
   virtual ~ThreadInfo();
 
@@ -415,7 +402,6 @@ class ThreadInfo {
   ThreadProfile* Profile() const { return mProfile; }
 
   PlatformData* GetPlatformData() const { return mPlatformData; }
-  void* StackTop() const { return mStackTop; }
 
   virtual void SetPendingDelete();
   bool IsPendingDelete() const { return mPendingDelete; }
@@ -435,7 +421,6 @@ class ThreadInfo {
   PseudoStack* mPseudoStack;
   PlatformData* mPlatformData;
   ThreadProfile* mProfile;
-  void* const mStackTop;
   nsCOMPtr<nsIThread> mThread;
   bool mPendingDelete;
 };
@@ -443,10 +428,8 @@ class ThreadInfo {
 // Just like ThreadInfo, but owns a reference to the PseudoStack.
 class StackOwningThreadInfo : public ThreadInfo {
  public:
-  StackOwningThreadInfo(const char* aName, int aThreadId, bool aIsMainThread, PseudoStack* aPseudoStack, void* aStackTop);
+  StackOwningThreadInfo(const char* aName, int aThreadId, bool aIsMainThread, PseudoStack* aPseudoStack);
   virtual ~StackOwningThreadInfo();
 
   virtual void SetPendingDelete();
 };
-
-#endif /* ndef TOOLS_PLATFORM_H_ */

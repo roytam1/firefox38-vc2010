@@ -498,8 +498,8 @@ class Build(MachCommandBase):
                     print('To take your build for a test drive, run: |mach run|')
                 app = self.substs['MOZ_BUILD_APP']
                 if app in ('browser', 'mobile/android'):
-                    print('For more information on what to do now, see '
-                        'https://developer.mozilla.org/docs/Developer_Guide/So_You_Just_Built_Firefox')
+                    print('Please remember that you also need to PACKAGE your build '
+                        'to have all components properly included and unnecessary files removed.')
             except Exception:
                 # Ignore Exceptions in case we can't find config.status (such
                 # as when doing OSX Universal builds)
@@ -860,6 +860,24 @@ class Package(MachCommandBase):
         description='Package the built product for distribution as an APK, DMG, etc.')
     def package(self):
         return self._run_make(directory=".", target='package', ensure_exit_code=False)
+		
+@CommandProvider
+class Installer(MachCommandBase):
+    """Create the windows installer for the built product."""
+
+    @Command('installer', category='post-build',
+        description='Create the installer for the built product for distribution.')
+    def installer(self):
+        return self._run_make(directory=".", target='installer', ensure_exit_code=False)
+
+@CommandProvider
+class Mar(MachCommandBase):
+    """Create the mar file for the built product."""
+
+    @Command('mar', category='post-build',
+        description='Create the mar file for the built product for distribution.')
+    def mar(self):
+        return self._run_make(directory="./tools/update-packaging/", target='', ensure_exit_code=False)
 
 @CommandProvider
 class Install(MachCommandBase):
