@@ -15,7 +15,6 @@
 #include "ContentChild.h"
 
 #include "BlobChild.h"
-#include "CrashReporterChild.h"
 #include "GeckoProfiler.h"
 #include "TabChild.h"
 
@@ -30,7 +29,6 @@
 #include "mozilla/dom/ContentBridgeParent.h"
 #include "mozilla/dom/DOMStorageIPC.h"
 #include "mozilla/dom/ExternalHelperAppChild.h"
-#include "mozilla/dom/PCrashReporterChild.h"
 #include "mozilla/dom/ProcessGlobal.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/asmjscache/AsmJSCache.h"
@@ -620,11 +618,6 @@ ContentChild::Init(MessageLoop* aIOLoop,
     // resources.
     int xSocketFd = ConnectionNumber(DefaultXDisplay());
     SendBackUpXResources(FileDescriptor(xSocketFd));
-#endif
-
-#ifdef MOZ_CRASHREPORTER
-    SendPCrashReporterConstructor(CrashReporter::CurrentThreadId(),
-                                  XRE_GetProcessType());
 #endif
 
     GetCPOWManager();
@@ -1376,24 +1369,6 @@ ContentChild::SendPBlobConstructor(PBlobChild* aActor,
     return PContentChild::SendPBlobConstructor(aActor, aParams);
 }
 
-PCrashReporterChild*
-ContentChild::AllocPCrashReporterChild(const mozilla::dom::NativeThreadId& id,
-                                       const uint32_t& processType)
-{
-#ifdef MOZ_CRASHREPORTER
-    return new CrashReporterChild();
-#else
-    return nullptr;
-#endif
-}
-
-bool
-ContentChild::DeallocPCrashReporterChild(PCrashReporterChild* crashreporter)
-{
-    delete crashreporter;
-    return true;
-}
-
 PHalChild*
 ContentChild::AllocPHalChild()
 {
@@ -1858,16 +1833,6 @@ ContentChild::ProcessingError(Result aCode, const char* aReason)
             NS_RUNTIMEABORT("not reached");
     }
 
-#if defined(MOZ_CRASHREPORTER) && !defined(MOZ_B2G)
-    if (ManagedPCrashReporterChild().Length() > 0) {
-        CrashReporterChild* crashReporter =
-            static_cast<CrashReporterChild*>(ManagedPCrashReporterChild()[0]);
-            nsDependentCString reason(aReason);
-            crashReporter->SendAnnotateCrashReport(
-                NS_LITERAL_CSTRING("ipc_channel_error"),
-                reason);
-    }
-#endif
     NS_RUNTIMEABORT("Content child abort due to IPC error");
 }
 

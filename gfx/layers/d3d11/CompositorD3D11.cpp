@@ -16,7 +16,6 @@
 #include "mozilla/layers/Effects.h"
 #include "nsWindowsHelpers.h"
 #include "gfxPrefs.h"
-#include "gfxCrashReporterUtils.h"
 #include "gfxVR.h"
 
 #include "mozilla/EnumeratedArray.h"
@@ -132,8 +131,6 @@ bool
 CompositorD3D11::Initialize()
 {
   bool force = gfxPrefs::LayersAccelerationForceEnabled();
-
-  ScopedGfxFeatureReporter reporter("D3D11 Layers", force);
 
   if (!gfxPlatform::CanUseDirect3D11()) {
     NS_WARNING("Direct3D 11-accelerated layers are not supported on this system.");
@@ -427,7 +424,6 @@ CompositorD3D11::Initialize()
                                        DXGI_MWA_NO_WINDOW_CHANGES);
   }
 
-  reporter.SetSuccessful();
   return true;
 }
 

@@ -36,15 +36,6 @@ XPCOMUtils.defineLazyGetter(Services, "dirsvc", function () {
            .QueryInterface(Ci.nsIProperties);
 });
 
-#ifdef MOZ_CRASHREPORTER
-XPCOMUtils.defineLazyGetter(Services, "crashmanager", () => {
-  let ns = {};
-  Components.utils.import("resource://gre/modules/CrashManager.jsm", ns);
-
-  return ns.CrashManager.Singleton;
-});
-#endif
-
 let initTable = [
 #ifdef MOZ_WIDGET_ANDROID
   ["androidBridge", "@mozilla.org/android/bridge;1", "nsIAndroidBridge"],
@@ -64,9 +55,6 @@ let initTable = [
   ["obs", "@mozilla.org/observer-service;1", "nsIObserverService"],
   ["perms", "@mozilla.org/permissionmanager;1", "nsIPermissionManager"],
   ["prompt", "@mozilla.org/embedcomp/prompt-service;1", "nsIPromptService"],
-#ifdef MOZ_ENABLE_PROFILER_SPS
-  ["profiler", "@mozilla.org/tools/profiler;1", "nsIProfiler"],
-#endif
   ["scriptloader", "@mozilla.org/moz/jssubscript-loader;1", "mozIJSSubScriptLoader"],
   ["scriptSecurityManager", "@mozilla.org/scriptsecuritymanager;1", "nsIScriptSecurityManager"],
 #ifdef MOZ_TOOLKIT_SEARCH

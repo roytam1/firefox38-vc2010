@@ -21,16 +21,8 @@
 #include "nsThreadUtils.h"
 #include "nsXULAppAPI.h"
 
-#ifdef MOZ_CRASHREPORTER
-#include "nsExceptionHandler.h"
-#endif
-
 #ifdef XP_WIN
 #include <windows.h>
-#endif
-
-#if defined(MOZ_ENABLE_PROFILER_SPS) && defined(MOZ_PROFILING) && defined(XP_WIN)
-  #define REPORT_CHROME_HANGS
 #endif
 
 namespace mozilla {
@@ -111,11 +103,6 @@ Crash()
   if (::IsDebuggerPresent()) {
     return;
   }
-#endif
-
-#ifdef MOZ_CRASHREPORTER
-  CrashReporter::AnnotateCrashReport(NS_LITERAL_CSTRING("Hang"),
-                                     NS_LITERAL_CSTRING("1"));
 #endif
 
   NS_RUNTIMEABORT("HangMonitor triggered");

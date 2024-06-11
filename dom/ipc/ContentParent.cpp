@@ -27,7 +27,6 @@
 #include "AppProcessChecker.h"
 #include "AudioChannelService.h"
 #include "BlobParent.h"
-#include "CrashReporterParent.h"
 #include "IHistory.h"
 #include "mozIApplication.h"
 #ifdef ACCESSIBILITY
@@ -206,20 +205,12 @@ using namespace mozilla::system;
 #include "nsIBrowserSearchService.h"
 #endif
 
-#ifdef MOZ_ENABLE_PROFILER_SPS
-#include "nsIProfiler.h"
-#include "nsIProfileSaveEvent.h"
-#endif
-
 static NS_DEFINE_CID(kCClipboardCID, NS_CLIPBOARD_CID);
 static const char* sClipboardTextFlavors[] = { kUnicodeMime };
 
 using base::ChildPrivileges;
 using base::KillProcess;
 
-#ifdef MOZ_CRASHREPORTER
-using namespace CrashReporter;
-#endif
 using namespace mozilla::dom::bluetooth;
 using namespace mozilla::dom::cellbroadcast;
 using namespace mozilla::dom::devicestorage;
@@ -606,11 +597,6 @@ static const char* sObserverTopics[] = {
     "a11y-init-or-shutdown",
 #endif
     "app-theme-changed",
-#ifdef MOZ_ENABLE_PROFILER_SPS
-    "profiler-started",
-    "profiler-stopped",
-    "profiler-subprocess",
-#endif
 };
 
 /* static */ already_AddRefed<ContentParent>
@@ -1855,40 +1841,6 @@ ContentParent::ActorDestroy(ActorDestroyReason why)
 
             props->SetPropertyAsBool(NS_LITERAL_STRING("abnormal"), true);
 
-#ifdef MOZ_CRASHREPORTER
-            // There's a window in which child processes can crash
-            // after IPC is established, but before a crash reporter
-            // is created.
-            if (ManagedPCrashReporterParent().Length() > 0) {
-                CrashReporterParent* crashReporter =
-                    static_cast<CrashReporterParent*>(ManagedPCrashReporterParent()[0]);
-
-                // If we're an app process, always stomp the latest URI
-                // loaded in the child process with our manifest URL.  We
-                // would rather associate the crashes with apps than
-                // random child windows loaded in them.
-                //
-                // XXX would be nice if we could get both ...
-                if (!mAppManifestURL.IsEmpty()) {
-                    crashReporter->AnnotateCrashReport(NS_LITERAL_CSTRING("URL"),
-                                                       NS_ConvertUTF16toUTF8(mAppManifestURL));
-                }
-
-                if (mCreatedPairedMinidumps) {
-                    // We killed the child with KillHard, so two minidumps should already
-                    // exist - one for the content process, and one for the browser process.
-                    // The "main" minidump of this crash report is the content processes,
-                    // and we use GenerateChildData to annotate our crash report with
-                    // information about the child process.
-                    crashReporter->GenerateChildData(nullptr);
-                } else {
-                    crashReporter->GenerateCrashReport(this, nullptr);
-                }
-
-                nsAutoString dumpID(crashReporter->ChildDumpID());
-                props->SetPropertyAsAString(NS_LITERAL_STRING("dumpID"), dumpID);
-            }
-#endif
         }
         obs->NotifyObservers((nsIPropertyBag2*) props, "ipc:content-shutdown", nullptr);
     }
@@ -2937,31 +2889,6 @@ ContentParent::Observe(nsISupports* aSubject,
     else if (!strcmp(aTopic, "app-theme-changed")) {
         unused << SendOnAppThemeChanged();
     }
-#ifdef MOZ_ENABLE_PROFILER_SPS
-    else if (!strcmp(aTopic, "profiler-started")) {
-        nsCOMPtr<nsIProfilerStartParams> params(do_QueryInterface(aSubject));
-        uint32_t entries;
-        double interval;
-        params->GetEntries(&entries);
-        params->GetInterval(&interval);
-        const nsTArray<nsCString>& features = params->GetFeatures();
-        const nsTArray<nsCString>& threadFilterNames = params->GetThreadFilterNames();
-        unused << SendStartProfiler(entries, interval, features, threadFilterNames);
-    }
-    else if (!strcmp(aTopic, "profiler-stopped")) {
-        unused << SendStopProfiler();
-    }
-    else if (!strcmp(aTopic, "profiler-subprocess")) {
-        nsCOMPtr<nsIProfileSaveEvent> pse = do_QueryInterface(aSubject);
-        if (pse) {
-            nsCString result;
-            unused << SendGetProfile(&result);
-            if (!result.IsEmpty()) {
-                pse->AddSubProfile(result.get());
-            }
-        }
-    }
-#endif
     return NS_OK;
 }
 
@@ -3185,40 +3112,6 @@ ContentParent::KillHard(const char* aReason)
     mCalledKillHard = true;
     mForceKillTask = nullptr;
 
-#if defined(MOZ_CRASHREPORTER) && !defined(MOZ_B2G)
-    if (ManagedPCrashReporterParent().Length() > 0) {
-        CrashReporterParent* crashReporter =
-            static_cast<CrashReporterParent*>(ManagedPCrashReporterParent()[0]);
-
-        // We're about to kill the child process associated with this
-        // ContentParent. Something has gone wrong to get us here,
-        // so we generate a minidump to be potentially submitted in
-        // a crash report. ContentParent::ActorDestroy is where the
-        // actual report gets generated, once the child process has
-        // finally died.
-        if (crashReporter->GeneratePairedMinidump(this)) {
-            mCreatedPairedMinidumps = true;
-            // GeneratePairedMinidump created two minidumps for us - the main
-            // one is for the content process we're about to kill, and the other
-            // one is for the main browser process. That second one is the extra
-            // minidump tagging along, so we have to tell the crash reporter that
-            // it exists and is being appended.
-            nsAutoCString additionalDumps("browser");
-            crashReporter->AnnotateCrashReport(
-                NS_LITERAL_CSTRING("additional_minidumps"),
-                additionalDumps);
-            if (IsKillHardAnnotationSet()) {
-              crashReporter->AnnotateCrashReport(
-                  NS_LITERAL_CSTRING("kill_hard"),
-                  GetKillHardAnnotation());
-            }
-            nsDependentCString reason(aReason ? aReason : "");
-            crashReporter->AnnotateCrashReport(
-                NS_LITERAL_CSTRING("ipc_channel_error"),
-                reason);
-        }
-    }
-#endif
     if (!KillProcess(OtherProcess(), 1, false)) {
         NS_WARNING("failed to kill subprocess!");
     }
@@ -3263,33 +3156,6 @@ ContentParent::FriendlyName(nsAString& aName, bool aAnonymize)
     } else {
         aName.AssignLiteral("???");
     }
-}
-
-PCrashReporterParent*
-ContentParent::AllocPCrashReporterParent(const NativeThreadId& tid,
-                                         const uint32_t& processType)
-{
-#ifdef MOZ_CRASHREPORTER
-    return new CrashReporterParent();
-#else
-    return nullptr;
-#endif
-}
-
-bool
-ContentParent::RecvPCrashReporterConstructor(PCrashReporterParent* actor,
-                                             const NativeThreadId& tid,
-                                             const uint32_t& processType)
-{
-    static_cast<CrashReporterParent*>(actor)->SetChildData(tid, processType);
-    return true;
-}
-
-bool
-ContentParent::DeallocPCrashReporterParent(PCrashReporterParent* crashreporter)
-{
-    delete crashreporter;
-    return true;
 }
 
 hal_sandbox::PHalParent*
