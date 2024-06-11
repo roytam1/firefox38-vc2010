@@ -502,9 +502,11 @@ case "$target" in
             MSVS_VERSION=2010
             MSVC_C_RUNTIME_DLL=msvcr100.dll
             MSVC_CXX_RUNTIME_DLL=msvcp100.dll
+            # C4275: non dll-interface class 'stdext::exception' used as base for dll-interface class 'this'
             # C4355: 'this' : used in base member initializer list
-            CFLAGS="$CFLAGS -wd4355"
-            CXXFLAGS="$CXXFLAGS -wd4355"
+            # C4396: 'this' : the inline specifier cannot be used when a friend declaration refers to a specialization of a function template
+            CFLAGS="$CFLAGS -wd4275 -wd4355 -wd4396"
+            CXXFLAGS="$CXXFLAGS -wd4275 -wd4355 -wd4396"
         elif test "$_CC_MAJOR_VERSION" = "18" -a "$_CC_BUILD_VERSION" -ge "30723"; then
             _CC_SUITE=12
             MSVS_VERSION=2013
