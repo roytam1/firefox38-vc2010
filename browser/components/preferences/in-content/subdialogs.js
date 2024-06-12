@@ -260,8 +260,8 @@ let gSubDialog = {
 
     let docEl = frame.contentDocument.documentElement;
     let persistedAttributes = docEl.getAttribute("persist");
-    if (!persistedAttributes.contains("width") &&
-        !persistedAttributes.contains("height")) {
+    if (!persistedAttributes.includes("width") &&
+        !persistedAttributes.includes("height")) {
       return;
     }
 

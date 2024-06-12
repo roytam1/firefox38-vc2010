@@ -210,6 +210,8 @@ toolkit.jar:
         skin/classic/global/tree/sort-dsc-classic.png            (tree/sort-dsc-classic.png)
         skin/classic/global/tree/twisty-clsd.png                 (tree/twisty-clsd.png)
         skin/classic/global/tree/twisty-open.png                 (tree/twisty-open.png)
+        skin/classic/global/tree/twisty.svg                      (tree/twisty.svg)
+        skin/classic/global/tree/twisty-10.svg                   (tree/twisty-10.svg)
 
 #ifdef XP_WIN
 toolkit.jar:
@@ -419,4 +421,6 @@ toolkit.jar:
         skin/classic/aero/global/tree/twisty-open-rtl.png                (tree/twisty-open-rtl-aero.png)
         skin/classic/aero/global/tree/twisty-open-hover.png              (tree/twisty-open-hover-aero.png)
         skin/classic/aero/global/tree/twisty-open-hover-rtl.png          (tree/twisty-open-hover-rtl-aero.png)
+        skin/classic/aero/global/tree/twisty.svg                      (tree/twisty.svg)
+        skin/classic/aero/global/tree/twisty-10.svg                   (tree/twisty-10.svg)
 #endif

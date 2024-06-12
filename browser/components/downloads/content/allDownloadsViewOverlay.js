@@ -418,8 +418,8 @@ HistoryDownloadElementShell.prototype = {
       return true;
     }
     aTerm = aTerm.toLowerCase();
-    return this.displayName.toLowerCase().contains(aTerm) ||
-           this.download.source.url.toLowerCase().contains(aTerm);
+    return this.displayName.toLowerCase().includes(aTerm) ||
+           this.download.source.url.toLowerCase().includes(aTerm);
   },
 
   // Handles return keypress on the element (the keypress listener is
@@ -1391,9 +1391,9 @@ DownloadsPlacesView.prototype = {
 
   onDragOver(aEvent) {
     let types = aEvent.dataTransfer.types;
-    if (types.contains("text/uri-list") ||
-        types.contains("text/x-moz-url") ||
-        types.contains("text/plain")) {
+    if (types.includes("text/uri-list") ||
+        types.includes("text/x-moz-url") ||
+        types.includes("text/plain")) {
       aEvent.preventDefault();
     }
   },

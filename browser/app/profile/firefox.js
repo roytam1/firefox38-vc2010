@@ -1351,6 +1351,7 @@ pref("devtools.errorconsole.enabled", false);
 // Developer toolbar and GCLI preferences
 pref("devtools.toolbar.enabled", true);
 pref("devtools.toolbar.visible", false);
+pref("devtools.gcli.allowSet", false);
 pref("devtools.commands.dir", "");
 
 // Enable the app manager
@@ -1404,6 +1405,7 @@ pref("devtools.inspector.showAllAnonymousContent", false);
 pref("devtools.defaultColorUnit", "hex");
 
 // Enable the Responsive UI tool
+pref("devtools.responsiveUI.enabled", true);
 pref("devtools.responsiveUI.no-reload-notification", false);
 
 // Enable the Debugger
@@ -1480,14 +1482,12 @@ pref("devtools.tilt.enabled", true);
 pref("devtools.tilt.intro_transition", true);
 pref("devtools.tilt.outro_transition", true);
 
-// Scratchpad settings
-// - recentFileMax: The maximum number of recently-opened files
-//                  stored. Setting this preference to 0 will not
-//                  clear any recent files, but rather hide the
-//                  'Open Recent'-menu.
-// - showTrailingSpace: Whether to highlight trailing space or not.
-// - enableCodeFolding: Whether to enable code folding or not.
-// - enableAutocompletion: Whether to enable JavaScript autocompletion.
+// Enable the Scratchpad tool.
+pref("devtools.scratchpad.enabled", true);
+
+// The maximum number of recently-opened files stored.
+// Setting this preference to 0 will not clear any recent files, but rather hide
+// the 'Open Recent'-menu.
 pref("devtools.scratchpad.recentFilesMax", 10);
 pref("devtools.scratchpad.showTrailingSpace", false);
 pref("devtools.scratchpad.enableAutocompletion", true);
@@ -1503,6 +1503,9 @@ pref("devtools.styleeditor.showMediaSidebar", true);
 pref("devtools.styleeditor.mediaSidebarWidth", 238);
 pref("devtools.styleeditor.navSidebarWidth", 245);
 pref("devtools.styleeditor.transitions", true);
+
+// Enable tools for Chrome development.
+pref("devtools.chrome.enabled", false);
 
 // Enable the Shader Editor.
 pref("devtools.shadereditor.enabled", false);
@@ -1599,7 +1602,7 @@ pref("devtools.eyedropper.zoom", 6);
 // - keymap: which keymap to use (can be 'default', 'emacs' or 'vim')
 // - autoclosebrackets: whether to permit automatic bracket/quote closing.
 // - detectindentation: whether to detect the indentation from the file
-pref("devtools.editor.tabsize", 2);
+pref("devtools.editor.tabsize", 4);
 pref("devtools.editor.expandtab", true);
 pref("devtools.editor.keymap", "default");
 pref("devtools.editor.autoclosebrackets", true);

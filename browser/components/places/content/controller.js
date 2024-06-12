@@ -1477,7 +1477,7 @@ let PlacesControllerDragHelper = {
     // If no supported flavor is found, check if data includes text/plain
     // contents.  If so, request them as text/unicode, a conversion will happen
     // automatically.
-    if (aFlavors.contains("text/plain")) {
+    if (aFlavors.includes("text/plain")) {
         return PlacesUtils.TYPE_UNICODE;
     }
 
