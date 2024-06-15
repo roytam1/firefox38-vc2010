@@ -62,7 +62,6 @@ vpx_codec_get_cx_data
 vpx_codec_enc_config_default
 vpx_img_alloc
 vpx_codec_encode
-vpx_mem_set_functions
 #endif
 #endif
 #ifdef MOZ_VORBIS
@@ -153,6 +152,8 @@ th_info_init
 th_packet_isheader
 th_packet_iskeyframe
 th_setup_free
+downmix_int
+opus_custom_mode_create
 opus_decoder_create
 opus_decoder_destroy
 opus_decoder_ctl
@@ -171,6 +172,7 @@ opus_encoder_destroy
 opus_encoder_ctl
 opus_encode
 opus_encode_float
+run_analysis
 #ifndef MOZ_NATIVE_PNG
 MOZ_APNG_get_first_frame_is_hidden
 MOZ_APNG_get_next_frame_blend_op
@@ -580,6 +582,7 @@ hb_font_create
 hb_font_destroy
 hb_font_funcs_create
 hb_font_funcs_set_glyph_contour_point_func
+hb_font_funcs_set_glyph_extents_func
 hb_font_funcs_set_glyph_func
 hb_font_funcs_set_glyph_h_advance_func
 hb_font_funcs_set_glyph_h_kerning_func

@@ -21,12 +21,6 @@ namespace mozilla {
 class MediaResource;
 class MediaDecoderReader;
 
-namespace dom {
-
-class TimeRanges;
-
-} // namespace dom
-
 class SourceBufferDecoder final : public AbstractMediaDecoder
 {
 public:
@@ -64,7 +58,6 @@ public:
   virtual void SetMediaEndTime(int64_t aTime) final override;
   virtual void SetMediaSeekable(bool aMediaSeekable) final override;
   virtual void UpdateEstimatedMediaDuration(int64_t aDuration) final override;
-  virtual void UpdatePlaybackPosition(int64_t aTime) final override;
   virtual bool HasInitializationData() final override;
 
   // SourceBufferResource specific interface below.
@@ -73,7 +66,7 @@ public:
 
   // Warning: this mirrors GetBuffered in MediaDecoder, but this class's base is
   // AbstractMediaDecoder, which does not supply this interface.
-  nsresult GetBuffered(dom::TimeRanges* aBuffered);
+  media::TimeIntervals GetBuffered();
 
   void SetReader(MediaDecoderReader* aReader)
   {

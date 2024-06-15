@@ -46,7 +46,7 @@ namespace dom {
 class AppendDataRunnable : public nsRunnable {
 public:
   AppendDataRunnable(SourceBuffer* aSourceBuffer,
-                     LargeDataBuffer* aData,
+                     MediaLargeByteBuffer* aData,
                      double aTimestampOffset,
                      uint32_t aUpdateID)
   : mSourceBuffer(aSourceBuffer)
@@ -65,7 +65,7 @@ public:
 
 private:
   nsRefPtr<SourceBuffer> mSourceBuffer;
-  nsRefPtr<LargeDataBuffer> mData;
+  nsRefPtr<MediaLargeByteBuffer> mData;
   double mTimestampOffset;
   uint32_t mUpdateID;
 };
@@ -146,17 +146,14 @@ SourceBuffer::GetBuffered(ErrorResult& aRv)
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return nullptr;
   }
-  nsRefPtr<TimeRanges> ranges = new TimeRanges();
-  double highestEndTime = mTrackBuffer->Buffered(ranges);
-  if (mMediaSource->ReadyState() == MediaSourceReadyState::Ended) {
-    // Set the end time on the last range to highestEndTime by adding a
-    // new range spanning the current end time to highestEndTime, which
-    // Normalize() will then merge with the old last range.
-    ranges->Add(ranges->GetEndTime(), highestEndTime);
-    ranges->Normalize();
-  }
+  // We only manage a single trackbuffer in our source buffer.
+  // As such, there's no need to adjust the end of the trackbuffers as per
+  // Step 4: http://w3c.github.io/media-source/index.html#widl-SourceBuffer-buffered
+  media::TimeIntervals ranges = mTrackBuffer->Buffered();
   MSE_DEBUGV("ranges=%s", DumpTimeRanges(ranges).get());
-  return ranges.forget();
+  nsRefPtr<dom::TimeRanges> tr = new dom::TimeRanges();
+  ranges.ToTimeRanges(tr);
+  return tr.forget();
 }
 
 void
@@ -287,8 +284,8 @@ SourceBuffer::DoRangeRemoval(double aStart, double aEnd)
 {
   MSE_DEBUG("DoRangeRemoval(%f, %f)", aStart, aEnd);
   if (mTrackBuffer && !IsInfinite(aStart)) {
-    mTrackBuffer->RangeRemoval(media::Microseconds::FromSeconds(aStart),
-                               media::Microseconds::FromSeconds(aEnd));
+    mTrackBuffer->RangeRemoval(media::TimeUnit::FromSeconds(aStart),
+                               media::TimeUnit::FromSeconds(aEnd));
   }
 }
 
@@ -425,7 +422,7 @@ SourceBuffer::AppendData(const uint8_t* aData, uint32_t aLength, ErrorResult& aR
 {
   MSE_DEBUG("AppendData(aLength=%u)", aLength);
 
-  nsRefPtr<LargeDataBuffer> data = PrepareAppend(aData, aLength, aRv);
+  nsRefPtr<MediaLargeByteBuffer> data = PrepareAppend(aData, aLength, aRv);
   if (!data) {
     return;
   }
@@ -439,7 +436,7 @@ SourceBuffer::AppendData(const uint8_t* aData, uint32_t aLength, ErrorResult& aR
 }
 
 void
-SourceBuffer::AppendData(LargeDataBuffer* aData, double aTimestampOffset,
+SourceBuffer::AppendData(MediaLargeByteBuffer* aData, double aTimestampOffset,
                          uint32_t aUpdateID)
 {
   if (!mUpdating || aUpdateID != mUpdateID) {
@@ -528,7 +525,7 @@ SourceBuffer::AppendError(bool aDecoderError)
   }
 }
 
-already_AddRefed<LargeDataBuffer>
+already_AddRefed<MediaLargeByteBuffer>
 SourceBuffer::PrepareAppend(const uint8_t* aData, uint32_t aLength, ErrorResult& aRv)
 {
   if (!IsAttached() || mUpdating) {
@@ -574,7 +571,7 @@ SourceBuffer::PrepareAppend(const uint8_t* aData, uint32_t aLength, ErrorResult&
     return nullptr;
   }
 
-  nsRefPtr<LargeDataBuffer> data = new LargeDataBuffer();
+  nsRefPtr<MediaLargeByteBuffer> data = new MediaLargeByteBuffer();
   if (!data->AppendElements(aData, aLength)) {
     aRv.Throw(NS_ERROR_DOM_QUOTA_EXCEEDED_ERR);
     return nullptr;

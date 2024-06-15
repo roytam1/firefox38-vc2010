@@ -728,18 +728,18 @@ static bool underMetaDataPath(const Vector<uint32_t> &path) {
 }
 
 // Given a time in seconds since Jan 1 1904, produce a human-readable string.
-static void convertTimeToDate(int64_t time_1904, String8 *s) {
+static bool convertTimeToDate(int64_t time_1904, String8 *s) {
     time_t time_1970 = time_1904 - (((66 * 365 + 17) * 24) * 3600);
 
     if (time_1970 < 0) {
-        s->clear();
-        return;
+        return false;
     }
 
     char tmp[32];
     strftime(tmp, sizeof(tmp), "%Y%m%dT%H%M%S.000Z", gmtime(&time_1970));
 
     s->setTo(tmp);
+    return true;
 }
 
 static bool ValidInputSize(int32_t size) {
@@ -876,6 +876,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 track->includes_expensive_metadata = false;
                 track->skipTrack = false;
                 track->timescale = 0;
+                track->empty_duration = 0;
                 track->segment_duration = 0;
                 track->media_time = 0;
                 track->meta->setCString(kKeyMIMEType, "application/octet-stream");
@@ -943,19 +944,25 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_IO;
             }
 
-            if (entry_count != 1) {
-                // we only support a single entry at the moment, for gapless playback
-                ALOGW("ignoring edit list with %d entries", entry_count);
-            } else if (mHeaderTimescale == 0) {
-                ALOGW("ignoring edit list because timescale is 0");
-            } else {
-                off64_t entriesoffset = data_offset + 8;
-
+            off64_t entriesoffset = data_offset + 8;
+            bool nonEmptyCount = false;
+            for (uint32_t i = 0; i < entry_count; i++) {
+                if (mHeaderTimescale == 0) {
+                    ALOGW("ignoring edit list because timescale is 0");
+                    break;
+                }
+                if (entriesoffset - data_offset > chunk_size) {
+                    ALOGW("invalid edit list size");
+                    break;
+                }
+                uint64_t segment_duration;
+                int64_t media_time;
                 if (version == 1) {
-                    if (!mDataSource->getUInt64(entriesoffset, &mLastTrack->segment_duration) ||
-                            !mDataSource->getUInt64(entriesoffset + 8, (uint64_t*)&mLastTrack->media_time)) {
+                    if (!mDataSource->getUInt64(entriesoffset, &segment_duration) ||
+                            !mDataSource->getUInt64(entriesoffset + 8, (uint64_t*)&media_time)) {
                         return ERROR_IO;
                     }
+                    entriesoffset += 16;
                 } else if (version == 0) {
                     uint32_t sd;
                     int32_t mt;
@@ -963,15 +970,31 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                             !mDataSource->getUInt32(entriesoffset + 4, (uint32_t*)&mt)) {
                         return ERROR_IO;
                     }
-                    mLastTrack->segment_duration = sd;
-                    mLastTrack->media_time = mt;
+                    entriesoffset += 8;
+                    segment_duration = sd;
+                    media_time = mt;
                 } else {
                     return ERROR_IO;
                 }
-
-                storeEditList();
-
+                entriesoffset += 4; // ignore media_rate_integer and media_rate_fraction.
+                if (media_time == -1 && i) {
+                    ALOGW("ignoring invalid empty edit", i);
+                    break;
+                } else if (media_time == -1) {
+                    // Starting offsets for tracks (streams) are represented by an initial empty edit.
+                    mLastTrack->empty_duration = segment_duration;
+                    continue;
+                } else if (nonEmptyCount) {
+                    // we only support a single non-empty entry at the moment, for gapless playback
+                    ALOGW("multiple edit list entries, A/V sync will be wrong");
+                    break;
+                } else {
+                    nonEmptyCount = true;
+                }
+                mLastTrack->segment_duration = segment_duration;
+                mLastTrack->media_time = media_time;
             }
+            storeEditList();
             *offset += chunk_size;
             break;
         }
@@ -1288,11 +1311,6 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 mLastTrack->meta->setCString(kKeyMIMEType, FourCC2MIME(chunk_type));
                 AdjustChannelsAndRate(chunk_type, &num_channels, &sample_rate);
             }
-            ALOGV("*** coding='%s' %d channels, size %d, rate %d\n",
-                   chunk, num_channels, sample_size, sample_rate);
-            mLastTrack->meta->setInt32(kKeyChannelCount, num_channels);
-            mLastTrack->meta->setInt32(kKeySampleSize, sample_size);
-            mLastTrack->meta->setInt32(kKeySampleRate, sample_rate);
 
             uint64_t skip = 0;
             if (qt_version == 1) {
@@ -1322,11 +1340,36 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     return ERROR_IO;
                 }
                 uint32_t structSize = ntohl(structSize32);
+                // Read SampleRate.
+                uint64_t sample_rate64;
+                if (mDataSource->readAt(
+                            data_offset + 32, &sample_rate64, sizeof(sample_rate64))
+                        < (ssize_t)sizeof(sample_rate64)) {
+                    return ERROR_IO;
+                }
+                uint64_t i_value = ntoh64(sample_rate64);
+                void* v_value = reinterpret_cast<void*>(&i_value);
+                sample_rate = uint32_t(*reinterpret_cast<double*>(v_value));
+                // Read ChannelCount.
+                uint32_t channel_count32;
+                if (mDataSource->readAt(
+                            data_offset + 40, &channel_count32, sizeof(channel_count32))
+                        < (ssize_t)sizeof(channel_count32)) {
+                    return ERROR_IO;
+                }
+                num_channels = ntohl(channel_count32);
+
                 skip += 36;
                 if (structSize > 72) {
                     skip += structSize - 72;
                 }
             }
+            ALOGV("*** coding='%s' %d channels, size %d, rate %d\n",
+                   chunk, num_channels, sample_size, sample_rate);
+            mLastTrack->meta->setInt32(kKeyChannelCount, num_channels);
+            mLastTrack->meta->setInt32(kKeySampleSize, sample_size);
+            mLastTrack->meta->setInt32(kKeySampleRate, sample_rate);
+
             off64_t stop_offset = *offset + chunk_size;
             *offset = data_offset + sizeof(buffer) + skip;
             while (*offset < stop_offset) {
@@ -1764,8 +1807,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             }
 
             String8 s;
-            convertTimeToDate(creationTime, &s);
-            if (s.length()) {
+            if (convertTimeToDate(creationTime, &s)) {
                 mFileMetaData->setCString(kKeyDate, s.string());
             }
 
@@ -1959,13 +2001,14 @@ void MPEG4Extractor::storeEditList()
     return;
   }
 
-  uint64_t segment_duration = (mLastTrack->segment_duration * 1000000)/ mHeaderTimescale;
+  uint64_t segment_duration = (mLastTrack->segment_duration * 1000000) / mHeaderTimescale;
   // media_time is measured in media time scale units.
   int64_t media_time = (mLastTrack->media_time * 1000000) / mLastTrack->timescale;
 
-  if (segment_duration == 0) {
-    mLastTrack->meta->setInt64(kKeyMediaTime, media_time);
-  }
+  // empty_duration is in the Movie Header Box's timescale.
+  int64_t empty_duration = (mLastTrack->empty_duration * 1000000) / mHeaderTimescale;
+  media_time -= empty_duration;
+  mLastTrack->meta->setInt64(kKeyMediaTime, media_time);
 
   int64_t duration;
   int32_t samplerate;
@@ -4131,9 +4174,10 @@ nsTArray<MediaSource::Indice> MPEG4Source::exportIndex()
       uint32_t compositionTime;
       uint32_t duration;
       bool isSyncSample;
+      uint32_t decodeTime;
       if (mSampleTable->getMetaDataForSample(sampleIndex, &offset, &size,
                                              &compositionTime, &duration,
-                                             &isSyncSample) != OK) {
+                                             &isSyncSample, &decodeTime) != OK) {
           ALOGE("Unexpected sample table problem");
           continue;
       }
@@ -4147,6 +4191,7 @@ nsTArray<MediaSource::Indice> MPEG4Source::exportIndex()
       indice.end_composition =
           (compositionTime * 1000000ll + duration * 1000000ll) / mTimescale;
       indice.sync = isSyncSample;
+      indice.start_decode = (decodeTime * 1000000ll) / mTimescale;
       MOZ_ALWAYS_TRUE(index.AppendElement(indice));
   }
 

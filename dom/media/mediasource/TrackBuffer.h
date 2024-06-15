@@ -22,13 +22,7 @@ namespace mozilla {
 
 class ContainerParser;
 class MediaSourceDecoder;
-class LargeDataBuffer;
-
-namespace dom {
-
-class TimeRanges;
-
-} // namespace dom
+class MediaLargeByteBuffer;
 
 class TrackBuffer final {
 public:
@@ -41,7 +35,7 @@ public:
   // Append data to the current decoder.  Also responsible for calling
   // NotifyDataArrived on the decoder to keep buffered range computation up
   // to date.  Returns false if the append failed.
-  nsRefPtr<TrackBufferAppendPromise> AppendData(LargeDataBuffer* aData,
+  nsRefPtr<TrackBufferAppendPromise> AppendData(MediaLargeByteBuffer* aData,
                                                 int64_t aTimestampOffset /* microseconds */);
 
   // Evicts data held in the current decoders SourceBufferResource from the
@@ -56,10 +50,9 @@ public:
   // of the buffer through to aTime.
   void EvictBefore(double aTime);
 
-  // Returns the highest end time of all of the buffered ranges in the
-  // decoders managed by this TrackBuffer, and returns the union of the
-  // decoders buffered ranges in aRanges. This may be called on any thread.
-  double Buffered(dom::TimeRanges* aRanges);
+  // Returns the union of the decoders buffered ranges in aRanges.
+  // This may be called on any thread.
+  media::TimeIntervals Buffered();
 
   // Mark the current decoder's resource as ended, clear mCurrentDecoder and
   // reset mLast{Start,End}Timestamp.  Main thread only.
@@ -75,6 +68,8 @@ public:
   // Returns true iff mParser->HasInitData() and the decoder using that init
   // segment has successfully initialized by setting mHas{Audio,Video}..
   bool IsReady();
+
+  bool IsWaitingOnCDMResource();
 
   // Returns true if any of the decoders managed by this track buffer
   // contain aTime in their buffered ranges.
@@ -97,8 +92,8 @@ public:
   // Implementation is only partial, we can only trim a buffer.
   // Returns true if data was evicted.
   // Times are in microseconds.
-  bool RangeRemoval(mozilla::media::Microseconds aStart,
-                    mozilla::media::Microseconds aEnd);
+  bool RangeRemoval(mozilla::media::TimeUnit aStart,
+                    mozilla::media::TimeUnit aEnd);
 
   // Abort any pending appendBuffer by rejecting any pending promises.
   void AbortAppendData();
@@ -120,6 +115,7 @@ public:
 
 private:
   friend class DecodersToInitialize;
+  friend class MetadataRecipient;
   ~TrackBuffer();
 
   // Create a new decoder, set mCurrentDecoder to the new decoder and
@@ -131,8 +127,10 @@ private:
 
   // Helper for AppendData, ensures NotifyDataArrived is called whenever
   // data is appended to the current decoder's SourceBufferResource.
-  bool AppendDataToCurrentResource(LargeDataBuffer* aData,
+  bool AppendDataToCurrentResource(MediaLargeByteBuffer* aData,
                                    uint32_t aDuration /* microseconds */);
+  // Queue on the parent's decoder task queue a call to NotifyTimeRangesChanged.
+  void NotifyTimeRangesChanged();
 
   // Queue execution of InitializeDecoder on mTaskQueue.
   bool QueueInitializeDecoder(SourceBufferDecoder* aDecoder);
@@ -165,6 +163,13 @@ private:
   // Remove all empty decoders from the provided list;
   void RemoveEmptyDecoders(nsTArray<SourceBufferDecoder*>& aDecoders);
 
+  void OnMetadataRead(MetadataHolder* aMetadata,
+                      SourceBufferDecoder* aDecoder,
+                      bool aWasEnded);
+
+  void OnMetadataNotRead(ReadMetadataFailureReason aReason,
+                         SourceBufferDecoder* aDecoder);
+
   nsAutoPtr<ContainerParser> mParser;
 
   // A task queue using the shared media thread pool.  Used exclusively to
@@ -185,10 +190,6 @@ private:
   // Access protected by mParentDecoder's monitor.
   nsTArray<nsRefPtr<SourceBufferDecoder>> mInitializedDecoders;
 
-  // Decoders which are waiting on a Content Decryption Module to be able to
-  // finish ReadMetadata.
-  nsTArray<nsRefPtr<SourceBufferDecoder>> mWaitingDecoders;
-
   // The decoder that the owning SourceBuffer is currently appending data to.
   // Modified on the main thread only.
   nsRefPtr<SourceBufferDecoder> mCurrentDecoder;
@@ -206,6 +207,9 @@ private:
   int64_t mLastTimestampOffset;
   int64_t mAdjustedTimestamp;
 
+  // True if at least one of our decoders has encrypted content.
+  bool mIsWaitingOnCDM;
+
   // Set when the first decoder used by this TrackBuffer is initialized.
   // Protected by mParentDecoder's monitor.
   MediaInfo mInfo;
@@ -216,7 +220,8 @@ private:
   bool mShutdown;
 
   MediaPromiseHolder<TrackBufferAppendPromise> mInitializationPromise;
-
+  // Track our request for metadata from the reader.
+  MediaPromiseConsumerHolder<MediaDecoderReader::MetadataPromise> mMetadataRequest;
 };
 
 } // namespace mozilla

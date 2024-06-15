@@ -162,8 +162,7 @@ AudioSink::AudioLoop()
 
   if (NS_FAILED(InitializeAudioStream())) {
     NS_WARNING("Initializing AudioStream failed.");
-    ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
-    mStateMachine->OnAudioSinkError();
+    mStateMachine->DispatchOnAudioSinkError();
     return;
   }
 
@@ -203,7 +202,7 @@ AudioSink::AudioLoop()
     }
     int64_t endTime = GetEndTime();
     if (endTime != -1) {
-      mStateMachine->OnAudioEndTimeUpdate(endTime);
+      mStateMachine->DispatchOnAudioEndTimeUpdate(endTime);
     }
   }
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
@@ -257,7 +256,7 @@ AudioSink::Cleanup()
   AssertCurrentThreadInMonitor();
   nsRefPtr<AudioStream> audioStream;
   audioStream.swap(mAudioStream);
-  mStateMachine->OnAudioSinkComplete();
+  mStateMachine->DispatchOnAudioSinkComplete();
 
   ReentrantMonitorAutoExit exit(GetReentrantMonitor());
   audioStream->Shutdown();
@@ -341,7 +340,7 @@ AudioSink::PlayFromAudioQueue()
   StartAudioStreamPlaybackIfNeeded();
 
   if (audio->mOffset != -1) {
-    mStateMachine->OnPlaybackOffsetUpdate(audio->mOffset);
+    mStateMachine->DispatchOnPlaybackOffsetUpdate(audio->mOffset);
   }
   return audio->mFrames;
 }

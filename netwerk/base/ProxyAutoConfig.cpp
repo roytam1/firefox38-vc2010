@@ -416,8 +416,8 @@ bool PACDnsResolve(JSContext *cx, unsigned int argc, JS::Value *vp)
     return false;
   }
 
-  JS::Rooted<JSString*> arg1(cx, JS::ToString(cx, args[0]));
-  if (!arg1)
+  JS::Rooted<JSString*> arg1(cx);
+  if (!JS_ConvertArguments(cx, args, "S", arg1.address()))
     return false;
 
   nsAutoJSString hostName;
@@ -465,8 +465,8 @@ bool PACProxyAlert(JSContext *cx, unsigned int argc, JS::Value *vp)
 {
   JS::CallArgs args = CallArgsFromVp(argc, vp);
 
-  JS::Rooted<JSString*> arg1(cx, JS::ToString(cx, args[0]));
-  if (!arg1)
+  JS::Rooted<JSString*> arg1(cx);
+  if (!JS_ConvertArguments(cx, args, "S", arg1.address()))
     return false;
 
   nsAutoJSString message;

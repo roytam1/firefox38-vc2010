@@ -76,7 +76,6 @@ nsresult RawReader::ReadMetadata(MediaInfo* aInfo,
     return NS_ERROR_FAILURE;
   }
 
-  mInfo.mVideo.mHasVideo = true;
   mInfo.mVideo.mDisplay = display;
 
   mFrameRate = static_cast<float>(mMetadata.framerateNumerator) /
@@ -290,7 +289,7 @@ nsresult RawReader::SeekInternal(int64_t aTime)
   return NS_OK;
 }
 
-nsresult RawReader::GetBuffered(dom::TimeRanges* aBuffered)
+media::TimeIntervals RawReader::GetBuffered()
 {
-  return NS_OK;
+  return media::TimeIntervals();
 }

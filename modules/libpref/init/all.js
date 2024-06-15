@@ -39,8 +39,7 @@ pref("browser.cache.auto_delete_cache_version", 0);
 // Preference for switching the cache backend, can be changed freely at runtime
 // 0 - use the old (Darin's) cache
 // 1 - use the new cache back-end (cache v2)
-pref("browser.cache.use_new_backend",       0);
-pref("browser.cache.use_new_backend_temp",  true);
+pref("browser.cache.backend", 1);
 
 pref("browser.cache.disk.enable",           true);
 // Is this the first-time smartsizing has been introduced?
@@ -105,6 +104,14 @@ pref("offline-apps.quota.warn",        51200);
 // 1 => best speed
 // 9 => best compression
 pref("browser.cache.compression_level", 3);
+
+#ifdef XP_WIN
+// Save internet zone information on downloaded files:
+// 0 => Never
+// 1 => Always
+// 2 => Use system setting
+pref("browser.download.saveZoneInformation", 2);
+#endif
 
 // Whether or not MozAbortablePromise is enabled.
 pref("dom.abortablepromise.enabled", false);
@@ -206,6 +213,9 @@ pref("browser.display.normal_lineheight_calc_control", 2);
 pref("browser.display.show_image_placeholders", true); // true = show image placeholders while image is loaded and when image is broken
 // min font device pixel size at which to turn on high quality
 pref("browser.display.auto_quality_min_font_size", 20);
+// Background color for standalone images; leave empty to use default
+// all CSS colors available: named colors, rgb(..), #rrggbb, ...
+pref("browser.display.standalone_images.background_color", "");
 pref("browser.anchor_color",                "#0000EE");
 pref("browser.active_color",                "#EE0000");
 pref("browser.visited_color",               "#551A8B");
@@ -271,10 +281,8 @@ pref("media.wakelock_timeout", 2000);
 // opened as top-level documents, as opposed to inside a media element.
 pref("media.play-stand-alone", true);
 
-#if defined(XP_WIN)
 pref("media.decoder.heuristic.dormant.enabled", true);
 pref("media.decoder.heuristic.dormant.timeout", 60000);
-#endif
 
 #ifdef MOZ_WMF
 pref("media.windows-media-foundation.enabled", true);
@@ -454,6 +462,11 @@ pref("media.mediasource.enabled", false);
 
 pref("media.mediasource.mp4.enabled", true);
 pref("media.mediasource.webm.enabled", false);
+
+// Enable new MediaFormatReader architecture for mp4 in MSE
+pref("media.mediasource.format-reader.mp4", true);
+// Enable new MediaFormatReader architecture for plain mp4.
+pref("media.format-reader.mp4", true);
 
 #ifdef MOZ_WEBSPEECH
 pref("media.webspeech.recognition.enable", false);
@@ -1213,7 +1226,7 @@ pref("network.http.sendRefererHeader",      2);
 pref("network.http.referer.spoofSource", false);
 // 0=full URI, 1=scheme+host+port+path, 2=scheme+host+port
 pref("network.http.referer.trimmingPolicy", 0);
-// 0=always send, 1=send iff base domains match, 2=send iff hosts match
+// 0=always send, 1=send if base domains match, 2=send if hosts match
 pref("network.http.referer.XOriginPolicy", 0);
 
 // Controls whether we send HTTPS referrers to other HTTPS sites.
@@ -2028,7 +2041,7 @@ pref("bidi.edit.caret_movement_style", 2);
 // expose it for bidi-associated system locales.
 pref("bidi.browser.ui", false);
 
-// used for double-click word selection behavior. Win will override.
+// used for double-click word selection behavior.
 pref("layout.word_select.eat_space_to_next_word", false);
 pref("layout.word_select.stop_at_punctuation", true);
 
@@ -2047,7 +2060,7 @@ pref("layout.selection.caret_style", 0);
 pref("layout.frames.force_resizability", false);
 
 // pref to report CSS errors to the error console
-pref("layout.css.report_errors", true);
+pref("layout.css.report_errors", false);
 
 // Should the :visited selector ever match (otherwise :link matches instead)?
 pref("layout.css.visited_links_enabled", true);
@@ -2109,11 +2122,7 @@ pref("layout.css.convertFromNode.enabled", true);
 #endif
 
 // Is support for unicode-range enabled?
-#ifdef RELEASE_BUILD
-pref("layout.css.unicode-range.enabled", false);
-#else
 pref("layout.css.unicode-range.enabled", true);
-#endif
 
 // Is support for CSS "text-align: true X" enabled?
 pref("layout.css.text-align-true-value.enabled", false);
@@ -2914,7 +2923,7 @@ pref("gfx.font_rendering.cleartype_params.force_gdi_classic_max_size", 15);
 pref("ui.key.menuAccessKeyFocuses", true);
 
 // override double-click word selection behavior.
-pref("layout.word_select.eat_space_to_next_word", true);
+pref("layout.word_select.eat_space_to_next_word", false);
 
 // scrollbar snapping region
 pref("slider.snapMultiplier", 6);
@@ -3500,6 +3509,8 @@ pref("ui.panel.default_level_parent", true);
 
 pref("mousewheel.system_scroll_override_on_root_content.enabled", false);
 
+pref("ui.key.menuAccessKeyFocuses", true);
+
 #if MOZ_WIDGET_GTK == 2
 pref("intl.ime.use_simple_context_on_password_field", true);
 #else
@@ -4044,7 +4055,7 @@ pref("browser.history.maxStateObjectSize", 655360);
 // XPInstall prefs
 pref("xpinstall.whitelist.required", true);
 pref("extensions.alwaysUnpack", false);
-pref("extensions.minCompatiblePlatformVersion", "2.0");
+pref("extensions.minCompatiblePlatformVersion", "1.8");
 
 pref("network.buffer.cache.count", 24);
 pref("network.buffer.cache.size",  32768);
