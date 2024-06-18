@@ -8,11 +8,10 @@
 #include <unistd.h>
 
 #include "MediaTaskQueue.h"
-#include "FFmpegLibs.h"
 #include "FFmpegLog.h"
 #include "FFmpegDataDecoder.h"
 #include "prsystem.h"
-#include "FFmpegDecoderModule.h"
+#include "FFmpegRuntimeLinker.h"
 
 namespace mozilla
 {
@@ -36,47 +35,18 @@ FFmpegDataDecoder<LIBAV_VER>::~FFmpegDataDecoder()
   MOZ_COUNT_DTOR(FFmpegDataDecoder);
 }
 
-/**
- * FFmpeg calls back to this function with a list of pixel formats it supports.
- * We choose a pixel format that we support and return it.
- * For now, we just look for YUV420P as it is the only non-HW accelerated format
- * supported by FFmpeg's H264 decoder.
- */
-static PixelFormat
-ChoosePixelFormat(AVCodecContext* aCodecContext, const PixelFormat* aFormats)
-{
-  FFMPEG_LOG("Choosing FFmpeg pixel format for video decoding.");
-  for (; *aFormats > -1; aFormats++) {
-    if (*aFormats == PIX_FMT_YUV420P || *aFormats == PIX_FMT_YUVJ420P) {
-      FFMPEG_LOG("Requesting pixel format YUV420P.");
-      return PIX_FMT_YUV420P;
-    }
-  }
-
-  NS_WARNING("FFmpeg does not share any supported pixel formats.");
-  return PIX_FMT_NONE;
-}
-
 nsresult
 FFmpegDataDecoder<LIBAV_VER>::Init()
 {
-  StaticMutexAutoLock mon(sMonitor);
-
   FFMPEG_LOG("Initialising FFmpeg decoder.");
 
-  if (!sFFmpegInitDone) {
-    avcodec_register_all();
-#ifdef DEBUG
-    av_log_set_level(AV_LOG_DEBUG);
-#endif
-    sFFmpegInitDone = true;
-  }
-
-  AVCodec* codec = avcodec_find_decoder(mCodecID);
+  AVCodec* codec = FindAVCodec(mCodecID);
   if (!codec) {
     NS_WARNING("Couldn't find ffmpeg decoder");
     return NS_ERROR_FAILURE;
   }
+
+  StaticMutexAutoLock mon(sMonitor);
 
   if (!(mCodecContext = avcodec_alloc_context3(codec))) {
     NS_WARNING("Couldn't init ffmpeg context");
@@ -85,19 +55,7 @@ FFmpegDataDecoder<LIBAV_VER>::Init()
 
   mCodecContext->opaque = this;
 
-  // FFmpeg takes this as a suggestion for what format to use for audio samples.
-  uint32_t major, minor;
-  FFmpegDecoderModule<LIBAV_VER>::GetVersion(major, minor);
-  // LibAV 0.8 produces rubbish float interleaved samples, request 16 bits audio.
-  mCodecContext->request_sample_fmt = major == 53 ?
-    AV_SAMPLE_FMT_S16 : AV_SAMPLE_FMT_FLT;
-
-  // FFmpeg will call back to this to negotiate a video pixel format.
-  mCodecContext->get_format = ChoosePixelFormat;
-
-  mCodecContext->thread_count = PR_GetNumberOfProcessors();
-  mCodecContext->thread_type = FF_THREAD_SLICE | FF_THREAD_FRAME;
-  mCodecContext->thread_safe_callbacks = false;
+  InitCodecContext();
 
   if (mExtraData) {
     mCodecContext->extradata_size = mExtraData->Length();
@@ -156,8 +114,7 @@ FFmpegDataDecoder<LIBAV_VER>::Shutdown()
 #elif LIBAVCODEC_VERSION_MAJOR == 54
     avcodec_free_frame(&mFrame);
 #else
-    delete mFrame;
-    mFrame = nullptr;
+    av_freep(&mFrame);
 #endif
   }
   return NS_OK;
@@ -179,11 +136,24 @@ FFmpegDataDecoder<LIBAV_VER>::PrepareFrame()
     mFrame = avcodec_alloc_frame();
   }
 #else
-  delete mFrame;
-  mFrame = new AVFrame;
-  avcodec_get_frame_defaults(mFrame);
+  av_freep(&mFrame);
+  mFrame = avcodec_alloc_frame();
 #endif
   return mFrame;
+}
+
+/* static */ AVCodec*
+FFmpegDataDecoder<LIBAV_VER>::FindAVCodec(AVCodecID aCodec)
+{
+  StaticMutexAutoLock mon(sMonitor);
+  if (!sFFmpegInitDone) {
+    avcodec_register_all();
+#ifdef DEBUG
+    av_log_set_level(AV_LOG_DEBUG);
+#endif
+    sFFmpegInitDone = true;
+  }
+  return avcodec_find_decoder(aCodec);
 }
 
 } // namespace mozilla

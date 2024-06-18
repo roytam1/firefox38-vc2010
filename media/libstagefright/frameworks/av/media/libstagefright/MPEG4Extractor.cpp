@@ -752,7 +752,14 @@ static bool ValidInputSize(int32_t size) {
 status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
     ALOGV("entering parseChunk %lld/%d", *offset, depth);
     uint32_t hdr[2];
-    if (mDataSource->readAt(*offset, hdr, 8) < 8) {
+    if (mDataSource->readAt(*offset, hdr, 4) < 4) {
+        return ERROR_IO;
+    }
+    if (!hdr[0]) {
+        *offset += 4;
+        return OK;
+    }
+    if (mDataSource->readAt(*offset + 4, hdr + 1, 4) < 4) {
         return ERROR_IO;
     }
     uint64_t chunk_size = ntohl(hdr[0]);
@@ -1508,7 +1515,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                         mLastTrack->meta->findInt32(kKeyHeight, &height)) {
                     mLastTrack->meta->setInt32(kKeyMaxInputSize, width * height * 3 / 2);
                 } else {
-                    ALOGE("No width or height, assuming worst case 1080p");
+                    ALOGV("No width or height, assuming worst case 1080p");
                     mLastTrack->meta->setInt32(kKeyMaxInputSize, 3110400);
                 }
             }

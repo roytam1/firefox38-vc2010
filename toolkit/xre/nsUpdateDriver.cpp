@@ -331,19 +331,6 @@ IsOlderVersion(nsIFile *versionFile, const char *appVersion)
   return false;
 }
 
-#if defined(XP_WIN) && defined(MOZ_METRO)
-static bool
-IsWindowsMetroUpdateRequest(int appArgc, char **appArgv)
-{
-  for (int index = 0; index < appArgc; index++) {
-    if (!strcmp(appArgv[index], "--metro-update")) {
-      return true;
-    }
-  }
-  return false;
-}
-#endif
-
 static bool
 CopyFileIntoUpdateDir(nsIFile *parentDir, const char *leafName, nsIFile *updateDir)
 {
@@ -584,15 +571,7 @@ SwitchToUpdatedApp(nsIFile *greDir, nsIFile *updateDir,
   // just needs to replace the update directory.
   pid.AppendLiteral("/replace");
 
-  int immersiveArgc = 0;
-#if defined(XP_WIN) && defined(MOZ_METRO)
-  // If this is desktop doing an update for metro, or if we're the metro browser
-  // we want to launch the metro browser after we're finished.
-  if (IsWindowsMetroUpdateRequest(appArgc, appArgv) || IsRunningInWindowsMetro()) {
-    immersiveArgc = 1;
-  }
-#endif
-  int argc = appArgc + 6 + immersiveArgc;
+  int argc = appArgc + 6;
   char **argv = new char*[argc + 1];
   if (!argv)
     return;
@@ -606,11 +585,6 @@ SwitchToUpdatedApp(nsIFile *greDir, nsIFile *updateDir,
     argv[6] = (char*) appFilePath.get();
     for (int i = 1; i < appArgc; ++i)
       argv[6 + i] = appArgv[i];
-#ifdef XP_WIN
-    if (immersiveArgc) {
-      argv[argc - 1] = "-ServerName:DefaultBrowserServer";
-    }
-#endif
     argv[argc] = nullptr;
   } else {
     argc = 5;
@@ -869,15 +843,7 @@ ApplyUpdate(nsIFile *greDir, nsIFile *updateDir, nsIFile *statusFile,
 #endif
   }
 
-  int immersiveArgc = 0;
-#if defined(XP_WIN) && defined(MOZ_METRO)
-  // If this is desktop doing an update for metro, or if we're the metro browser
-  // we want to launch the metro browser after we're finished.
-  if (IsWindowsMetroUpdateRequest(appArgc, appArgv) || IsRunningInWindowsMetro()) {
-    immersiveArgc = 1;
-  }
-#endif
-  int argc = appArgc + 6 + immersiveArgc;
+  int argc = appArgc + 6;
   char **argv = new char*[argc + 1 ];
   if (!argv)
     return;
@@ -891,11 +857,6 @@ ApplyUpdate(nsIFile *greDir, nsIFile *updateDir, nsIFile *statusFile,
     argv[6] = (char*) appFilePath.get();
     for (int i = 1; i < appArgc; ++i)
       argv[6 + i] = appArgv[i];
-#ifdef XP_WIN
-    if (immersiveArgc) {
-      argv[argc - 1] = "-ServerName:DefaultBrowserServer";
-    }
-#endif
     argv[argc] = nullptr;
   } else {
     argc = 5;
