@@ -121,7 +121,7 @@ MediaSourceReader::SizeOfAudioQueueInFrames()
 nsRefPtr<MediaDecoderReader::AudioDataPromise>
 MediaSourceReader::RequestAudioData()
 {
-  MOZ_ASSERT(OnDecodeThread());
+  MOZ_ASSERT(OnTaskQueue());
   MOZ_DIAGNOSTIC_ASSERT(mSeekPromise.IsEmpty(), "No sample requests allowed while seeking");
   MOZ_DIAGNOSTIC_ASSERT(mAudioPromise.IsEmpty(), "No duplicate sample requests");
   nsRefPtr<AudioDataPromise> p = mAudioPromise.Ensure(__func__);
@@ -288,7 +288,7 @@ MediaSourceReader::OnAudioNotDecoded(NotDecodedReason aReason)
 nsRefPtr<MediaDecoderReader::VideoDataPromise>
 MediaSourceReader::RequestVideoData(bool aSkipToNextKeyframe, int64_t aTimeThreshold)
 {
-  MOZ_ASSERT(OnDecodeThread());
+  MOZ_ASSERT(OnTaskQueue());
   MOZ_DIAGNOSTIC_ASSERT(mSeekPromise.IsEmpty(), "No sample requests allowed while seeking");
   MOZ_DIAGNOSTIC_ASSERT(mVideoPromise.IsEmpty(), "No duplicate sample requests");
   nsRefPtr<VideoDataPromise> p = mVideoPromise.Ensure(__func__);
@@ -829,7 +829,7 @@ MediaSourceReader::Seek(int64_t aTime, int64_t aIgnored /* Used only for ogg whi
 nsresult
 MediaSourceReader::ResetDecode()
 {
-  MOZ_ASSERT(OnDecodeThread());
+  MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
   MSE_DEBUG("");
 
@@ -1049,7 +1049,7 @@ MediaSourceReader::FirstDecoder(MediaData::Type aType)
 nsRefPtr<MediaDecoderReader::WaitForDataPromise>
 MediaSourceReader::WaitForData(MediaData::Type aType)
 {
-  MOZ_ASSERT(OnDecodeThread());
+  MOZ_ASSERT(OnTaskQueue());
   ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
   nsRefPtr<WaitForDataPromise> p = WaitPromise(aType).Ensure(__func__);
   MaybeNotifyHaveData();

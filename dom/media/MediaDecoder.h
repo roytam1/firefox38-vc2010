@@ -665,9 +665,9 @@ public:
   // has changed.
   void DurationChanged();
 
-  bool OnStateMachineThread() const override;
+  bool OnStateMachineTaskQueue() const override;
 
-  bool OnDecodeThread() const override;
+  bool OnDecodeTaskQueue() const override;
 
   // Returns the monitor for other threads to synchronise access to
   // state.
@@ -870,10 +870,6 @@ public:
 #endif
 #ifdef NECKO_PROTOCOL_rtsp
   static bool IsRtspEnabled();
-#endif
-
-#ifdef MOZ_GSTREAMER
-  static bool IsGStreamerEnabled();
 #endif
 
 #ifdef MOZ_OMX_DECODER

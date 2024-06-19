@@ -397,6 +397,12 @@ private: // methods
   void CacheEntriesChanged(ImageURL *aURI, int32_t sizediff = 0);
   void CheckCacheLimits(imgCacheTable &cache, imgCacheQueue &queue);
 
+#ifdef MOZ_JXR
+  void UpdateJXRAcceptHeader(bool enabled);
+  static void FindMIMETypeInAcceptHeader(const char* mimeType, char* start,
+      char* end, char** subStart, char** subEnd);
+#endif
+
 private: // data
   friend class imgCacheEntry;
   friend class imgMemoryReporter;
@@ -425,6 +431,10 @@ private: // data
 
   nsAutoPtr<imgCacheExpirationTracker> mCacheTracker;
   bool mRespectPrivacy;
+
+#ifdef MOZ_JXR
+  nsCString mLastJxrMimeType;
+#endif
 };
 
 

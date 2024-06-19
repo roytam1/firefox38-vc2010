@@ -11,6 +11,7 @@
 #include "webrtc/modules/rtp_rtcp/source/rtcp_receiver_help.h"
 
 #include <assert.h>  // assert
+#include <stdint.h>
 #include <string.h>  // memset
 
 #include "webrtc/modules/rtp_rtcp/source/rtp_utility.h"
@@ -61,6 +62,9 @@ void RTCPPacketInformation::AddApplicationData(const uint8_t* data,
     uint16_t copySize = size;
     if (size > kRtcpAppCode_DATA_SIZE) {
         copySize = kRtcpAppCode_DATA_SIZE;
+    }
+    if (((uint32_t) applicationLength) + copySize > UINT16_MAX) {
+      return;
     }
 
     applicationLength += copySize;

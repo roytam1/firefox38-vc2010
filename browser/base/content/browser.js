@@ -47,6 +47,7 @@ XPCOMUtils.defineLazyServiceGetter(this, "gDNSService",
                                    "nsIDNSService");
 
 const nsIWebNavigation = Ci.nsIWebNavigation;
+const gToolbarInfoSeparators = ["|", "-"];
 
 var gLastBrowserCharset = null;
 var gProxyFavIcon = null;
@@ -4918,6 +4919,35 @@ function setToolbarVisibility(toolbar, isVisible, persist=true) {
   };
   let event = new CustomEvent("toolbarvisibilitychange", eventParams);
   toolbar.dispatchEvent(event);
+
+  // Customizable toolbars - persist the hiding attribute.
+  if (toolbar.hasAttribute("customindex")) {
+    var toolbox = toolbar.parentNode;
+    var name = toolbar.getAttribute("toolbarname");
+    if (toolbox.toolbarset) {
+      try {
+        // Checking all attributes starting with "toolbar".
+        Array.prototype.slice.call(toolbox.toolbarset.attributes, 0)
+            .find(x => {
+              if (x.name.startsWith("toolbar")) {
+                var toolbarInfo = x.value;
+                var infoSplit = toolbarInfo.split(gToolbarInfoSeparators[0]);
+                if (infoSplit[0] == name) {
+                  infoSplit[1] = [
+                    infoSplit[1].split(gToolbarInfoSeparators[1], 1), !isVisible
+                  ].join(gToolbarInfoSeparators[1]);
+                  toolbox.toolbarset.setAttribute(
+                      x.name, infoSplit.join(gToolbarInfoSeparators[0]));
+                  document.persist(toolbox.toolbarset.id, x.name);
+                }
+              }
+            });
+      } catch (e) {
+        Components.utils.reportError(
+            "Customizable toolbars - persist the hiding attribute: " + e);
+      }
+    }
+  }
 
   PlacesToolbarHelper.init();
   BookmarkingUI.onToolbarVisibilityChange();
