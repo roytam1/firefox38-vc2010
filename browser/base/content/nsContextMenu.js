@@ -1064,7 +1064,6 @@ nsContextMenu.prototype = {
         }, Components.utils.reportError);
       }
     } else {
-    else {
       viewURL = this.mediaURL;
       urlSecurityCheck(viewURL,
                        this.browser.contentPrincipal,
