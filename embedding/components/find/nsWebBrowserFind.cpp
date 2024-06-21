@@ -25,6 +25,7 @@
 #include "nsISelection.h"
 #include "nsIFrame.h"
 #include "nsITextControlFrame.h"
+#include "nsRange.h"
 #include "nsReadableUtils.h"
 #include "nsIDOMHTMLElement.h"
 #include "nsIDOMHTMLDocument.h"
@@ -687,11 +688,11 @@ nsresult nsWebBrowserFind::SearchInFrame(nsIDOMWindow* aWindow,
     GetFrameSelection(aWindow, getter_AddRefs(sel));
     NS_ENSURE_ARG_POINTER(sel);
 
-    nsCOMPtr<nsIDOMRange> searchRange = nsFind::CreateRange(theDoc);
+    nsCOMPtr<nsIDOMRange> searchRange = new nsRange(theDoc);
     NS_ENSURE_ARG_POINTER(searchRange);
-    nsCOMPtr<nsIDOMRange> startPt  = nsFind::CreateRange(theDoc);
+    nsCOMPtr<nsIDOMRange> startPt  = new nsRange(theDoc);
     NS_ENSURE_ARG_POINTER(startPt);
-    nsCOMPtr<nsIDOMRange> endPt  = nsFind::CreateRange(theDoc);
+    nsCOMPtr<nsIDOMRange> endPt  = new nsRange(theDoc);
     NS_ENSURE_ARG_POINTER(endPt);
 
     nsCOMPtr<nsIDOMRange> foundRange;

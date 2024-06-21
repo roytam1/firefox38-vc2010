@@ -5201,7 +5201,7 @@ AddonInstall.prototype = {
     this.updateAddonURIs();
 
     this.addon._install = this;
-    this.name = this.addon.selectedLocale.name;
+    this.name = this.addon.selectedLocale.name || this.addon.defaultLocale.name;
     this.type = this.addon.type;
     this.version = this.addon.version;
 
@@ -5330,7 +5330,7 @@ AddonInstall.prototype = {
     this.updateAddonURIs();
 
     this.addon._install = this;
-    this.name = this.addon.selectedLocale.name;
+    this.name = this.addon.selectedLocale.name || this.addon.defaultLocale.name;
     this.type = this.addon.type;
     this.version = this.addon.version;
 
@@ -6012,8 +6012,9 @@ AddonInstall.createUpdate = function AI_createUpdate(aCallback, aAddon, aUpdate)
     install.initLocalInstall(aCallback);
   }
   else {
-    install.initAvailableDownload(aAddon.selectedLocale.name, aAddon.type,
-                                  aAddon.icons, aUpdate.version, aCallback);
+    install.initAvailableDownload(aAddon.selectedLocale.name ?
+                                  aAddon.selectedLocale.name : aAddon.defaultLocale.name,
+                                  aAddon.type, aAddon.icons, aUpdate.version, aCallback);
   }
 };
 

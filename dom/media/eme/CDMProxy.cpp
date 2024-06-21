@@ -348,7 +348,7 @@ CDMProxy::gmp_Shutdown()
   // Abort any pending decrypt jobs, to awaken any clients waiting on a job.
   for (size_t i = 0; i < mDecryptionJobs.Length(); i++) {
     DecryptJob* job = mDecryptionJobs[i];
-    job->mClient->Decrypted(GMPAbortedErr, nullptr);
+    job->PostResult(GMPAbortedErr);
   }
   mDecryptionJobs.Clear();
 
@@ -533,23 +533,22 @@ CDMProxy::Capabilites() {
 
 void
 CDMProxy::Decrypt(MediaRawData* aSample,
-                  DecryptionClient* aClient)
+                  DecryptionClient* aClient,
+                  MediaTaskQueue* aTaskQueue)
 {
-  nsAutoPtr<DecryptJob> job(new DecryptJob(aSample, aClient));
+  nsRefPtr<DecryptJob> job(new DecryptJob(aSample, aClient, aTaskQueue));
   nsRefPtr<nsIRunnable> task(
-    NS_NewRunnableMethodWithArg<nsAutoPtr<DecryptJob>>(this, &CDMProxy::gmp_Decrypt, job));
+    NS_NewRunnableMethodWithArg<nsRefPtr<DecryptJob>>(this, &CDMProxy::gmp_Decrypt, job));
   mGMPThread->Dispatch(task, NS_DISPATCH_NORMAL);
 }
 
 void
-CDMProxy::gmp_Decrypt(nsAutoPtr<DecryptJob> aJob)
+CDMProxy::gmp_Decrypt(nsRefPtr<DecryptJob> aJob)
 {
   MOZ_ASSERT(IsOnGMPThread());
-  MOZ_ASSERT(aJob->mClient);
-  MOZ_ASSERT(aJob->mSample);
 
   if (!mCDM) {
-    aJob->mClient->Decrypted(GMPAbortedErr, nullptr);
+    aJob->PostResult(GMPAbortedErr);
     return;
   }
 
@@ -566,34 +565,64 @@ CDMProxy::gmp_Decrypted(uint32_t aId,
                         const nsTArray<uint8_t>& aDecryptedData)
 {
   MOZ_ASSERT(IsOnGMPThread());
+#ifdef DEBUG
+  bool jobIdFound = false;
+#endif
   for (size_t i = 0; i < mDecryptionJobs.Length(); i++) {
     DecryptJob* job = mDecryptionJobs[i];
     if (job->mId == aId) {
-      if (aDecryptedData.Length() != job->mSample->Size()) {
-        NS_WARNING("CDM returned incorrect number of decrypted bytes");
-      }
-      if (GMP_SUCCEEDED(aResult)) {
-        nsAutoPtr<MediaRawDataWriter> writer(job->mSample->CreateWriter());
-        PodCopy(writer->Data(),
-                aDecryptedData.Elements(),
-                std::min<size_t>(aDecryptedData.Length(), job->mSample->Size()));
-        job->mClient->Decrypted(GMPNoErr, job->mSample);
-      } else if (aResult == GMPNoKeyErr) {
-        NS_WARNING("CDM returned GMPNoKeyErr");
-        // We still have the encrypted sample, so we can re-enqueue it to be
-        // decrypted again once the key is usable again.
-        job->mClient->Decrypted(GMPNoKeyErr, job->mSample);
-      } else {
-        nsAutoCString str("CDM returned decode failure GMPErr=");
-        str.AppendInt(aResult);
-        NS_WARNING(str.get());
-        job->mClient->Decrypted(aResult, nullptr);
-      }
+#ifdef DEBUG
+      jobIdFound = true;
+#endif
+      job->PostResult(aResult, aDecryptedData);
       mDecryptionJobs.RemoveElementAt(i);
-      return;
     }
   }
-  NS_WARNING("GMPDecryptorChild returned incorrect job ID");
+#ifdef DEBUG
+  if (!jobIdFound) {
+    NS_WARNING("GMPDecryptorChild returned incorrect job ID");
+  }
+#endif
+}
+
+void
+CDMProxy::DecryptJob::PostResult(GMPErr aResult)
+{
+  nsTArray<uint8_t> empty;
+  PostResult(aResult, empty);
+}
+
+void
+CDMProxy::DecryptJob::PostResult(GMPErr aResult, const nsTArray<uint8_t>& aDecryptedData)
+{
+  if (aDecryptedData.Length() != mSample->Size()) {
+    NS_WARNING("CDM returned incorrect number of decrypted bytes");
+  }
+  mResult = aResult;
+  if (GMP_SUCCEEDED(aResult)) {
+    nsAutoPtr<MediaRawDataWriter> writer(mSample->CreateWriter());
+    PodCopy(writer->Data(),
+            aDecryptedData.Elements(),
+            std::min<size_t>(aDecryptedData.Length(), mSample->Size()));
+  } else if (aResult == GMPNoKeyErr) {
+    NS_WARNING("CDM returned GMPNoKeyErr");
+    // We still have the encrypted sample, so we can re-enqueue it to be
+    // decrypted again once the key is usable again.
+  } else {
+    nsAutoCString str("CDM returned decode failure GMPErr=");
+    str.AppendInt(aResult);
+    NS_WARNING(str.get());
+    mSample = nullptr;
+  }
+  mTaskQueue->Dispatch(RefPtr<nsIRunnable>(this).forget());
+}
+
+nsresult
+CDMProxy::DecryptJob::Run()
+{
+  MOZ_ASSERT(mTaskQueue->IsCurrentThreadIn());
+  mClient->Decrypted(mResult, mSample);
+  return NS_OK;
 }
 
 void
