@@ -194,8 +194,11 @@ destroying the MediaDecoder object.
 #include "mozilla/dom/AudioChannelBinding.h"
 #include "mozilla/gfx/Rect.h"
 #include "mozilla/ReentrantMonitor.h"
+#include "MediaDecoderOwner.h"
 #include "MediaStreamGraph.h"
 #include "AbstractMediaDecoder.h"
+#include "StateMirroring.h"
+#include "StateWatching.h"
 #include "necko-config.h"
 #include "TimeUnits.h"
 #ifdef MOZ_EME
@@ -212,7 +215,6 @@ class Image;
 
 class VideoFrameContainer;
 class MediaDecoderStateMachine;
-class MediaDecoderOwner;
 
 // GetCurrentTime is defined in winbase.h as zero argument macro forwarding to
 // GetTickCount() and conflicts with MediaDecoder::GetCurrentTime implementation.
@@ -670,6 +672,9 @@ public:
 
   bool OnDecodeTaskQueue() const override;
 
+  MediaDecoderStateMachine* GetStateMachine() { return mDecoderStateMachine; }
+  void SetStateMachine(MediaDecoderStateMachine* aStateMachine);
+
   // Returns the monitor for other threads to synchronise access to
   // state.
   ReentrantMonitor& GetReentrantMonitor() override;
@@ -813,10 +818,6 @@ public:
   // position. It dispatches a timeupdate event and invalidates the frame.
   // This must be called on the main thread only.
   virtual void PlaybackPositionChanged(MediaDecoderEventVisibility aEventVisibility = MediaDecoderEventVisibility::Observable);
-
-  // Calls mElement->UpdateReadyStateForData, telling it whether we have
-  // data for the next frame and if we're buffering. Main thread only.
-  virtual void UpdateReadyStateForData();
 
   // Find the end of the cached data starting at the current decoder
   // position.
@@ -1030,6 +1031,10 @@ public:
     GetFrameStatistics().NotifyDecodedFrames(aParsed, aDecoded, aDropped);
   }
 
+  WatchTarget& ReadyStateWatchTarget() { return *mReadyStateWatchTarget; }
+
+  virtual MediaDecoderOwner::NextFrameStatus NextFrameStatus() { return mNextFrameStatus; }
+
 protected:
   virtual ~MediaDecoder();
   void SetStateMachineParameters();
@@ -1044,6 +1049,11 @@ protected:
 
   // Return true if the decoder has reached the end of playback
   bool IsEnded() const;
+
+  WatcherHolder mReadyStateWatchTarget;
+
+  // NextFrameStatus, mirrored from the state machine.
+  Mirror<MediaDecoderOwner::NextFrameStatus>::Holder mNextFrameStatus;
 
   /******
    * The following members should be accessed with the decoder lock held.
@@ -1091,17 +1101,19 @@ protected:
    * The following member variables can be accessed from any thread.
    ******/
 
+  // Media data resource.
+  nsRefPtr<MediaResource> mResource;
+
+private:
   // The state machine object for handling the decoding. It is safe to
   // call methods of this object from other threads. Its internal data
   // is synchronised on a monitor. The lifetime of this object is
   // after mPlayState is LOADING and before mPlayState is SHUTDOWN. It
   // is safe to access it during this period.
+  //
+  // Explicitly private to force access via accessors.
   nsRefPtr<MediaDecoderStateMachine> mDecoderStateMachine;
 
-  // Media data resource.
-  nsRefPtr<MediaResource> mResource;
-
-private:
   // |ReentrantMonitor| for detecting when the video play state changes. A call
   // to |Wait| on this monitor will block the thread until the next state
   // change.  Explicitly private for force access via GetReentrantMonitor.
@@ -1127,7 +1139,7 @@ protected:
   // OR on the main thread.
   // Any change to the state on the main thread must call NotifyAll on the
   // monitor so the decode thread can wake up.
-  PlayState mPlayState;
+  Watchable<PlayState> mPlayState;
 
   // The state to change to after a seek or load operation.
   // This can only be changed on the main thread while holding the decoder

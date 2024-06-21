@@ -462,8 +462,8 @@ Cookies.prototype = {
           host = "." + host;
       }
 
-      let expireTime = CtypesHelpers.fileTimeToSecondsSinceEpoch(Number(expireTimeHi),
-                                                                 Number(expireTimeLo));
+      let expireTime = CtypesHelpers.fileTimeToDate(Number(expireTimeHi),
+                                                    Number(expireTimeLo));
       Services.cookies.add(host,
                            path,
                            name,
@@ -542,7 +542,7 @@ Settings.prototype = {
     this._set("Software\\Microsoft\\Internet Explorer\\Settings",
               "Always Use My Font Face",
               "browser.display.use_document_fonts",
-              function (v) !Boolean(v));
+              function (v) !Boolean(v) ? 1 : 2);
     this._set(kMainKey,
               "SmoothScroll",
               "general.smoothScroll",
@@ -579,21 +579,40 @@ Settings.prototype = {
     if (value === undefined)
       return;
 
-    if (aTransformFn)
+    if (aTransformFn) {
       value = aTransformFn(value);
+      if (typeof(value) == "object") {
+        try {
+          value = value.toString();
+        } catch (e) {
+          throw e;
+        }
+      }
+    }
 
-    switch (typeof(value)) {
-      case "string":
-        Services.prefs.setCharPref(aPref, value);
-        break;
-      case "number":
-        Services.prefs.setIntPref(aPref, value);
-        break;
-      case "boolean":
-        Services.prefs.setBoolPref(aPref, value);
-        break;
-      default:
-        throw new Error("Unexpected value type: " + typeof(value));
+    let _json = {
+      "path": aPath,
+      "key": aKey,
+      "pref": aPref,
+      "value": value,
+    };
+    try {
+      switch (typeof(value)) {
+        case "string":
+          Services.prefs.setCharPref(aPref, value);
+          break;
+        case "number":
+          Services.prefs.setIntPref(aPref, value);
+          break;
+        case "boolean":
+          Services.prefs.setBoolPref(aPref, value);
+          break;
+        default:
+          throw new Error("Unexpected value type: " + typeof(value));
+      }
+    } catch (e if e.result == Cr.NS_ERROR_UNEXPECTED) {
+      throw new Error(
+          "The value:" + "\n" + JSON.stringify(_json) + "\n" + e);
     }
   }
 };
