@@ -1780,7 +1780,7 @@ nsContextMenu.prototype = {
       }
       // Target should be in the menu (this catches using shortcuts for items
       // not in the menu while the menu is up)
-      if (!aXulMenu.includes(e.target)) {
+      if (!aXulMenu.contains(e.target)) {
         return;
       }
 

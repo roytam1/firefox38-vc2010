@@ -344,6 +344,12 @@ pref("browser.urlbar.suggest.history.onlyTyped",    false);
 pref("browser.urlbar.formatting.enabled", true);
 pref("browser.urlbar.trimURLs", true);
 
+// Display punycode in identity panel:
+// 0 = Display IDN name
+// 1 = Display punycode name for DV domains
+// 2 = Also display punycode for HTTP sites if IDN name used
+pref("browser.identity.display_punycode", 1);
+
 pref("browser.altClickSave", false);
 
 // Enable logging downloads operations to the Error Console.
