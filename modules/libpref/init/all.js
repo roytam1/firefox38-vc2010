@@ -1838,12 +1838,8 @@ pref("security.apps.privileged.CSP.default", "default-src *; script-src 'self'; 
 pref("security.mixed_content.block_active_content", false);
 pref("security.mixed_content.block_display_content", false);
 
-// Disable pinning checks by default.
-pref("security.cert_pinning.enforcement_level", 0);
-// Do not process hpkp headers rooted by not built in roots by default.
-// This is to prevent accidental pinning from MITM devices and is used
-// for tests.
-pref("security.cert_pinning.process_headers_from_non_builtin_roots", false);
+// Enable pinning checks by default.
+pref("security.cert_pinning.enforcement_level", 2);
 
 // Modifier key prefs: default to Windows settings,
 // menu access key = alt, accelerator key = control.
@@ -4604,3 +4600,6 @@ pref("dom.details_element.enabled", true);
 #ifdef MOZ_SECUREELEMENT
 pref("dom.secureelement.enabled", false);
 #endif
+
+// Turn rewriting of youtube embeds on/off
+pref("plugins.rewrite_youtube_embeds", true);

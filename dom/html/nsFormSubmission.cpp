@@ -42,7 +42,6 @@
 
 using namespace mozilla;
 using mozilla::dom::EncodingUtils;
-using mozilla::dom::File;
 
 static void
 SendJSWarning(nsIDocument* aDocument,
@@ -80,7 +79,7 @@ public:
   virtual nsresult AddNameValuePair(const nsAString& aName,
                                     const nsAString& aValue);
   virtual nsresult AddNameFilePair(const nsAString& aName,
-                                   File* aBlob);
+                                   mozilla::dom::File* aBlob);
   virtual nsresult GetEncodedSubmission(nsIURI* aURI,
                                         nsIInputStream** aPostDataStream);
 
@@ -166,7 +165,7 @@ nsFSURLEncoded::AddIsindex(const nsAString& aValue)
 
 nsresult
 nsFSURLEncoded::AddNameFilePair(const nsAString& aName,
-                                File* aBlob)
+                                mozilla::dom::File* aBlob)
 {
   if (!mWarnedFileControl) {
     SendJSWarning(mDocument, "ForgotFileEnctypeWarning", nullptr, 0);
@@ -440,7 +439,7 @@ nsFSMultipartFormData::AddNameValuePair(const nsAString& aName,
 
 nsresult
 nsFSMultipartFormData::AddNameFilePair(const nsAString& aName,
-                                       File* aBlob)
+                                       mozilla::dom::File* aBlob)
 {
   // Encode the control name
   nsAutoCString nameStr;
@@ -590,7 +589,7 @@ public:
   virtual nsresult AddNameValuePair(const nsAString& aName,
                                     const nsAString& aValue);
   virtual nsresult AddNameFilePair(const nsAString& aName,
-                                   File* aBlob);
+                                   mozilla::dom::File* aBlob);
   virtual nsresult GetEncodedSubmission(nsIURI* aURI,
                                         nsIInputStream** aPostDataStream);
 
@@ -613,7 +612,7 @@ nsFSTextPlain::AddNameValuePair(const nsAString& aName,
 
 nsresult
 nsFSTextPlain::AddNameFilePair(const nsAString& aName,
-                               File* aBlob)
+                               mozilla::dom::File* aBlob)
 {
   nsAutoString filename;
   if (aBlob && aBlob->IsFile()) {
