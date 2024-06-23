@@ -267,8 +267,7 @@ struct SeekTarget {
   MediaDecoderEventVisibility mEventVisibility;
 };
 
-class MediaDecoder : public nsIObserver,
-                     public AbstractMediaDecoder
+class MediaDecoder : public AbstractMediaDecoder
 {
 public:
   struct SeekResolveValue {
@@ -1162,7 +1161,7 @@ protected:
   // been requested. When a seek is started this is reset to invalid.
   SeekTarget mRequestedSeekTarget;
 
-  MediaPromiseConsumerHolder<SeekPromise> mSeekRequest;
+  MediaPromiseRequestHolder<SeekPromise> mSeekRequest;
 
   // True when seeking or otherwise moving the play position around in
   // such a manner that progress event data is inaccurate. This is set

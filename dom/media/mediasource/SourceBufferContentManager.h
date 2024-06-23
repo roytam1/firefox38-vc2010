@@ -19,20 +19,30 @@ namespace mozilla {
 using media::TimeUnit;
 using media::TimeIntervals;
 
+namespace dom {
+class SourceBuffer;
+}
+
 class SourceBufferContentManager {
 public:
   NS_INLINE_DECL_THREADSAFE_REFCOUNTING(SourceBufferContentManager);
 
   typedef MediaPromise<bool, nsresult, /* IsExclusive = */ true> AppendPromise;
+  typedef AppendPromise RangeRemovalPromise;
 
   static already_AddRefed<SourceBufferContentManager>
-  CreateManager(MediaSourceDecoder* aParentDecoder, const nsACString& aType);
+  CreateManager(dom::SourceBuffer* aParent, MediaSourceDecoder* aParentDecoder,
+                const nsACString& aType);
 
-  // Append data to the current decoder.  Also responsible for calling
-  // NotifyDataArrived on the decoder to keep buffered range computation up
-  // to date.  Returns false if the append failed.
-  virtual nsRefPtr<AppendPromise>
-  AppendData(MediaLargeByteBuffer* aData, TimeUnit aTimestampOffset /* microseconds */) = 0;
+  // Add data to the end of the input buffer.
+  // Returns false if the append failed.
+  virtual bool
+  AppendData(MediaLargeByteBuffer* aData, TimeUnit aTimestampOffset) = 0;
+
+  // Run MSE Buffer Append Algorithm
+  // 3.5.5 Buffer Append Algorithm.
+  // http://w3c.github.io/media-source/index.html#sourcebuffer-buffer-append
+  virtual nsRefPtr<AppendPromise> BufferAppend() = 0;
 
   // Abort any pending AppendData.
   virtual void AbortAppendData() = 0;
@@ -44,7 +54,7 @@ public:
 
   // Runs MSE range removal algorithm.
   // http://w3c.github.io/media-source/#sourcebuffer-coded-frame-removal
-  virtual bool RangeRemoval(TimeUnit aStart, TimeUnit aEnd) = 0;
+  virtual nsRefPtr<RangeRemovalPromise> RangeRemoval(TimeUnit aStart, TimeUnit aEnd) = 0;
 
   MOZ_BEGIN_NESTED_ENUM_CLASS(EvictDataResult, int8_t)
     NO_DATA_EVICTED,
@@ -75,6 +85,22 @@ public:
 
   // The parent SourceBuffer is about to be destroyed.
   virtual void Detach() = 0;
+
+  // Current state as per Segment Parser Loop Algorithm
+  // http://w3c.github.io/media-source/index.html#sourcebuffer-segment-parser-loop
+  MOZ_BEGIN_NESTED_ENUM_CLASS(AppendState, int32_t)
+    WAITING_FOR_SEGMENT,
+    PARSING_INIT_SEGMENT,
+    PARSING_MEDIA_SEGMENT,
+  MOZ_END_NESTED_ENUM_CLASS(AppendState)
+
+  virtual AppendState GetAppendState()
+  {
+    return AppendState::WAITING_FOR_SEGMENT;
+  }
+
+  virtual void SetGroupStartTimestamp(const TimeUnit& aGroupStartTimestamp) {}
+  virtual void RestartGroupStartTimestamp() {}
 
 #if defined(DEBUG)
   virtual void Dump(const char* aPath) { }

@@ -4585,12 +4585,12 @@ pref("reader.toolbar.vertical", true);
 pref("media.gmp.insecure.allow", false);
 #endif
 
-// Use vsync aligned rendering. b2g prefs are in b2g.js
+// Use vsync aligned rendering.
 // Only supported on windows, os x, and b2g
 #if defined(XP_WIN) || defined(XP_MACOSX)
-pref("gfx.vsync.hw-vsync.enabled", false);
+pref("gfx.vsync.hw-vsync.enabled", true);
 pref("gfx.vsync.compositor", false);
-pref("gfx.vsync.refreshdriver", false);
+pref("gfx.vsync.refreshdriver", true);
 #endif
 
 // Enable <details> and <summary> tags.

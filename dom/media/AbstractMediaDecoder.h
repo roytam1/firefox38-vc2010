@@ -45,7 +45,7 @@ MOZ_END_ENUM_CLASS(MediaDecoderEventVisibility)
  * The AbstractMediaDecoder class describes the public interface for a media decoder
  * and is used by the MediaReader classes.
  */
-class AbstractMediaDecoder : public nsISupports
+class AbstractMediaDecoder : public nsIObserver
 {
 public:
   // Returns the monitor for other threads to synchronise access to
@@ -154,10 +154,16 @@ public:
     AbstractMediaDecoder* mDecoder;
   };
 
+  // Classes directly inheriting from AbstractMediaDecoder do not support
+  // Observe and it should never be called directly.
+  NS_IMETHOD Observe(nsISupports *aSubject, const char * aTopic, const char16_t * aData) override
+  { MOZ_CRASH("Forbidden method"); return NS_OK; }
+
 #ifdef MOZ_EME
   virtual nsresult SetCDMProxy(CDMProxy* aProxy) { return NS_ERROR_NOT_IMPLEMENTED; }
   virtual CDMProxy* GetCDMProxy() { return nullptr; }
 #endif
+
 };
 
 class MetadataContainer

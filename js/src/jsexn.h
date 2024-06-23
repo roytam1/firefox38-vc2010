@@ -12,6 +12,7 @@
 #define jsexn_h
 
 #include "jsapi.h"
+#include "jscntxt.h"
 #include "NamespaceImports.h"
 
 namespace js {
@@ -115,5 +116,19 @@ ExnTypeFromProtoKey(JSProtoKey key)
     MOZ_ASSERT(type < JSEXN_LIMIT);
     return type;
 }
+
+class AutoClearPendingException
+{
+    JSContext *cx;
+
+  public:
+    explicit AutoClearPendingException(JSContext *cxArg)
+      : cx(cxArg)
+    { }
+
+    ~AutoClearPendingException() {
+        cx->clearPendingException();
+    }
+};
 
 #endif /* jsexn_h */

@@ -9,8 +9,10 @@
 
 #include "MediaPromise.h"
 #include "MediaSource.h"
+#include "SourceBufferContentManager.h"
 #include "js/RootingAPI.h"
 #include "mozilla/Assertions.h"
+#include "mozilla/Atomics.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/dom/SourceBufferBinding.h"
@@ -23,7 +25,6 @@
 #include "nsISupports.h"
 #include "nsString.h"
 #include "nscore.h"
-#include "SourceBufferContentManager.h"
 
 class JSObject;
 struct JSContext;
@@ -32,8 +33,8 @@ namespace mozilla {
 
 class ErrorResult;
 class MediaLargeByteBuffer;
-class TrackBuffer;
 template <typename T> class AsyncEventRunner;
+class TrackBuffersManager;
 
 namespace dom {
 
@@ -62,7 +63,7 @@ public:
 
   double TimestampOffset() const
   {
-    return mTimestampOffset;
+    return mApparentTimestampOffset;
   }
 
   void SetTimestampOffset(double aTimestampOffset, ErrorResult& aRv);
@@ -117,8 +118,6 @@ public:
 
   // Runs the range removal algorithm as defined by the MSE spec.
   void RangeRemoval(double aStart, double aEnd);
-  // Actually remove data between aStart and aEnd
-  void DoRangeRemoval(double aStart, double aEnd);
 
   bool IsActive() const
   {
@@ -133,8 +132,8 @@ private:
   ~SourceBuffer();
 
   friend class AsyncEventRunner<SourceBuffer>;
-  friend class AppendDataRunnable;
-  friend class RangeRemovalRunnable;
+  friend class BufferAppendRunnable;
+  friend class mozilla::TrackBuffersManager;
   void DispatchSimpleEvent(const char* aName);
   void QueueAsyncSimpleEvent(const char* aName);
 
@@ -150,8 +149,7 @@ private:
 
   // Shared implementation of AppendBuffer overloads.
   void AppendData(const uint8_t* aData, uint32_t aLength, ErrorResult& aRv);
-  void AppendData(MediaLargeByteBuffer* aData, TimeUnit aTimestampOffset,
-                  uint32_t aAppendID);
+  void BufferAppend(uint32_t aAppendID);
 
   // Implement the "Append Error Algorithm".
   // Will call endOfStream() with "decode" error if aDecodeError is true.
@@ -168,6 +166,9 @@ private:
   void AppendDataCompletedWithSuccess(bool aHasActiveTracks);
   void AppendDataErrored(nsresult aError);
 
+  // Set timestampOffset, must be called on the main thread.
+  void SetTimestampOffset(const TimeUnit& aTimestampOffset);
+
   nsRefPtr<MediaSource> mMediaSource;
 
   uint32_t mEvictionThreshold;
@@ -177,10 +178,13 @@ private:
   double mAppendWindowStart;
   double mAppendWindowEnd;
 
-  double mTimestampOffset;
+  double mApparentTimestampOffset;
+  TimeUnit mTimestampOffset;
 
   SourceBufferAppendMode mAppendMode;
   bool mUpdating;
+  bool mGenerateTimestamp;
+  bool mIsUsingFormatReader;
 
   bool mActive;
 
@@ -189,7 +193,7 @@ private:
   // aborted and another AppendData queued.
   uint32_t mUpdateID;
 
-  MediaPromiseConsumerHolder<SourceBufferContentManager::AppendPromise> mPendingAppend;
+  MediaPromiseRequestHolder<SourceBufferContentManager::AppendPromise> mPendingAppend;
   const nsCString mType;
 };
 
