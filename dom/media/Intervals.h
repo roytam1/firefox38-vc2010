@@ -129,6 +129,11 @@ public:
     return mStart <= aX && aX < mEnd;
   }
 
+  bool ContainsWithStrictEnd(const T& aX) const
+  {
+    return mStart - mFuzz <= aX && aX < mEnd;
+  }
+
   bool Contains(const SelfType& aOther) const
   {
     return (mStart - mFuzz <= aOther.mStart + aOther.mFuzz) &&
@@ -138,6 +143,12 @@ public:
   bool ContainsStrict(const SelfType& aOther) const
   {
     return mStart <= aOther.mStart && aOther.mEnd <= mEnd;
+  }
+
+  bool ContainsWithStrictEnd(const SelfType& aOther) const
+  {
+    return (mStart - mFuzz <= aOther.mStart + aOther.mFuzz) &&
+      aOther.mEnd <= mEnd;
   }
 
   bool Intersects(const SelfType& aOther) const
@@ -558,6 +569,16 @@ public:
     for (IndexType i = 0; i < mIntervals.Length(); i++) {
       const ElemType& interval = mIntervals[i];
       if (interval.ContainsStrict(aX)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool ContainsWithStrictEnd(const T& aX) const {
+    for (IndexType i = 0; i < mIntervals.Length(); i++) {
+      const ElemType& interval = mIntervals[i];
+      if (interval.ContainsWithStrictEnd(aX)) {
         return true;
       }
     }
