@@ -193,9 +193,11 @@ MediaFormatReader::Init(MediaDecoderReader* aCloneDonor)
 
   InitLayersBackendType();
 
-  mAudio.mTaskQueue = new FlushableMediaTaskQueue(GetMediaThreadPool());
+  mAudio.mTaskQueue =
+    new FlushableMediaTaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
 
-  mVideo.mTaskQueue = new FlushableMediaTaskQueue(GetMediaThreadPool());
+  mVideo.mTaskQueue =
+    new FlushableMediaTaskQueue(GetMediaThreadPool(MediaThreadType::PLATFORM_DECODER));
 
   static bool sSetupPrefCache = false;
   if (!sSetupPrefCache) {
@@ -470,7 +472,7 @@ MediaFormatReader::ShouldSkip(bool aSkipToNextKeyframe, media::TimeUnit aTimeThr
   if (NS_FAILED(rv)) {
     return aSkipToNextKeyframe;
   }
-  return nextKeyframe < aTimeThreshold;
+  return nextKeyframe < aTimeThreshold && nextKeyframe.ToMicroseconds() >= 0;
 }
 
 nsRefPtr<MediaDecoderReader::VideoDataPromise>
@@ -480,7 +482,8 @@ MediaFormatReader::RequestVideoData(bool aSkipToNextKeyframe,
   MOZ_ASSERT(OnTaskQueue());
   MOZ_DIAGNOSTIC_ASSERT(mSeekPromise.IsEmpty(), "No sample requests allowed while seeking");
   MOZ_DIAGNOSTIC_ASSERT(!mVideo.HasPromise(), "No duplicate sample requests");
-  MOZ_DIAGNOSTIC_ASSERT(!mVideo.mSeekRequest.Exists());
+  MOZ_DIAGNOSTIC_ASSERT(!mVideo.mSeekRequest.Exists() ||
+                        mVideo.mTimeThreshold.isSome());
   MOZ_DIAGNOSTIC_ASSERT(!mSkipRequest.Exists(), "called mid-skipping");
   MOZ_DIAGNOSTIC_ASSERT(!IsSeeking(), "called mid-seek");
   LOGV("RequestVideoData(%d, %lld)", aSkipToNextKeyframe, aTimeThreshold);
@@ -576,7 +579,8 @@ MediaFormatReader::RequestAudioData()
 {
   MOZ_ASSERT(OnTaskQueue());
   MOZ_DIAGNOSTIC_ASSERT(mSeekPromise.IsEmpty(), "No sample requests allowed while seeking");
-  MOZ_DIAGNOSTIC_ASSERT(!mAudio.mSeekRequest.Exists());
+  MOZ_DIAGNOSTIC_ASSERT(!mAudio.mSeekRequest.Exists() ||
+                        mAudio.mTimeThreshold.isSome());
   MOZ_DIAGNOSTIC_ASSERT(!mAudio.HasPromise(), "No duplicate sample requests");
   MOZ_DIAGNOSTIC_ASSERT(!IsSeeking(), "called mid-seek");
   LOGV("");
@@ -631,6 +635,8 @@ void
 MediaFormatReader::NotifyNewOutput(TrackType aTrack, MediaData* aSample)
 {
   MOZ_ASSERT(OnTaskQueue());
+  LOGV("Received new %s sample time:%lld duration:%lld",
+       TrackTypeToStr(aTrack), aSample->mTime, aSample->mDuration);
   auto& decoder = GetDecoderData(aTrack);
   if (!decoder.mOutputRequested) {
     LOG("MediaFormatReader produced output while flushing, discarding.");
@@ -669,6 +675,7 @@ MediaFormatReader::NotifyError(TrackType aTrack)
   MOZ_ASSERT(OnTaskQueue());
   auto& decoder = GetDecoderData(aTrack);
   decoder.mError = true;
+  decoder.mNeedDraining = true;
   ScheduleUpdate(aTrack);
 }
 
@@ -687,6 +694,7 @@ MediaFormatReader::NotifyEndOfStream(TrackType aTrack)
   MOZ_ASSERT(OnTaskQueue());
   auto& decoder = GetDecoderData(aTrack);
   decoder.mDemuxEOS = true;
+  decoder.mNeedDraining = true;
   ScheduleUpdate(aTrack);
 }
 
@@ -700,6 +708,7 @@ MediaFormatReader::NeedInput(DecoderData& aDecoder)
   // run of input than we input, decoders fire an "input exhausted" callback,
   // which overrides our "few more samples" threshold.
   return
+    !aDecoder.mDraining &&
     !aDecoder.mError &&
     aDecoder.HasPromise() &&
     !aDecoder.mDemuxRequest.Exists() &&
@@ -749,7 +758,6 @@ MediaFormatReader::UpdateReceivedNewData(TrackType aTrack)
       (!hasLastEnd || decoder.mTimeRanges.GetEnd() > lastEnd)) {
     // New data was added after our previous end, we can clear the EOS flag.
     decoder.mDemuxEOS = false;
-    decoder.mDemuxEOSServiced = false;
   }
 
   if (decoder.mError) {
@@ -820,6 +828,17 @@ MediaFormatReader::DecodeDemuxedSamples(TrackType aTrack,
         return;
       }
 
+      if (decoder.mNextStreamSourceID.isNothing() ||
+          decoder.mNextStreamSourceID.ref() != info->GetID()) {
+        LOG("%s stream id has changed from:%d to:%d, draining decoder.",
+            TrackTypeToStr(aTrack), decoder.mLastStreamSourceID,
+            info->GetID());
+        decoder.mNeedDraining = true;
+        decoder.mNextStreamSourceID = Some(info->GetID());
+        ScheduleUpdate(aTrack);
+        return;
+      }
+
       LOG("%s stream id has changed from:%d to:%d, recreating decoder.",
           TrackTypeToStr(aTrack), decoder.mLastStreamSourceID,
           info->GetID());
@@ -884,13 +903,41 @@ MediaFormatReader::DecodeDemuxedSamples(TrackType aTrack,
     if (aTrack == TrackInfo::kVideoTrack) {
       aA.mParsed++;
     }
-    decoder.mDecoder->Input(sample);
+    if (NS_FAILED(decoder.mDecoder->Input(sample))) {
+      LOG("Unable to pass frame to decoder");
+      NotifyError(aTrack);
+      return;
+    }
     decoder.mQueuedSamples.RemoveElementAt(0);
     samplesPending = true;
   }
 
   // We have serviced the decoder's request for more data.
   decoder.mInputExhausted = false;
+}
+
+void
+MediaFormatReader::DrainDecoder(TrackType aTrack)
+{
+  MOZ_ASSERT(OnTaskQueue());
+
+  auto& decoder = GetDecoderData(aTrack);
+  if (!decoder.mNeedDraining || decoder.mDraining) {
+    return;
+  }
+  decoder.mNeedDraining = false;
+  // mOutputRequest must be set, otherwise NotifyDrainComplete()
+  // may reject the drain if a Flush recently occurred.
+  decoder.mOutputRequested = true;
+  if (!decoder.mDecoder ||
+      decoder.mNumSamplesInput == decoder.mNumSamplesOutput) {
+    // No frames to drain.
+    NotifyDrainComplete(aTrack);
+    return;
+  }
+  decoder.mDecoder->Drain();
+  decoder.mDraining = true;
+  LOG("Requesting %s decoder to drain", TrackTypeToStr(aTrack));
 }
 
 void
@@ -911,20 +958,9 @@ MediaFormatReader::Update(TrackType aTrack)
     return;
   }
 
-  if (decoder.HasPromise()) {
-    // Handle pending requests from the MediaDecoderStateMachine.
-    if (decoder.mError) {
-      LOG("Decoding Error");
-      decoder.RejectPromise(DECODE_ERROR, __func__);
-      return;
-    }
-
-    if (decoder.mWaitingForData) {
-      LOG("Waiting For Data");
-      decoder.RejectPromise(WAITING_FOR_DATA, __func__);
-    }
-  } else if (decoder.mWaitingForData) {
+  if (!decoder.HasPromise() && decoder.mWaitingForData) {
     // Nothing more we can do at present.
+    LOGV("Still waiting for data.");
     return;
   }
 
@@ -938,6 +974,7 @@ MediaFormatReader::Update(TrackType aTrack)
     a.mDecoded = static_cast<uint32_t>(delta);
     mLastReportedNumDecodedFrames = decoder.mNumSamplesOutput;
   }
+
   if (decoder.HasPromise()) {
     needOutput = true;
     if (!decoder.mOutput.IsEmpty()) {
@@ -956,20 +993,32 @@ MediaFormatReader::Update(TrackType aTrack)
              output->mKeyframe);
       }
     } else if (decoder.mDrainComplete) {
-      decoder.RejectPromise(END_OF_STREAM, __func__);
       decoder.mDrainComplete = false;
+      decoder.mDraining = false;
+      if (decoder.mError) {
+        LOG("Decoding Error");
+        decoder.RejectPromise(DECODE_ERROR, __func__);
+        return;
+      } else if (decoder.mDemuxEOS) {
+        decoder.RejectPromise(END_OF_STREAM, __func__);
+      }
+    } else if (decoder.mError && !decoder.mDecoder) {
+      decoder.RejectPromise(DECODE_ERROR, __func__);
+      return;
+    } else if (decoder.mWaitingForData) {
+      LOG("Waiting For Data");
+      decoder.RejectPromise(WAITING_FOR_DATA, __func__);
+      return;
     }
   }
 
-  if (decoder.mDemuxEOS && !decoder.mDemuxEOSServiced) {
-    decoder.mOutputRequested = true;
-    decoder.mDecoder->Drain();
-    decoder.mDemuxEOSServiced = true;
-    LOGV("Requesting decoder to drain");
+  if (decoder.mNeedDraining) {
+    DrainDecoder(aTrack);
     return;
   }
 
   if (!NeedInput(decoder)) {
+    LOGV("No need for additional input");
     return;
   }
 
@@ -1081,8 +1130,9 @@ MediaFormatReader::ResetDecode()
 void
 MediaFormatReader::Output(TrackType aTrack, MediaData* aSample)
 {
-  LOGV("Decoded %s sample time=%lld dur=%lld",
-       TrackTypeToStr(aTrack), aSample->mTime, aSample->mDuration);
+  LOGV("Decoded %s sample time=%lld timecode=%lld kf=%d dur=%lld",
+       TrackTypeToStr(aTrack), aSample->mTime, aSample->mTimecode,
+       aSample->mKeyframe, aSample->mDuration);
 
   if (!aSample) {
     NS_WARNING("MediaFormatReader::Output() passed a null sample");

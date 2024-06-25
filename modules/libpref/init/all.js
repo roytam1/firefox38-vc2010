@@ -283,6 +283,10 @@ pref("media.wakelock_timeout", 2000);
 // opened as top-level documents, as opposed to inside a media element.
 pref("media.play-stand-alone", true);
 
+// Whether we should delay actioning a "play()" JS function call and autoplay
+// attribute until the media element's owner document is visible.
+pref("media.block-play-until-visible", false);
+
 pref("media.decoder.heuristic.dormant.enabled", true);
 pref("media.decoder.heuristic.dormant.timeout", 60000);
 
@@ -469,8 +473,7 @@ pref("media.mediasource.mp4.enabled", true);
 pref("media.mediasource.webm.enabled", false);
 
 // Enable new MediaSource architecture.
-// NOTE: This is an on-going WIP and should not be enabled yet.
-pref("media.mediasource.format-reader", false);
+pref("media.mediasource.format-reader", true);
 
 // Enable the MediaFormatReader architecture for MP4 + MSE.
 pref("media.mediasource.format-reader.mp4", true);
@@ -4592,8 +4595,8 @@ pref("media.gmp.insecure.allow", false);
 // Use vsync aligned rendering.
 // Only supported on windows, os x, and b2g
 #if defined(XP_WIN) || defined(XP_MACOSX)
-pref("gfx.vsync.hw-vsync.enabled", true);
-pref("gfx.vsync.compositor", false);
+pref("gfx.vsync.hw-vsync.enabled", false);
+pref("gfx.vsync.compositor", true);
 pref("gfx.vsync.refreshdriver", true);
 #endif
 

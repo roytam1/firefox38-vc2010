@@ -203,7 +203,8 @@ MediaDecoderStateMachine::MediaDecoderStateMachine(MediaDecoder* aDecoder,
                                                    MediaDecoderReader* aReader,
                                                    bool aRealTime) :
   mDecoder(aDecoder),
-  mTaskQueue(new MediaTaskQueue(GetMediaThreadPool(), /* aAssertTailDispatch = */ true)),
+  mTaskQueue(new MediaTaskQueue(GetMediaThreadPool(MediaThreadType::PLAYBACK),
+                                /* aAssertTailDispatch = */ true)),
   mWatchManager(this, mTaskQueue),
   mRealTime(aRealTime),
   mDispatchedStateMachine(false),
@@ -2427,16 +2428,7 @@ MediaDecoderStateMachine::SeekCompleted()
     newCurrentTime = mAudioStartTime = seekTime;
   } else if (HasAudio()) {
     AudioData* audio = AudioQueue().PeekFront();
-    // Though we adjust the newCurrentTime in audio-based, and supplemented
-    // by video. For better UX, should NOT bind the slide position to
-    // the first audio data timestamp directly.
-    // While seeking to a position where there's only either audio or video, or
-    // seeking to a position lies before audio or video, we need to check if
-    // seekTime is bounded in suitable duration. See Bug 1112438.
-    int64_t videoStart = video ? video->mTime : seekTime;
-    int64_t audioStart = audio ? audio->mTime : seekTime;
-    newCurrentTime = mAudioStartTime =
-        std::min(std::min(audioStart, videoStart), seekTime);
+    newCurrentTime = mAudioStartTime = audio ? audio->mTime : seekTime;
   } else {
     newCurrentTime = video ? video->mTime : seekTime;
   }

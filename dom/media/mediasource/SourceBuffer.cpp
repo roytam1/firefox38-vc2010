@@ -80,9 +80,9 @@ SourceBuffer::SetMode(SourceBufferAppendMode aMode, ErrorResult& aRv)
     aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
     return;
   }
-  if (mIsUsingFormatReader && mGenerateTimestamp &&
+  if (mIsUsingFormatReader && mAttributes->mGenerateTimestamps &&
       aMode == SourceBufferAppendMode::Segments) {
-    aRv.Throw(NS_ERROR_DOM_INVALID_ACCESS_ERR);
+    aRv.Throw(NS_ERROR_DOM_TYPE_ERR);
     return;
   }
   MOZ_ASSERT(mMediaSource->ReadyState() != MediaSourceReadyState::Closed);
@@ -100,7 +100,7 @@ SourceBuffer::SetMode(SourceBufferAppendMode aMode, ErrorResult& aRv)
     mContentManager->RestartGroupStartTimestamp();
   }
 
-  mAppendMode = aMode;
+  mAttributes->SetAppendMode(aMode);
 }
 
 void
@@ -123,20 +123,11 @@ SourceBuffer::SetTimestampOffset(double aTimestampOffset, ErrorResult& aRv)
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
   }
-  mApparentTimestampOffset = aTimestampOffset;
-  mTimestampOffset = TimeUnit::FromSeconds(aTimestampOffset);
-  if (mIsUsingFormatReader && mAppendMode == SourceBufferAppendMode::Sequence) {
-    mContentManager->SetGroupStartTimestamp(mTimestampOffset);
+  mAttributes->SetApparentTimestampOffset(aTimestampOffset);
+  if (mIsUsingFormatReader &&
+      mAttributes->GetAppendMode() == SourceBufferAppendMode::Sequence) {
+    mContentManager->SetGroupStartTimestamp(mAttributes->GetTimestampOffset());
   }
-}
-
-void
-SourceBuffer::SetTimestampOffset(const TimeUnit& aTimestampOffset)
-{
-  MOZ_ASSERT(NS_IsMainThread());
-
-  mTimestampOffset = aTimestampOffset;
-  mApparentTimestampOffset = aTimestampOffset.ToSeconds();
 }
 
 already_AddRefed<TimeRanges>
@@ -163,11 +154,12 @@ SourceBuffer::SetAppendWindowStart(double aAppendWindowStart, ErrorResult& aRv)
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
   }
-  if (aAppendWindowStart < 0 || aAppendWindowStart >= mAppendWindowEnd) {
-    aRv.Throw(NS_ERROR_DOM_INVALID_ACCESS_ERR);
+  if (aAppendWindowStart < 0 ||
+      aAppendWindowStart >= mAttributes->GetAppendWindowEnd()) {
+    aRv.Throw(NS_ERROR_DOM_TYPE_ERR);
     return;
   }
-  mAppendWindowStart = aAppendWindowStart;
+  mAttributes->SetAppendWindowStart(aAppendWindowStart);
 }
 
 void
@@ -179,11 +171,12 @@ SourceBuffer::SetAppendWindowEnd(double aAppendWindowEnd, ErrorResult& aRv)
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
   }
-  if (IsNaN(aAppendWindowEnd) || aAppendWindowEnd <= mAppendWindowStart) {
-    aRv.Throw(NS_ERROR_DOM_INVALID_ACCESS_ERR);
+  if (IsNaN(aAppendWindowEnd) ||
+      aAppendWindowEnd <= mAttributes->GetAppendWindowStart()) {
+    aRv.Throw(NS_ERROR_DOM_TYPE_ERR);
     return;
   }
-  mAppendWindowEnd = aAppendWindowEnd;
+  mAttributes->SetAppendWindowEnd(aAppendWindowEnd);
 }
 
 void
@@ -219,8 +212,8 @@ SourceBuffer::Abort(ErrorResult& aRv)
   }
   AbortBufferAppend();
   mContentManager->ResetParserState();
-  mAppendWindowStart = 0;
-  mAppendWindowEnd = PositiveInfinity<double>();
+  mAttributes->SetAppendWindowStart(0);
+  mAttributes->SetAppendWindowEnd(PositiveInfinity<double>());
 }
 
 void
@@ -251,7 +244,7 @@ SourceBuffer::Remove(double aStart, double aEnd, ErrorResult& aRv)
   if (IsNaN(mMediaSource->Duration()) ||
       aStart < 0 || aStart > mMediaSource->Duration() ||
       aEnd <= aStart || IsNaN(aEnd)) {
-    aRv.Throw(NS_ERROR_DOM_INVALID_ACCESS_ERR);
+    aRv.Throw(NS_ERROR_DOM_TYPE_ERR);
     return;
   }
   if (mMediaSource->ReadyState() == MediaSourceReadyState::Ended) {
@@ -309,10 +302,6 @@ SourceBuffer::Ended()
 SourceBuffer::SourceBuffer(MediaSource* aMediaSource, const nsACString& aType)
   : DOMEventTargetHelper(aMediaSource->GetParentObject())
   , mMediaSource(aMediaSource)
-  , mAppendWindowStart(0)
-  , mAppendWindowEnd(PositiveInfinity<double>())
-  , mApparentTimestampOffset(0)
-  , mAppendMode(SourceBufferAppendMode::Segments)
   , mUpdating(false)
   , mActive(false)
   , mUpdateID(0)
@@ -322,23 +311,25 @@ SourceBuffer::SourceBuffer(MediaSource* aMediaSource, const nsACString& aType)
   MOZ_ASSERT(NS_IsMainThread());
   MOZ_ASSERT(aMediaSource);
   mEvictionThreshold = Preferences::GetUint("media.mediasource.eviction_threshold",
-                                            75 * (1 << 20));
+                                            100 * (1 << 20));
+  bool generateTimestamps = false;
+  if (aType.LowerCaseEqualsLiteral("audio/mpeg") ||
+      aType.LowerCaseEqualsLiteral("audio/aac")) {
+    generateTimestamps = true;
+  }
+  mAttributes = new SourceBufferAttributes(generateTimestamps);
+
   mContentManager =
-    SourceBufferContentManager::CreateManager(this,
+    SourceBufferContentManager::CreateManager(mAttributes,
                                               aMediaSource->GetDecoder(),
                                               aType);
   MSE_DEBUG("Create mContentManager=%p",
             mContentManager.get());
-  if (aType.LowerCaseEqualsLiteral("audio/mpeg") ||
-      aType.LowerCaseEqualsLiteral("audio/aac")) {
-    mGenerateTimestamp = true;
-  } else {
-    mGenerateTimestamp = false;
-  }
+
   mIsUsingFormatReader =
     Preferences::GetBool("media.mediasource.format-reader", false);
   ErrorResult dummy;
-  if (mGenerateTimestamp) {
+  if (mAttributes->mGenerateTimestamps) {
     SetMode(SourceBufferAppendMode::Sequence, dummy);
   } else {
     SetMode(SourceBufferAppendMode::Segments, dummy);
@@ -427,7 +418,7 @@ SourceBuffer::CheckEndTime()
 {
   MOZ_ASSERT(NS_IsMainThread());
   // Check if we need to update mMediaSource duration
-  double endTime = GetBufferedEnd();
+  double endTime = mContentManager->GroupEndTimestamp().ToSeconds();
   double duration = mMediaSource->Duration();
   if (endTime > duration) {
     mMediaSource->SetDuration(endTime, MSRangeRemovalAction::SKIP);
@@ -443,11 +434,12 @@ SourceBuffer::AppendData(const uint8_t* aData, uint32_t aLength, ErrorResult& aR
   if (!data) {
     return;
   }
-  mContentManager->AppendData(data, mTimestampOffset);
+  mContentManager->AppendData(data, mAttributes->GetTimestampOffset());
 
   StartUpdating();
 
-  MOZ_ASSERT(mAppendMode == SourceBufferAppendMode::Segments,
+  MOZ_ASSERT(mIsUsingFormatReader ||
+             mAttributes->GetAppendMode() == SourceBufferAppendMode::Segments,
              "We don't handle timestampOffset for sequence mode yet");
   nsRefPtr<nsIRunnable> task = new BufferAppendRunnable(this, mUpdateID);
   NS_DispatchToMainThread(task);
@@ -493,10 +485,14 @@ SourceBuffer::AppendDataCompletedWithSuccess(bool aHasActiveTracks)
         mMediaSource->GetDecoder()->NotifyWaitingForResourcesStatusChanged();
       }
     }
+  }
+  if (mActive && mIsUsingFormatReader) {
     // Tell our parent decoder that we have received new data.
     // The information provided do not matter much so long as it is monotonically
     // increasing.
     mMediaSource->GetDecoder()->NotifyDataArrived(nullptr, 1, mReportedOffset++);
+    // Send progress event.
+    mMediaSource->GetDecoder()->NotifyBytesDownloaded();
   }
 
   CheckEndTime();
@@ -551,6 +547,15 @@ SourceBuffer::PrepareAppend(const uint8_t* aData, uint32_t aLength, ErrorResult&
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return nullptr;
   }
+
+  // If the HTMLMediaElement.error attribute is not null, then throw an
+  // InvalidStateError exception and abort these steps.
+  if (!mMediaSource->GetDecoder() ||
+      mMediaSource->GetDecoder()->IsEndedOrShutdown()) {
+    aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
+    return nullptr;
+  }
+
   if (mMediaSource->ReadyState() == MediaSourceReadyState::Ended) {
     mMediaSource->SetReadyState(MediaSourceReadyState::Open);
   }
@@ -583,8 +588,9 @@ SourceBuffer::PrepareAppend(const uint8_t* aData, uint32_t aLength, ErrorResult&
   // See if we have enough free space to append our new data.
   // As we can only evict once we have playable data, we must give a chance
   // to the DASH player to provide a complete media segment.
-  if (aLength > mEvictionThreshold ||
-      ((mContentManager->GetSize() > mEvictionThreshold - aLength) &&
+  if (aLength > mEvictionThreshold || evicted == Result::BUFFER_FULL ||
+      ((!mIsUsingFormatReader &&
+        mContentManager->GetSize() > mEvictionThreshold - aLength) &&
        evicted != Result::CANT_EVICT)) {
     aRv.Throw(NS_ERROR_DOM_QUOTA_EXCEEDED_ERR);
     return nullptr;
@@ -595,7 +601,6 @@ SourceBuffer::PrepareAppend(const uint8_t* aData, uint32_t aLength, ErrorResult&
     aRv.Throw(NS_ERROR_DOM_QUOTA_EXCEEDED_ERR);
     return nullptr;
   }
-  // TODO: Test buffer full flag.
   return data.forget();
 }
 

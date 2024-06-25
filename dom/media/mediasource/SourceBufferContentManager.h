@@ -16,6 +16,10 @@
 
 namespace mozilla {
 
+namespace dom {
+  class SourceBufferAttributes;
+}
+
 using media::TimeUnit;
 using media::TimeIntervals;
 
@@ -31,7 +35,8 @@ public:
   typedef AppendPromise RangeRemovalPromise;
 
   static already_AddRefed<SourceBufferContentManager>
-  CreateManager(dom::SourceBuffer* aParent, MediaSourceDecoder* aParentDecoder,
+  CreateManager(dom::SourceBufferAttributes* aAttributes,
+                MediaSourceDecoder* aParentDecoder,
                 const nsACString& aType);
 
   // Add data to the end of the input buffer.
@@ -60,6 +65,7 @@ public:
     NO_DATA_EVICTED,
     DATA_EVICTED,
     CANT_EVICT,
+    BUFFER_FULL,
   MOZ_END_NESTED_ENUM_CLASS(EvictDataResult)
 
   // Evicts data up to aPlaybackTime. aThreshold is used to
@@ -101,6 +107,7 @@ public:
 
   virtual void SetGroupStartTimestamp(const TimeUnit& aGroupStartTimestamp) {}
   virtual void RestartGroupStartTimestamp() {}
+  virtual TimeUnit GroupEndTimestamp() = 0;
 
 #if defined(DEBUG)
   virtual void Dump(const char* aPath) { }

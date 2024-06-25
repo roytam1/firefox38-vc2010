@@ -124,6 +124,7 @@ void
 MediaDecoder::InitStatics()
 {
   AbstractThread::InitStatics();
+  SharedThreadPool::InitStatics();
 
   // Log modules.
 #ifdef PR_LOGGING
@@ -763,12 +764,11 @@ void MediaDecoder::SetMinimizePrerollUntilPlaybackStarts()
 nsresult MediaDecoder::ScheduleStateMachineThread()
 {
   MOZ_ASSERT(NS_IsMainThread());
-  NS_ASSERTION(mDecoderStateMachine,
-               "Must have state machine to start state machine thread");
-  NS_ENSURE_STATE(mDecoderStateMachine);
-
   if (mShuttingDown)
     return NS_OK;
+
+  MOZ_ASSERT(mDecoderStateMachine);
+  NS_ENSURE_STATE(mDecoderStateMachine);
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   mDecoderStateMachine->ScheduleStateMachine();
   return NS_OK;

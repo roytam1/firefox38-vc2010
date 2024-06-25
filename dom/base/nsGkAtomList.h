@@ -676,6 +676,7 @@ GK_ATOM(onantennaavailablechange, "onantennaavailablechange")
 GK_ATOM(onAppCommand, "onAppCommand")
 GK_ATOM(onattributechanged, "onattributechanged")
 GK_ATOM(onaudioprocess, "onaudioprocess")
+GK_ATOM(onauxclick, "onauxclick")
 GK_ATOM(onbeforecopy, "onbeforecopy")
 GK_ATOM(onbeforecut, "onbeforecut")
 GK_ATOM(onbeforepaste, "onbeforepaste")
@@ -2336,3 +2337,13 @@ GK_ATOM(onboundary, "onboundary")
 #endif
 
 GK_ATOM(vr_state, "vr-state")
+
+// MSE
+GK_ATOM(onsourceopen, "onsourceopen")
+GK_ATOM(onsourceended, "onsourceended")
+GK_ATOM(onsourceclosed, "onsourceclosed")
+GK_ATOM(onupdatestart, "onupdatestart")
+GK_ATOM(onupdate, "onupdate")
+GK_ATOM(onupdateend, "onupdateend")
+GK_ATOM(onaddsourcebuffer, "onaddsourcebuffer")
+GK_ATOM(onremovesourcebuffer, "onremovesourcebuffer")

@@ -28,6 +28,7 @@
 #include "ScopedNSSTypes.h"
 #include "SharedCertVerifier.h"
 
+#pragma optimize("", off)
 // A note about the preload list:
 // When a site specifically disables HSTS by sending a header with
 // 'max-age: 0', we keep a "knockout" value that means "we have no information
@@ -36,6 +37,7 @@
 // This prevents the preload list from overriding the site's current
 // desired HSTS status.
 #include "nsSTSPreloadList.inc"
+#pragma optimize("", on)
 
 using namespace mozilla;
 using namespace mozilla::psm;
