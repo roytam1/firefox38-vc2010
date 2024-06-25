@@ -2773,11 +2773,7 @@ nsresult HTMLMediaElement::InitializeDecoderAsClone(MediaDecoder* aOriginal)
     return NS_ERROR_FAILURE;
   }
 
-  double duration = aOriginal->GetDuration();
-  if (duration >= 0) {
-    decoder->SetDuration(duration);
-    decoder->SetMediaSeekable(aOriginal->IsMediaSeekable());
-  }
+  decoder->SetMediaSeekable(aOriginal->IsMediaSeekable());
 
   nsRefPtr<MediaResource> resource = originalResource->CloneData(decoder);
   if (!resource) {

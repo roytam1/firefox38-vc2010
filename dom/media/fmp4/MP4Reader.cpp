@@ -31,6 +31,7 @@
 using mozilla::layers::Image;
 using mozilla::layers::LayerManager;
 using mozilla::layers::LayersBackend;
+using mozilla::media::TimeUnit;
 
 #ifdef PR_LOGGING
 PRLogModuleInfo* GetDemuxerLog() {
@@ -404,8 +405,7 @@ MP4Reader::ReadMetadata(MediaInfo* aInfo,
     duration = mDemuxer->Duration();
   }
   if (duration != -1) {
-    ReentrantMonitorAutoEnter mon(mDecoder->GetReentrantMonitor());
-    mDecoder->SetMediaDuration(duration);
+    mInfo.mMetadataDuration = Some(TimeUnit::FromMicroseconds(duration));
   }
 
   *aInfo = mInfo;

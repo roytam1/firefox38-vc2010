@@ -25,6 +25,10 @@
 #include "MP4Reader.h"
 #endif
 
+#ifdef MOZ_WEBM
+#include "WebMReader.h"
+#endif
+
 #ifdef PR_LOGGING
 extern PRLogModuleInfo* GetMediaSourceLog();
 
@@ -679,7 +683,14 @@ CreateReaderForType(const nsACString& aType, AbstractMediaDecoder* aDecoder)
     return reader;
   }
 #endif
-  return DecoderTraits::CreateReader(aType, aDecoder);
+
+#ifdef MOZ_WEBM
+  if (DecoderTraits::IsWebMType(aType)) {
+    return new WebMReader(aDecoder);
+  }
+#endif
+
+  return nullptr;
 }
 
 already_AddRefed<SourceBufferDecoder>
@@ -1120,7 +1131,7 @@ MediaSourceReader::ReadMetadata(MediaInfo* aInfo, MetadataTags** aTags)
     mInfo.mCrypto.AddInitData(info.mCrypto);
     MSE_DEBUG("audio reader=%p duration=%lld",
               mAudioSourceDecoder.get(),
-              mAudioSourceDecoder->GetReader()->GetDecoder()->GetMediaDuration());
+              mInfo.mMetadataDuration.isSome() ? mInfo.mMetadataDuration.ref().ToMicroseconds() : -1);
   }
 
   if (mVideoTrack) {
@@ -1133,7 +1144,7 @@ MediaSourceReader::ReadMetadata(MediaInfo* aInfo, MetadataTags** aTags)
     mInfo.mCrypto.AddInitData(info.mCrypto);
     MSE_DEBUG("video reader=%p duration=%lld",
               GetVideoReader(),
-              GetVideoReader()->GetDecoder()->GetMediaDuration());
+              mInfo.mMetadataDuration.isSome() ? mInfo.mMetadataDuration.ref().ToMicroseconds() : -1);
   }
 
   *aInfo = mInfo;

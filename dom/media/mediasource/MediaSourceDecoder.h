@@ -69,7 +69,6 @@ public:
   void SetInitialDuration(int64_t aDuration);
   void SetMediaSourceDuration(double aDuration, MSRangeRemovalAction aAction);
   double GetMediaSourceDuration();
-  void DurationChanged(double aOldDuration, double aNewDuration);
 
   // Called whenever a TrackBuffer has new data appended or a new decoder
   // initializes.  Safe to call from any thread.
@@ -109,9 +108,6 @@ public:
 
 private:
   void DoSetMediaSourceDuration(double aDuration);
-  void ScheduleDurationChange(double aOldDuration,
-                              double aNewDuration,
-                              MSRangeRemovalAction aAction);
 
   // The owning MediaSource holds a strong reference to this decoder, and
   // calls Attach/DetachMediaSource on this decoder to set and clear
@@ -120,9 +116,6 @@ private:
   nsRefPtr<MediaDecoderReader> mReader;
   bool mIsUsingFormatReader;
   nsRefPtr<MediaSourceDemuxer> mDemuxer;
-
-  // Protected by GetReentrantMonitor()
-  double mMediaSourceDuration;
   bool mEnded;
 };
 
