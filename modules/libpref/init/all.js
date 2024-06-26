@@ -998,6 +998,8 @@ pref("dom.disable_window_open_feature.status",      true);
 
 pref("dom.allow_scripts_to_close_windows",          false);
 
+pref("dom.require_user_interaction_for_beforeunload", true);
+
 pref("dom.disable_open_during_load",                false);
 pref("dom.popup_maximum",                           20);
 pref("dom.popup_allowed_events", "change click dblclick mouseup reset submit touchend");
@@ -1261,6 +1263,7 @@ pref("network.http.redirection-limit", 20);
 // NOTE: support for "compress" has been disabled per bug 196406.
 // NOTE: separate values with comma+space (", "): see bug 576033
 pref("network.http.accept-encoding", "gzip, deflate");
+pref("network.http.accept-encoding.secure", "gzip, deflate");
 
 pref("network.http.pipelining"      , true);
 pref("network.http.pipelining.ssl"  , true); // disable pipelining over SSL

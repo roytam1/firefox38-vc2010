@@ -76,6 +76,10 @@ pref("app.update.checkInstallTime", true);
 // The number of days a binary is permitted to be old without checking is defined in
 // firefox-branding.js (app.update.checkInstallTime.days)
 
+// Whether to escape to a content-less page if a user presses "Get me out of here"
+// on a network error page (e.g. cert error)
+pref("browser.escape_to_blank", false);
+
 // The minimum delay in seconds for the timer to fire.
 // default=2 minutes
 pref("app.update.timerMinimumDelay", 120);

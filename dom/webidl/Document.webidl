@@ -251,12 +251,13 @@ partial interface Document {
     Element createElementNS(DOMString? namespace, DOMString qualifiedName, DOMString typeExtension);
 };
 
-// http://dvcs.w3.org/hg/webperf/raw-file/tip/specs/PageVisibility/Overview.html#sec-document-interface
+// https://w3c.github.io/page-visibility/#extensions-to-the-document-interface
 partial interface Document {
   readonly attribute boolean hidden;
   readonly attribute boolean mozHidden;
   readonly attribute VisibilityState visibilityState;
   readonly attribute VisibilityState mozVisibilityState;
+           attribute EventHandler onvisibilitychange;
 };
 
 // http://dev.w3.org/csswg/cssom/#extensions-to-the-document-interface
@@ -276,6 +277,8 @@ partial interface Document {
     Element? elementFromPoint (float x, float y);
 
     CaretPosition? caretPositionFromPoint (float x, float y);
+
+    readonly attribute Element? scrollingElement;
 };
 
 // http://dvcs.w3.org/hg/undomanager/raw-file/tip/undomanager.html
@@ -387,6 +390,12 @@ partial interface Document {
    */
   [ChromeOnly, Throws]
   void removeAnonymousContent(AnonymousContent aContent);
+};
+
+// Extension to give chrome JS the ability to determine whether
+// the user has interacted with the document or not.
+partial interface Document {
+  [ChromeOnly] readonly attribute boolean userHasInteracted;
 };
 
 // Extension to give chrome and XBL JS the ability to determine whether

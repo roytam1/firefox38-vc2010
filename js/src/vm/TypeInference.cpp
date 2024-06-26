@@ -1271,7 +1271,6 @@ js::FinishCompilation(JSContext* cx, HandleScript script, CompilerConstraintList
         // after any future changes to the stack type sets.
         if (entry.script->hasFreezeConstraints())
             continue;
-        entry.script->setHasFreezeConstraints();
 
         size_t count = TypeScript::NumTypeSets(entry.script);
 
@@ -1280,6 +1279,9 @@ js::FinishCompilation(JSContext* cx, HandleScript script, CompilerConstraintList
             if (!array[i].addConstraint(cx, cx->typeLifoAlloc().new_<TypeConstraintFreezeStack>(entry.script), false))
                 succeeded = false;
         }
+        
+        if (succeeded)
+            entry.script->setHasFreezeConstraints();
     }
 
     if (!succeeded || types.compilerOutputs->back().pendingInvalidation()) {
@@ -3606,7 +3608,10 @@ TypeNewScript::rollbackPartiallyInitializedObjects(JSContext* cx, ObjectGroup* g
     RootedFunction function(cx, this->function());
     Vector<uint32_t, 32> pcOffsets(cx);
     for (ScriptFrameIter iter(cx); !iter.done(); ++iter) {
-        pcOffsets.append(iter.script()->pcToOffset(iter.pc()));
+        {
+            if (!pcOffsets.append(iter.script()->pcToOffset(iter.pc())))
+                MOZ_CRASH("rollbackPartiallyInitializedObjects");
+        }
 
         if (!iter.isConstructing() || !iter.matchCallee(cx, function))
             continue;

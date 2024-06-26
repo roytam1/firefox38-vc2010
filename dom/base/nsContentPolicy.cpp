@@ -238,6 +238,12 @@ nsContentPolicy::ShouldLoad(uint32_t          contentType,
 {
     // ShouldProcess does not need a content location, but we do
     NS_PRECONDITION(contentLocation, "Must provide request location");
+    NS_PRECONDITION(decision, "Null out pointer");
+    if (!decision) {
+      // We have a null out pointer, meaning this is spinning its wheels
+      // and may crash.
+      return NS_OK;
+    }
     nsresult rv = CheckPolicy(&nsIContentPolicy::ShouldLoad,
                               &nsISimpleContentPolicy::ShouldLoad,
                               contentType,

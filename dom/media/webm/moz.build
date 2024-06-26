@@ -6,6 +6,7 @@
 
 EXPORTS += [
     'IntelWebMVideoDecoder.h',
+    'NesteggPacketHolder.h',
     'SoftwareWebMVideoDecoder.h',
     'WebMBufferedParser.h',
     'WebMDecoder.h',
@@ -13,6 +14,7 @@ EXPORTS += [
 ]
 
 UNIFIED_SOURCES += [
+    'AudioDecoder.cpp',
     'SoftwareWebMVideoDecoder.cpp',
     'WebMBufferedParser.cpp',
     'WebMDecoder.cpp',
