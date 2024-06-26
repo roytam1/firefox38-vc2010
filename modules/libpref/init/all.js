@@ -615,12 +615,19 @@ pref("gfx.layerscope.port", 23456);
 // This should be use to quickly find which slow paths are used by test cases.
 pref("gfx.perf-warnings.enabled", false);
 
-// 0 = Off, 1 = Full, 2 = Tagged Images Only.
+// 0 = Off, 1 = All Images, 2 = Tagged Images Only.
 // See eCMSMode in gfx/thebes/gfxPlatform.h
-pref("gfx.color_management.mode", 1);
+#ifdef XP_WIN
+pref("gfx.color_management.mode", 2);
 pref("gfx.color_management.display_profile", "");
 pref("gfx.color_management.rendering_intent", 0);
 pref("gfx.color_management.enablev4", true);
+#else
+pref("gfx.color_management.mode", 0);
+pref("gfx.color_management.display_profile", "");
+pref("gfx.color_management.rendering_intent", 0);
+pref("gfx.color_management.enablev4", false);
+#endif
 
 pref("gfx.downloadable_fonts.enabled", true);
 pref("gfx.downloadable_fonts.fallback_delay", 3000);
@@ -2270,18 +2277,6 @@ pref("layout.frame_rate", -1);
 
 // pref to dump the display list to the log. Useful for debugging drawing.
 pref("layout.display-list.dump", false);
-
-// pref to control precision of the frame rate timer. When true,
-// we use a "precise" timer, which means each notification fires
-// Nms after the start of the last notification. That means if the
-// processing of the notification is slow, the timer can fire immediately
-// after we've just finished processing the last notification, which might
-// lead to starvation problems.
-// When false, we use a "slack" timer which fires Nms after the *end*
-// of the last notification. This can give less tight frame rates
-// but provides more time for other operations when the browser is
-// heavily loaded.
-pref("layout.frame_rate.precise", false);
 
 // pref to control whether layout warnings that are hit quite often are enabled
 pref("layout.spammy_warnings.enabled", true);
