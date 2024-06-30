@@ -56,23 +56,17 @@ static const sslSocketOps ssl_secure_ops = { /* SSL. */
 */
 static sslOptions ssl_defaults = {
     { siBuffer, NULL, 0 }, /* nextProtoNego */
-    1 << 16,
-    MAX_FRAGMENT_LENGTH + 1,
+    1 << 16,    /* recordSizeLimit */
+    MAX_FRAGMENT_LENGTH + 1, /* maxEarlyDataSize */
     PR_TRUE,    /* useSecurity        */
     PR_FALSE,   /* useSocks           */
     PR_FALSE,   /* requestCertificate */
     2,          /* requireCertificate */
     PR_FALSE,   /* handshakeAsClient  */
     PR_FALSE,   /* handshakeAsServer  */
-    PR_FALSE,   /* enableSSL2         */ /* now defaults to off in NSS 3.13 */
-    PR_FALSE,   /* unusedBit9         */
-    PR_FALSE,   /* unusedBit10        */
     PR_FALSE,   /* noCache            */
     PR_FALSE,   /* fdx                */
-    PR_FALSE,   /* v2CompatibleHello  */ /* now defaults to off in NSS 3.13 */
     PR_TRUE,    /* detectRollBack     */
-    PR_FALSE,   /* noStepDown         */
-    PR_FALSE,   /* bypassPKCS11       */
     PR_FALSE,   /* noLocks            */
     PR_FALSE,   /* enableSessionTickets */
     PR_FALSE,   /* enableDeflate      */
@@ -81,12 +75,19 @@ static sslOptions ssl_defaults = {
     PR_FALSE,   /* enableFalseStart   */
     PR_TRUE,    /* cbcRandomIV        */
     PR_FALSE,   /* enableOCSPStapling */
-    PR_TRUE,    /* enableNPN          */
     PR_FALSE,   /* enableALPN         */
     PR_TRUE,    /* reuseServerECDHEKey */
     PR_FALSE,   /* enableFallbackSCSV */
     PR_TRUE,    /* enableServerDhe */
-    PR_FALSE    /* enableExtendedMS    */
+    PR_FALSE,   /* enableExtendedMS    */
+    PR_FALSE,   /* enableSignedCertTimestamps */
+    PR_FALSE,   /* requireDHENamedGroups */
+    PR_FALSE,   /* enable0RttData */
+    PR_FALSE,   /* enableTls13CompatMode */
+    PR_FALSE,   /* enableDtlsShortHeader */
+    PR_FALSE,   /* enableHelloDowngradeCheck */
+    PR_FALSE,   /* enableV2CompatibleHello */
+    PR_FALSE    /* enablePostHandshakeAuth */
 };
 
 /*
@@ -842,6 +843,10 @@ SSL_OptionSet(PRFileDesc *fd, PRInt32 which, PRIntn val)
             ss->opt.enableV2CompatibleHello = val;
             break;
 
+        case SSL_ENABLE_POST_HANDSHAKE_AUTH:
+            ss->opt.enablePostHandshakeAuth = val;
+            break;
+
         default:
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
             rv = SECFailure;
@@ -990,6 +995,9 @@ SSL_OptionGet(PRFileDesc *fd, PRInt32 which, PRIntn *pVal)
         case SSL_ENABLE_V2_COMPATIBLE_HELLO:
             val = ss->opt.enableV2CompatibleHello;
             break;
+        case SSL_ENABLE_POST_HANDSHAKE_AUTH:
+            val = ss->opt.enablePostHandshakeAuth;
+            break;
         default:
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
             rv = SECFailure;
@@ -1121,6 +1129,9 @@ SSL_OptionGetDefault(PRInt32 which, PRIntn *pVal)
             break;
         case SSL_ENABLE_V2_COMPATIBLE_HELLO:
             val = ssl_defaults.enableV2CompatibleHello;
+            break;
+        case SSL_ENABLE_POST_HANDSHAKE_AUTH:
+            val = ssl_defaults.enablePostHandshakeAuth;
             break;
         default:
             PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -1323,6 +1334,10 @@ SSL_OptionSetDefault(PRInt32 which, PRIntn val)
 
         case SSL_ENABLE_V2_COMPATIBLE_HELLO:
             ssl_defaults.enableV2CompatibleHello = val;
+            break;
+
+        case SSL_ENABLE_POST_HANDSHAKE_AUTH:
+            ssl_defaults.enablePostHandshakeAuth = val;
             break;
 
         default:
@@ -4028,20 +4043,32 @@ struct {
     void *function;
 } ssl_experimental_functions[] = {
 #ifndef SSL_DISABLE_EXPERIMENTAL_API
+    EXP(AeadDecrypt),
+    EXP(AeadEncrypt),
+    EXP(DestroyAead),
+    EXP(DestroyResumptionTokenInfo),
+    EXP(EnableESNI),
+    EXP(EncodeESNIKeys),
+    EXP(GetCurrentEpoch),
     EXP(GetExtensionSupport),
+    EXP(GetResumptionTokenInfo),
     EXP(HelloRetryRequestCallback),
     EXP(InstallExtensionHooks),
+    EXP(HkdfExtract),
+    EXP(HkdfExpandLabel),
+    EXP(HkdfExpandLabelWithMech),
     EXP(KeyUpdate),
+    EXP(MakeAead),
+    EXP(RecordLayerData),
+    EXP(RecordLayerWriteCallback),
+    EXP(SecretCallback),
+    EXP(SendCertificateRequest),
     EXP(SendSessionTicket),
+    EXP(SetESNIKeyPair),
     EXP(SetMaxEarlyDataSize),
-    EXP(SetupAntiReplay),
     EXP(SetResumptionTokenCallback),
     EXP(SetResumptionToken),
-    EXP(GetResumptionTokenInfo),
-    EXP(DestroyResumptionTokenInfo),
-    EXP(SetESNIKeyPair),
-    EXP(EncodeESNIKeys),
-    EXP(EnableESNI),
+    EXP(SetupAntiReplay),
 #endif
     { "", NULL }
 };
