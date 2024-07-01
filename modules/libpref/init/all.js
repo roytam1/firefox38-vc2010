@@ -1002,6 +1002,7 @@ pref("dom.disable_window_open_feature.scrollbars",  false);
 pref("dom.disable_window_open_feature.resizable",   true);
 pref("dom.disable_window_open_feature.minimizable", false);
 pref("dom.disable_window_open_feature.status",      true);
+pref("dom.disable_window_showModalDialog",          true);
 
 pref("dom.allow_scripts_to_close_windows",          false);
 
@@ -1270,12 +1271,12 @@ pref("network.http.redirection-limit", 20);
 // NOTE: support for "compress" has been disabled per bug 196406.
 // NOTE: separate values with comma+space (", "): see bug 576033
 pref("network.http.accept-encoding", "gzip, deflate");
-pref("network.http.accept-encoding.secure", "gzip, deflate");
+pref("network.http.accept-encoding.secure", "gzip, deflate, br");
 
 pref("network.http.pipelining"      , true);
-pref("network.http.pipelining.ssl"  , true); // disable pipelining over SSL
+pref("network.http.pipelining.ssl"  , true);
 pref("network.http.pipelining.abtest", false);
-pref("network.http.proxy.pipelining", false);
+pref("network.http.proxy.pipelining", false); // for old, broken proxies.
 
 // Max number of requests in the pipeline
 pref("network.http.pipelining.maxrequests" , 4);
@@ -1750,7 +1751,7 @@ pref("intl.accept_languages",               "chrome://global/locale/intl.propert
 pref("intl.menuitems.alwaysappendaccesskeys","chrome://global/locale/intl.properties");
 pref("intl.menuitems.insertseparatorbeforeaccesskeys","chrome://global/locale/intl.properties");
 pref("intl.charset.detector",               "chrome://global/locale/intl.properties");
-pref("intl.charset.fallback.override",      "");
+pref("intl.charset.fallback.override",      "*"); // '*' to make sure the UI selects the proper entry for 'auto'
 pref("intl.charset.fallback.tld",           true);
 pref("intl.ellipsis",                       "chrome://global-platform/locale/intl.properties");
 pref("intl.locale.matchOS",                 false);
@@ -4097,6 +4098,8 @@ pref("dom.webnotifications.enabled", true);
 
 // Alert animation effect, name is disableSlidingEffect for backwards-compat.
 pref("alerts.disableSlidingEffect", false);
+// The immediate duration of the alert, in milliseconds.
+pref("alerts.durationImmediate", 20000);
 
 // DOM full-screen API.
 pref("full-screen-api.enabled", false);

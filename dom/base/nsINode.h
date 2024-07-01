@@ -73,6 +73,8 @@ class Element;
 class EventHandlerNonNull;
 class OnErrorEventHandlerNonNull;
 template<typename T> class Optional;
+class OwningNodeOrString;
+template<typename> class Sequence;
 class Text;
 class TextOrElementOrDocument;
 struct DOMPointInit;
@@ -265,6 +267,7 @@ public:
   typedef mozilla::dom::DOMPointInit DOMPointInit;
   typedef mozilla::dom::DOMQuad DOMQuad;
   typedef mozilla::dom::DOMRectReadOnly DOMRectReadOnly;
+  typedef mozilla::dom::OwningNodeOrString OwningNodeOrString;
   typedef mozilla::dom::TextOrElementOrDocument TextOrElementOrDocument;
   typedef mozilla::ErrorResult ErrorResult;
 
@@ -914,9 +917,10 @@ public:
   class nsSlots
   {
   public:
-    nsSlots()
-      : mChildNodes(nullptr),
-        mWeakReference(nullptr)
+   nsSlots()
+     : mChildNodes(nullptr),
+       mWeakReference(nullptr),
+       mEditableDescendantCount(0)
     {
     }
 
@@ -945,6 +949,12 @@ public:
      * Weak reference to this node
      */
     nsNodeWeakReference* mWeakReference;
+
+    /**
+     * Number of descendant nodes in the uncomposed document that have been
+     * explicitly set as editable.
+     */
+    uint32_t mEditableDescendantCount;
   };
 
   /**
@@ -979,6 +989,22 @@ public:
                  "Trying to unset write-only flags");
     nsWrapperCache::UnsetFlags(aFlagsToUnset);
   }
+
+  void ChangeEditableDescendantCount(int32_t aDelta);
+
+  /**
+   * Returns the count of descendant nodes in the uncomposed
+   * document that are explicitly set as editable.
+   */
+  uint32_t EditableDescendantCount();
+
+  /**
+   * Sets the editable descendant count to 0. The editable
+   * descendant count only counts explicitly editable nodes
+   * that are in the uncomposed document so this method
+   * should be called when nodes are are removed from it.
+   */
+  void ResetEditableDescendantCount();
 
   void SetEditableFlag(bool aEditable)
   {
@@ -1655,6 +1681,11 @@ public:
   // ChildNode methods
   mozilla::dom::Element* GetPreviousElementSibling() const;
   mozilla::dom::Element* GetNextElementSibling() const;
+
+  void Before(const mozilla::dom::Sequence<OwningNodeOrString>& aNodes, ErrorResult& aRv);
+  void After(const mozilla::dom::Sequence<OwningNodeOrString>& aNodes, ErrorResult& aRv);
+  void ReplaceWith(const mozilla::dom::Sequence<OwningNodeOrString>& aNodes,
+                   ErrorResult& aRv);
   /**
    * Remove this node from its parent, if any.
    */
@@ -1663,6 +1694,9 @@ public:
   // ParentNode methods
   mozilla::dom::Element* GetFirstElementChild() const;
   mozilla::dom::Element* GetLastElementChild() const;
+
+  void Prepend(const mozilla::dom::Sequence<OwningNodeOrString>& aNodes, ErrorResult& aRv);
+  void Append(const mozilla::dom::Sequence<OwningNodeOrString>& aNodes, ErrorResult& aRv);
 
   void GetBoxQuads(const BoxQuadOptions& aOptions,
                    nsTArray<nsRefPtr<DOMQuad> >& aResult,
