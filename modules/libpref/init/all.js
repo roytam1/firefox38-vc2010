@@ -134,6 +134,9 @@ pref("dom.select_events.enabled", true);
 // Whether or not selection events on text controls are enabled
 pref("dom.select_events.textcontrols.enabled", true);
 
+// Whether or not the document visbility API is enabled
+pref("dom.visibilityAPI.enabled", true);
+
 // Whether or not Web Workers are enabled.
 pref("dom.workers.enabled", true);
 // The number of workers per domain allowed to run concurrently.
@@ -1726,7 +1729,7 @@ pref("network.cookie.cookieBehavior",       0); // 0-Accept, 1-dontAcceptForeign
 pref("network.cookie.cookieBehavior",       0); // Keep the old default of accepting all cookies
 #endif
 pref("network.cookie.thirdparty.sessionOnly", false);
-pref("network.cookie.lifetimePolicy",       0); // accept normally, 1-askBeforeAccepting, 2-acceptForSession,3-acceptForNDays
+pref("network.cookie.lifetimePolicy",       0); // 0-accept normally, 2-acceptForSession,3-acceptForNDays
 pref("network.cookie.alwaysAcceptSessionCookies", false);
 pref("network.cookie.prefsMigrated",        false);
 pref("network.cookie.lifetime.days",        90);
@@ -1889,6 +1892,15 @@ pref("middlemouse.paste", false);
 pref("middlemouse.openNewWindow", true);
 pref("middlemouse.contentLoadURL", false);
 pref("middlemouse.scrollbarPosition", false);
+
+#ifdef XP_WIN
+// Mouse 4th/5th button handling
+// Setting these to false allows you to disable the 4th and/or 5th button of
+// your mouse. The 4th button is typically mapped to "Back" and the 5th
+// button is typically mapped to "Forward".
+pref("mouse.button4.enabled", true);
+pref("mouse.button5.enabled", true);
+#endif
 
 // Clipboard behavior
 pref("clipboard.autocopy", false);

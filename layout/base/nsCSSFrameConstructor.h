@@ -571,6 +571,7 @@ private:
      @param nsStyleContext the style context to use for the frame. */
   typedef nsIFrame* (* FrameCreationFunc)(nsIPresShell*, nsStyleContext*);
   typedef nsContainerFrame* (* ContainerFrameCreationFunc)(nsIPresShell*, nsStyleContext*);
+  typedef nsBlockFrame* (* BlockFrameCreationFunc)(nsIPresShell*, nsStyleContext*);
 
   /* A function that can be used to get a FrameConstructionData.  Such
      a function is allowed to return null.
@@ -694,6 +695,13 @@ private:
    * display:contents
    */
 #define FCDATA_IS_CONTENTS 0x100000
+  /**
+   * When FCDATA_CREATE_BLOCK_WRAPPER_FOR_ALL_KIDS is set, this bit says
+   * if we should create a grid/flex/columnset container instead of
+   * a block wrapper when the styles say so. If not set, it will fall
+   * back to a standard block frame wrapper.
+   */
+#define FCDATA_ALLOW_GRID_FLEX_COLUMNSET 0x200000
 
   /* Structure representing information about how a frame should be
      constructed.  */
@@ -847,6 +855,27 @@ private:
                                   aSuppressWhiteSpaceOptimizations,
                                   aAnonChildren);
       PR_APPEND_LINK(item, &mItems);
+      ++mItemCount;
+      ++mDesiredParentCounts[item->DesiredParentType()];
+      return item;
+    }
+
+    // Arguments are the same as AppendItem().
+    FrameConstructionItem* PrependItem(const FrameConstructionData* aFCData,
+                                       nsIContent* aContent,
+                                       nsIAtom* aTag,
+                                       int32_t aNameSpaceID,
+                                       PendingBinding* aPendingBinding,
+                                       already_AddRefed<nsStyleContext>&& aStyleContext,
+                                       bool aSuppressWhiteSpaceOptimizations,
+                                       nsTArray<nsIAnonymousContentCreator::ContentInfo>* aAnonChildren)
+    {
+      FrameConstructionItem* item =
+        new FrameConstructionItem(aFCData, aContent, aTag, aNameSpaceID,
+                                  aPendingBinding, aStyleContext,
+                                  aSuppressWhiteSpaceOptimizations,
+                                  aAnonChildren);
+      PR_INSERT_LINK(item, &mItems);
       ++mItemCount;
       ++mDesiredParentCounts[item->DesiredParentType()];
       return item;
@@ -1537,6 +1566,18 @@ private:
                                      nsFrameItems&            aFrameItems);
 
   /**
+   * Construct a scrollable block frame using the given block frame creation
+   * function.
+   */
+  nsIFrame* ConstructScrollableBlockWithConstructor(
+    nsFrameConstructorState& aState,
+    FrameConstructionItem& aItem,
+    nsContainerFrame* aParentFrame,
+    const nsStyleDisplay* aDisplay,
+    nsFrameItems& aFrameItems,
+    BlockFrameCreationFunc aConstructor);
+
+  /**
    * Construct a non-scrollable block frame
    */
   nsIFrame* ConstructNonScrollableBlock(nsFrameConstructorState& aState,
@@ -1544,6 +1585,18 @@ private:
                                         nsContainerFrame*        aParentFrame,
                                         const nsStyleDisplay*    aDisplay,
                                         nsFrameItems&            aFrameItems);
+
+  /**
+   * Construct a non-scrollable block frame using the given block frame creation
+   * function.
+   */
+  nsIFrame* ConstructNonScrollableBlockWithConstructor(
+    nsFrameConstructorState& aState,
+    FrameConstructionItem& aItem,
+    nsContainerFrame* aParentFrame,
+    const nsStyleDisplay* aDisplay,
+    nsFrameItems& aFrameItems,
+    BlockFrameCreationFunc aConstructor);
 
   /**
    * This adds FrameConstructionItem objects to aItemsToConstruct for the

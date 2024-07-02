@@ -6194,9 +6194,6 @@ IonBuilder::jsop_eval(uint32_t argc)
             }
         }
 
-        MInstruction* filterArguments = MFilterArgumentsOrEval::New(alloc(), string);
-        current->add(filterArguments);
-
         MInstruction* ins = MCallDirectEval::New(alloc(), scopeChain, string, thisValue, pc);
         current->add(ins);
         current->push(ins);
@@ -7624,9 +7621,6 @@ IonBuilder::getElemTryTypedObject(bool* emitted, MDefinition* obj, MDefinition* 
     MOZ_CRASH("Bad kind");
 }
 
-static MIRType
-MIRTypeForTypedArrayRead(Scalar::Type arrayType, bool observedDouble);
-
 bool
 IonBuilder::checkTypedObjectIndexInBounds(int32_t elemSize,
                                           MDefinition* obj,
@@ -8428,29 +8422,6 @@ IonBuilder::convertShiftToMaskForStaticTypedArray(MDefinition* id,
     return ptr;
 }
 
-static MIRType
-MIRTypeForTypedArrayRead(Scalar::Type arrayType, bool observedDouble)
-{
-    switch (arrayType) {
-      case Scalar::Int8:
-      case Scalar::Uint8:
-      case Scalar::Uint8Clamped:
-      case Scalar::Int16:
-      case Scalar::Uint16:
-      case Scalar::Int32:
-        return MIRType_Int32;
-      case Scalar::Uint32:
-        return observedDouble ? MIRType_Double : MIRType_Int32;
-      case Scalar::Float32:
-        return MIRType_Float32;
-      case Scalar::Float64:
-        return MIRType_Double;
-      default:
-        break;
-    }
-    MOZ_CRASH("Unknown typed array type");
-}
-
 bool
 IonBuilder::jsop_getelem_typed(MDefinition* obj, MDefinition* index,
                                Scalar::Type arrayType)
@@ -9158,6 +9129,15 @@ IonBuilder::jsop_arguments()
 bool
 IonBuilder::jsop_rest()
 {
+    if (info().analysisMode() == Analysis_ArgumentsUsage) {
+        // There's no BaselineScript with the template object. Just push a
+        // dummy value, it does not affect the arguments analysis.
+        MUnknownValue* unknown = MUnknownValue::New(alloc());
+        current->add(unknown);
+        current->push(unknown);
+        return true;
+    }
+
     ArrayObject* templateObject = &inspector->getTemplateObject(pc)->as<ArrayObject>();
 
     if (inliningDepth_ == 0) {

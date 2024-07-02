@@ -51,6 +51,8 @@
 #include "nsIFrameInlines.h"
 #include "CounterStyleManager.h"
 #include "nsISelection.h"
+#include "mozilla/dom/HTMLDetailsElement.h"
+#include "mozilla/dom/HTMLSummaryElement.h"
 
 #include "nsBidiPresUtils.h"
 
@@ -61,6 +63,7 @@ static const char16_t kDiscCharacter = 0x2022;
 using namespace mozilla;
 using namespace mozilla::css;
 using namespace mozilla::layout;
+using mozilla::dom::HTMLSummaryElement;
 
 static void MarkAllDescendantLinesDirty(nsBlockFrame* aBlock)
 {
@@ -299,11 +302,18 @@ NS_DECLARE_FRAME_PROPERTY(BlockEndEdgeOfChildrenProperty, nullptr)
 //----------------------------------------------------------------------
 
 nsBlockFrame*
-NS_NewBlockFrame(nsIPresShell* aPresShell, nsStyleContext* aContext, nsFrameState aFlags)
+NS_NewBlockFrame(nsIPresShell* aPresShell, nsStyleContext* aContext)
 {
-  nsBlockFrame* it = new (aPresShell) nsBlockFrame(aContext);
-  it->SetFlags(aFlags);
-  return it;
+  return new (aPresShell) nsBlockFrame(aContext);
+}
+
+nsBlockFrame*
+NS_NewBlockFormattingContext(nsIPresShell* aPresShell,
+                             nsStyleContext* aStyleContext)
+{
+  nsBlockFrame* blockFrame = NS_NewBlockFrame(aPresShell, aStyleContext);
+  blockFrame->AddStateBits(NS_BLOCK_FLOAT_MGR | NS_BLOCK_MARGIN_ROOT);
+  return blockFrame;
 }
 
 NS_IMPL_FRAMEARENA_HELPERS(nsBlockFrame)
@@ -7081,6 +7091,13 @@ nsBlockFrame::RenumberListsFor(nsPresContext* aPresContext,
   // possible there is no content insertion frame
   if (!kid)
     return false;
+
+  // Do not renumber list for summary elements.
+  HTMLSummaryElement* summary =
+    HTMLSummaryElement::FromContent(kid->GetContent());
+  if (summary && summary->IsMainSummary()) {
+    return false;
+  }
 
   bool kidRenumberedABullet = false;
 

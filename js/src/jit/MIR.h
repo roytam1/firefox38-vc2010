@@ -3732,34 +3732,6 @@ class MGetDynamicName
     }
 };
 
-// Bailout if the input string contains 'arguments' or 'eval'.
-class MFilterArgumentsOrEval
-  : public MAryInstruction<1>,
-    public BoxExceptPolicy<0, MIRType_String>::Data
-{
-  protected:
-    explicit MFilterArgumentsOrEval(MDefinition* string)
-    {
-        initOperand(0, string);
-        setGuard();
-        setResultType(MIRType_None);
-    }
-
-  public:
-    INSTRUCTION_HEADER(FilterArgumentsOrEval)
-
-    static MFilterArgumentsOrEval* New(TempAllocator& alloc, MDefinition* string) {
-        return new(alloc) MFilterArgumentsOrEval(string);
-    }
-
-    MDefinition* getString() const {
-        return getOperand(0);
-    }
-    bool possiblyCalls() const override {
-        return true;
-    }
-};
-
 class MCallDirectEval
   : public MAryInstruction<3>,
     public Mix3Policy<ObjectPolicy<0>,
@@ -12784,6 +12756,29 @@ bool PropertyWriteNeedsTypeBarrier(TempAllocator& alloc, CompilerConstraintList*
                                    MBasicBlock* current, MDefinition** pobj,
                                    PropertyName* name, MDefinition** pvalue,
                                    bool canModify, MIRType implicitType = MIRType_None);
+
+inline MIRType
+MIRTypeForTypedArrayRead(Scalar::Type arrayType, bool observedDouble)
+{
+    switch (arrayType) {
+      case Scalar::Int8:
+      case Scalar::Uint8:
+      case Scalar::Uint8Clamped:
+      case Scalar::Int16:
+      case Scalar::Uint16:
+      case Scalar::Int32:
+        return MIRType_Int32;
+      case Scalar::Uint32:
+        return observedDouble ? MIRType_Double : MIRType_Int32;
+      case Scalar::Float32:
+        return MIRType_Float32;
+      case Scalar::Float64:
+        return MIRType_Double;
+      default:
+        break;
+    }
+    MOZ_CRASH("Unknown typed array type");
+}
 
 } // namespace jit
 } // namespace js

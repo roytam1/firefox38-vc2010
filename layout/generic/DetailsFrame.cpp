@@ -22,7 +22,7 @@ NS_QUERYFRAME_HEAD(DetailsFrame)
   NS_QUERYFRAME_ENTRY(nsIAnonymousContentCreator)
 NS_QUERYFRAME_TAIL_INHERITING(nsBlockFrame)
 
-DetailsFrame*
+nsBlockFrame*
 NS_NewDetailsFrame(nsIPresShell* aPresShell, nsStyleContext* aContext)
 {
   return new (aPresShell) DetailsFrame(aContext);
@@ -46,41 +46,43 @@ DetailsFrame::GetType() const
 void
 DetailsFrame::SetInitialChildList(ChildListID aListID, nsFrameList& aChildList)
 {
-  if (aListID == kPrincipalList) {
-    auto* details = HTMLDetailsElement::FromContent(GetContent());
-    bool isOpen = details->Open();
-
-    if (isOpen) {
-      // If details is open, the first summary needs to be rendered as if it is
-      // the first child.
-      for (nsFrameList::Enumerator e(aChildList); !e.AtEnd(); e.Next()) {
-        auto* realFrame = nsPlaceholderFrame::GetRealFrameFor(e.get());
-        auto* cif = realFrame->GetContentInsertionFrame();
-        if (cif && cif->GetType() == nsGkAtoms::summaryFrame) {
-          // Take out the first summary frame and insert it to the beginning of
-          // the list.
-          aChildList.RemoveFrame(e.get());
-          aChildList.InsertFrame(nullptr, nullptr, e.get());
-          break;
-        }
-      }
-    }
-
 #ifdef DEBUG
-    nsIFrame* realFrame =
-      nsPlaceholderFrame::GetRealFrameFor(isOpen ?
-                                          aChildList.FirstChild() :
-                                          aChildList.OnlyChild());
-    MOZ_ASSERT(realFrame, "Principal list of details should not be empty!");
-    nsIFrame* summaryFrame = realFrame->GetContentInsertionFrame();
-    MOZ_ASSERT(summaryFrame->GetType() == nsGkAtoms::summaryFrame,
-               "The frame should be summary frame!");
-#endif
-
+  if (aListID == kPrincipalList) {
+    CheckValidMainSummary(aChildList);
   }
+#endif
 
   nsBlockFrame::SetInitialChildList(aListID, aChildList);
 }
+
+#ifdef DEBUG
+bool
+DetailsFrame::CheckValidMainSummary(const nsFrameList& aFrameList) const
+{
+  for (nsFrameList::Enumerator e(aFrameList); !e.AtEnd(); e.Next()) {
+    HTMLSummaryElement* summary =
+      HTMLSummaryElement::FromContent(e.get()->GetContent());
+
+    if (e.get() == aFrameList.FirstChild()) {
+      if (summary && summary->IsMainSummary()) {
+        return true;
+      } else if (e.get()->GetContent() == GetContent()) {
+        // The child frame's content is the same as our content, which means
+        // it's a kind of wrapper frame. Descend into its child list to find
+        // main summary.
+        if (CheckValidMainSummary(e.get()->PrincipalChildList())) {
+          return true;
+        }
+      }
+    } else {
+      NS_ASSERTION(!summary || !summary->IsMainSummary(),
+                   "Rest of the children are either not summary element "
+                   "or are not the main summary!");
+    }
+  }
+  return false;
+}
+#endif
 
 void
 DetailsFrame::DestroyFrom(nsIFrame* aDestructRoot)
@@ -107,9 +109,11 @@ DetailsFrame::CreateAnonymousContent(nsTArray<ContentInfo>& aElements)
                                  nsIDOMNode::ELEMENT_NODE);
   mDefaultSummary = new HTMLSummaryElement(nodeInfo);
 
-  // TODO: Need to localize this "Details" string in bug 1225752.
+  nsXPIDLString defaultSummaryText;
+  nsContentUtils::GetLocalizedString(nsContentUtils::eFORMS_PROPERTIES,
+                                     "DefaultSummary", defaultSummaryText);
   nsRefPtr<nsTextNode> description = new nsTextNode(nodeInfoManager);
-  description->SetText(NS_LITERAL_STRING("Details"), false);
+  description->SetText(defaultSummaryText, false);
   mDefaultSummary->AppendChildTo(description, false);
 
   aElements.AppendElement(mDefaultSummary);

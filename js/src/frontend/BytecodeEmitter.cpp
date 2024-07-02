@@ -6917,8 +6917,6 @@ frontend::EmitTree(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
             ParseNode* rest = nullptr;
             bool restIsDefn = false;
             if (fun->hasRest()) {
-                MOZ_ASSERT(!bce->sc->asFunctionBox()->argumentsHasLocalBinding());
-
                 // Defaults with a rest parameter need special handling. The
                 // rest parameter needs to be undefined while defaults are being
                 // processed. To do this, we create the rest argument and let it
@@ -6964,7 +6962,6 @@ frontend::EmitTree(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
                 return false;
             if (pn2->pn_next == pnlast && fun->hasRest() && !hasDefaults) {
                 // Fill rest parameter. We handled the case with defaults above.
-                MOZ_ASSERT(!bce->sc->asFunctionBox()->argumentsHasLocalBinding());
                 bce->switchToProlog();
                 if (Emit1(cx, bce, JSOP_REST) < 0)
                     return false;
@@ -7105,6 +7102,7 @@ frontend::EmitTree(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
       case PNK_MULASSIGN:
       case PNK_DIVASSIGN:
       case PNK_MODASSIGN:
+      case PNK_POWASSIGN:
         if (!EmitAssignment(cx, bce, pn->pn_left, pn->getOp(), pn->pn_right))
             return false;
         break;
@@ -7149,6 +7147,20 @@ frontend::EmitTree(ExclusiveContext* cx, BytecodeEmitter* bce, ParseNode* pn)
             if (!EmitTree(cx, bce, subexpr))
                 return false;
             if (Emit1(cx, bce, op) < 0)
+                return false;
+        }
+        break;
+      }
+
+      case PNK_POW: {
+        MOZ_ASSERT(pn->isArity(PN_LIST));
+        /* Right-associative operator chain. */
+        for (ParseNode* subexpr = pn->pn_head; subexpr; subexpr = subexpr->pn_next) {
+            if (!EmitTree(cx, bce, subexpr))
+                return false;
+        }
+        for (int i = 0; i < pn->pn_count - 1; i++) {
+            if (!Emit1(cx, bce, JSOP_POW))
                 return false;
         }
         break;

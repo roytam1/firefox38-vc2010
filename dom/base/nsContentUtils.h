@@ -876,6 +876,11 @@ public:
   static bool IsChildOfSameType(nsIDocument* aDoc);
 
   /**
+  '* Returns true if the content-type is any of the supported script types.
+   */
+  static bool IsScriptType(const nsACString& aContentType);
+
+  /**
   '* Returns true if the content-type will be rendered as plain-text.
    */
   static bool IsPlainTextType(const nsACString& aContentType);
@@ -2072,7 +2077,7 @@ MOZ_END_NESTED_ENUM_CLASS(DispatchFailureHandling)
   };
 
   static already_AddRefed<nsIDocumentLoaderFactory>
-  FindInternalContentViewer(const char* aType,
+  FindInternalContentViewer(const nsACString& aType,
                             ContentViewerType* aLoaderType = nullptr);
 
   /**

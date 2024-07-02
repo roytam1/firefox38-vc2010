@@ -2194,6 +2194,11 @@ inline int CheckIsStrictPropertyOp(JSStrictPropertyOp op);
      { nullptr, JS_CAST_STRING_TO(getterName, const JSJitInfo*) },  \
      { nullptr, JS_CAST_STRING_TO(setterName, const JSJitInfo*) } }
 #define JS_PS_END { nullptr, 0, JSNATIVE_WRAPPER(nullptr), JSNATIVE_WRAPPER(nullptr) }
+#define JS_SELF_HOSTED_SYM_GET(symbol, getterName, flags) \
+    {reinterpret_cast<const char*>(uint32_t(::JS::SymbolCode::symbol) + 1), \
+     uint8_t(JS_CHECK_ACCESSOR_FLAGS(flags) | JSPROP_SHARED | JSPROP_GETTER), \
+     { { nullptr, JS_CAST_STRING_TO(getterName, const JSJitInfo*) } }, \
+     JSNATIVE_WRAPPER(nullptr) }
 
 /*
  * To define a native function, set call to a JSNativeWrapper. To define a
@@ -4210,14 +4215,23 @@ JS_PUBLIC_API(JSString*)
 GetSymbolDescription(HandleSymbol symbol);
 
 /* Well-known symbols. */
+#define JS_FOR_EACH_WELL_KNOWN_SYMBOL(macro) \
+    macro(iterator) \
+    macro(species) \
+    macro(unscopables)
+
 MOZ_BEGIN_ENUM_CLASS(SymbolCode, uint32_t)
-    iterator,                       // well-known Symbol.iterator
+    // There is one SymbolCode for each well-known symbol.
+#define JS_DEFINE_SYMBOL_ENUM(name) name,
+    JS_FOR_EACH_WELL_KNOWN_SYMBOL(JS_DEFINE_SYMBOL_ENUM)  // SymbolCode::iterator, etc.
+#undef JS_DEFINE_SYMBOL_ENUM
+    Limit,
     InSymbolRegistry = 0xfffffffe,  // created by Symbol.for() or JS::GetSymbolFor()
     UniqueSymbol = 0xffffffff       // created by Symbol() or JS::NewSymbol()
 MOZ_END_ENUM_CLASS(SymbolCode)
 
 /* For use in loops that iterate over the well-known symbols. */
-const size_t WellKnownSymbolLimit = 1;
+const size_t WellKnownSymbolLimit = size_t(SymbolCode::Limit);
 
 /*
  * Return the SymbolCode telling what sort of symbol `symbol` is.

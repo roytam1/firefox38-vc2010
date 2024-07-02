@@ -50,7 +50,7 @@ class nsTableColFrame;
 // Create a frame that supports "display: block" layout behavior
 class nsBlockFrame;
 nsBlockFrame*
-NS_NewBlockFrame(nsIPresShell* aPresShell, nsStyleContext* aContext, nsFrameState aFlags = nsFrameState(0));
+NS_NewBlockFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
 
 // Special Generated Content Node. It contains text taken from an
 // attribute of its *grandparent* content node. 
@@ -67,12 +67,8 @@ nsContainerFrame*
 NS_NewSelectsAreaFrame(nsIPresShell* aPresShell, nsStyleContext* aContext, nsFrameState aFlags);
 
 // Create a block formatting context blockframe
-inline nsBlockFrame* NS_NewBlockFormattingContext(nsIPresShell* aPresShell,
-                                                  nsStyleContext* aStyleContext)
-{
-  return NS_NewBlockFrame(aPresShell, aStyleContext,
-                          NS_BLOCK_FLOAT_MGR | NS_BLOCK_MARGIN_ROOT);
-}
+nsBlockFrame*
+NS_NewBlockFormattingContext(nsIPresShell* aPresShell, nsStyleContext* aStyleContext);
 
 nsIFrame*
 NS_NewBRFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
@@ -177,12 +173,8 @@ nsIFrame*
 NS_NewRangeFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
 nsIFrame*
 NS_NewNumberControlFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
-class DetailsFrame;
-DetailsFrame*
+nsBlockFrame*
 NS_NewDetailsFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
-class SummaryFrame;
-SummaryFrame*
-NS_NewSummaryFrame(nsIPresShell* aPresShell, nsStyleContext* aContext);
 
 // Table frame factories
 class nsTableOuterFrame;

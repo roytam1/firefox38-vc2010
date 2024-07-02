@@ -938,6 +938,9 @@ nsDocShell::~nsDocShell()
 {
   MOZ_ASSERT(!mProfileTimelineRecording);
 
+  // Avoid notifying observers while we're in the dtor.
+  mIsBeingDestroyed = true;
+
   Destroy();
 
   nsCOMPtr<nsISHistoryInternal> shPrivate(do_QueryInterface(mSessionHistory));
@@ -8000,7 +8003,7 @@ nsDocShell::CreateAboutBlankContentViewer(nsIPrincipal* aPrincipal,
   mFiredUnloadEvent = false;
 
   nsCOMPtr<nsIDocumentLoaderFactory> docFactory =
-    nsContentUtils::FindInternalContentViewer("text/html");
+    nsContentUtils::FindInternalContentViewer(NS_LITERAL_CSTRING("text/html"));
 
   if (docFactory) {
     nsCOMPtr<nsIPrincipal> principal;
@@ -8962,7 +8965,7 @@ nsDocShell::RestoreFromHistory()
 }
 
 nsresult
-nsDocShell::CreateContentViewer(const char* aContentType,
+nsDocShell::CreateContentViewer(const nsACString& aContentType,
                                 nsIRequest* aRequest,
                                 nsIStreamListener** aContentHandler)
 {
@@ -9158,7 +9161,7 @@ nsDocShell::CreateContentViewer(const char* aContentType,
 }
 
 nsresult
-nsDocShell::NewContentViewerObj(const char* aContentType,
+nsDocShell::NewContentViewerObj(const nsACString& aContentType,
                                 nsIRequest* aRequest, nsILoadGroup* aLoadGroup,
                                 nsIStreamListener** aContentHandler,
                                 nsIContentViewer** aViewer)
@@ -11041,9 +11044,15 @@ nsDocShell::DoChannelLoad(nsIChannel* aChannel,
       break;
     }
 
-    case LOAD_RELOAD_CHARSET_CHANGE:
-      loadFlags |= nsIRequest::LOAD_FROM_CACHE;
+    case LOAD_RELOAD_CHARSET_CHANGE: {
+      // Use SetAllowStaleCacheContent (not LOAD_FROM_CACHE flag) since we only want
+      // to force cache load for this channel, not the whole loadGroup.
+      nsCOMPtr<nsICacheInfoChannel> cachingChannel = do_QueryInterface(aChannel);
+      if (cachingChannel) {
+        cachingChannel->SetAllowStaleCacheContent(true);
+      }
       break;
+    }
 
     case LOAD_RELOAD_NORMAL:
     case LOAD_REFRESH:

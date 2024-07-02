@@ -1295,3 +1295,9 @@ toolbarpaletteitem[place="palette"][hidden] {
 .popup-notification-footer[popupid="bad-content"][trackingblockdisabled] {
   display: block;
 }
+
+/* Remove white bar at the bottom of the screen when watching HTML5 video in fullscreen */
+#main-window[inFullscreen] #global-notificationbox,
+#main-window[inFullscreen] #high-priority-global-notificationbox {
+  visibility: collapse;
+}
