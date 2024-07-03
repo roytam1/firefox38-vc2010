@@ -389,6 +389,7 @@ gfxDWriteFontEntry::CopyFontTable(uint32_t aTableTag,
                                   FallibleTArray<uint8_t> &aBuffer)
 {
     gfxDWriteFontList *pFontList = gfxDWriteFontList::PlatformFontList();
+    const uint32_t tagBE = NativeEndian::swapToBigEndian(aTableTag);
 
     // Don't use GDI table loading for symbol fonts or for
     // italic fonts in Arabic-script system locales because of
@@ -399,27 +400,22 @@ gfxDWriteFontEntry::CopyFontTable(uint32_t aTableTag,
         !mFont->IsSymbolFont())
     {
         LOGFONTW logfont = { 0 };
-        if (!InitLogFont(mFont, &logfont))
-            return NS_ERROR_FAILURE;
-
-        AutoDC dc;
-        AutoSelectFont font(dc.GetDC(), &logfont);
-        if (font.IsValid()) {
-            uint32_t tableSize =
-                ::GetFontData(dc.GetDC(),
-                              NativeEndian::swapToBigEndian(aTableTag), 0,
-                              nullptr, 0);
-            if (tableSize != GDI_ERROR) {
-                if (aBuffer.SetLength(tableSize)) {
-                    ::GetFontData(dc.GetDC(),
-                                  NativeEndian::swapToBigEndian(aTableTag), 0,
-                                  aBuffer.Elements(), aBuffer.Length());
-                    return NS_OK;
+        if (InitLogFont(mFont, &logfont)) {
+            AutoDC dc;
+            AutoSelectFont font(dc.GetDC(), &logfont);
+            if (font.IsValid()) {
+                uint32_t tableSize =
+                    ::GetFontData(dc.GetDC(), tagBE, 0, nullptr, 0);
+                if (tableSize != GDI_ERROR) {
+                    if (aBuffer.SetLength(tableSize)) {
+                        ::GetFontData(dc.GetDC(), tagBE, 0,
+                                      aBuffer.Elements(), aBuffer.Length());
+                        return NS_OK;
+                    }
+                    return NS_ERROR_OUT_OF_MEMORY;
                 }
-                return NS_ERROR_OUT_OF_MEMORY;
             }
         }
-        return NS_ERROR_FAILURE;
     }
 
     nsRefPtr<IDWriteFontFace> fontFace;
@@ -433,8 +429,7 @@ gfxDWriteFontEntry::CopyFontTable(uint32_t aTableTag,
     void *tableContext = nullptr;
     BOOL exists;
     HRESULT hr =
-        fontFace->TryGetFontTable(NativeEndian::swapToBigEndian(aTableTag),
-                                  (const void**)&tableData, &len,
+        fontFace->TryGetFontTable(tagBE, (const void**)&tableData, &len,
                                   &tableContext, &exists);
     if (FAILED(hr) || !exists) {
         return NS_ERROR_FAILURE;
@@ -651,7 +646,10 @@ gfxDWriteFontEntry::InitLogFont(IDWriteFont *aFont, LOGFONTW *aLogFont)
     IDWriteGdiInterop *gdi = 
         gfxDWriteFontList::PlatformFontList()->GetGDIInterop();
     hr = gdi->ConvertFontToLOGFONT(aFont, aLogFont, &isInSystemCollection);
-    return (FAILED(hr) ? false : true);
+    // If the font is not in the system collection, GDI will be unable to
+    // select it and load its tables, so we return false here to indicate
+    // failure, and let CopyFontTable fall back to DWrite native methods.
+    return (SUCCEEDED(hr) && isInSystemCollection);
 }
 
 bool
@@ -1805,9 +1803,9 @@ public:
     IFACEMETHODIMP GetCurrentFontFile(IDWriteFontFile ** fontFile);
 
 private:
-    BundledFontFileEnumerator() = delete;
-    BundledFontFileEnumerator(const BundledFontFileEnumerator&) = delete;
-    BundledFontFileEnumerator& operator=(const BundledFontFileEnumerator&) = delete;
+    BundledFontFileEnumerator() MOZ_DELETE;
+    BundledFontFileEnumerator(const BundledFontFileEnumerator&) MOZ_DELETE;
+    BundledFontFileEnumerator& operator=(const BundledFontFileEnumerator&) MOZ_DELETE;
 
     nsRefPtr<IDWriteFactory>      mFactory;
 
@@ -1873,8 +1871,8 @@ public:
         IDWriteFontFileEnumerator **aFontFileEnumerator);
 
 private:
-    BundledFontLoader(const BundledFontLoader&) = delete;
-    BundledFontLoader& operator=(const BundledFontLoader&) = delete;
+    BundledFontLoader(const BundledFontLoader&) MOZ_DELETE;
+    BundledFontLoader& operator=(const BundledFontLoader&) MOZ_DELETE;
 };
 
 IFACEMETHODIMP

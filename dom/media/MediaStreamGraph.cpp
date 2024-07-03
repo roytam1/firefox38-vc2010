@@ -194,12 +194,14 @@ MediaStreamGraphImpl::ExtractPendingInput(SourceMediaStream* aStream,
       aStream->ApplyTrackDisabling(data->mID, data->mData);
       for (uint32_t j = 0; j < aStream->mListeners.Length(); ++j) {
         MediaStreamListener* l = aStream->mListeners[j];
-        StreamTime offset = (data->mCommands & SourceMediaStream::TRACK_CREATE)
-            ? data->mStart : aStream->mBuffer.FindTrack(data->mID)->GetSegment()->GetDuration();
+        StreamBuffer::Track* track = aStream->mBuffer.FindTrack(data->mID);
+        StreamTime offset = ((data->mCommands & SourceMediaStream::TRACK_CREATE) || !track)
+            ? data->mStart : track->GetSegment()->GetDuration();
         l->NotifyQueuedTrackChanges(this, data->mID,
                                     offset, data->mCommands, *data->mData);
       }
-      if (data->mCommands & SourceMediaStream::TRACK_CREATE) {
+      StreamBuffer::Track* track = aStream->mBuffer.FindTrack(data->mID);
+      if ((data->mCommands & SourceMediaStream::TRACK_CREATE) || !track) {
         MediaSegment* segment = data->mData.forget();
         STREAM_LOG(PR_LOG_DEBUG, ("SourceMediaStream %p creating track %d, start %lld, initial end %lld",
                                   aStream, data->mID, int64_t(data->mStart),
@@ -213,7 +215,7 @@ MediaStreamGraphImpl::ExtractPendingInput(SourceMediaStream* aStream,
         data->mCommands &= ~SourceMediaStream::TRACK_CREATE;
         notifiedTrackCreated = true;
       } else if (data->mData->GetDuration() > 0) {
-        MediaSegment* dest = aStream->mBuffer.FindTrack(data->mID)->GetSegment();
+        MediaSegment* dest = track->GetSegment();
         STREAM_LOG(PR_LOG_DEBUG+1, ("SourceMediaStream %p track %d, advancing end from %lld to %lld",
                                     aStream, data->mID,
                                     int64_t(dest->GetDuration()),
@@ -221,8 +223,8 @@ MediaStreamGraphImpl::ExtractPendingInput(SourceMediaStream* aStream,
         data->mEndOfFlushedData += data->mData->GetDuration();
         dest->AppendFrom(data->mData);
       }
-      if (data->mCommands & SourceMediaStream::TRACK_END) {
-        aStream->mBuffer.FindTrack(data->mID)->SetEnded();
+      if ((data->mCommands & SourceMediaStream::TRACK_END) && track) {
+        track->SetEnded();
         aStream->mUpdateTracks.RemoveElementAt(i);
       }
     }
@@ -261,6 +263,9 @@ MediaStreamGraphImpl::UpdateBufferSufficiencyState(SourceMediaStream* aStream)
         continue;
       }
       StreamBuffer::Track* track = aStream->mBuffer.FindTrack(data->mID);
+      if (!track) {
+        continue;
+      }        
       // Note that track->IsEnded() must be false, otherwise we would have
       // removed the track from mUpdateTracks already.
       NS_ASSERTION(!track->IsEnded(), "What is this track doing here?");
