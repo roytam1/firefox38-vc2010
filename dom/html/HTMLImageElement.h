@@ -21,8 +21,6 @@ namespace mozilla {
 class EventChainPreVisitor;
 namespace dom {
 
-class ImageLoadTask;
-
 class ResponsiveImageSelector;
 class HTMLImageElement final : public nsGenericHTMLElement,
                                    public nsImageLoadingContent,
@@ -207,8 +205,6 @@ public:
 
   virtual void DestroyContent() override;
 
-  void MediaFeatureValuesChanged();
-
   /**
    * Given a hypothetical <img> or <source> tag with the given parameters,
    * return what URI we would attempt to use, if any.  Used by the preloader to
@@ -261,7 +257,7 @@ protected:
   // algorithm (InResponsiveMode()) -- synchronous actions when just
   // using img.src will bypass this, and update source and kick off
   // image load synchronously.
-  void QueueImageLoadTask(bool aAlwaysLoad);
+  void QueueImageLoadTask();
 
   // True if we have a srcset attribute or a <picture> parent, regardless of if
   // any valid responsive sources were parsed from either.
@@ -273,7 +269,7 @@ protected:
 
   // Resolve and load the current mResponsiveSelector (responsive mode) or src
   // attr image.
-  nsresult LoadSelectedImage(bool aForce, bool aNotify, bool aAlwaysLoad);
+  nsresult LoadSelectedImage(bool aForce, bool aNotify);
 
   // True if this string represents a type we would support on <source type>
   static bool SupportedPictureSourceType(const nsAString& aType);
@@ -302,9 +298,7 @@ protected:
   // the existing mResponsiveSelector, meaning you need to update its
   // parameters as appropriate before calling (or null it out to force
   // recreation)
-  //
-  // Returns true if the source has changed, and false otherwise.
-  bool UpdateResponsiveSource();
+  void UpdateResponsiveSource();
 
   // Given a <source> node that is a previous sibling *or* ourselves, try to
   // create a ResponsiveSelector.
@@ -337,13 +331,10 @@ protected:
   nsRefPtr<ResponsiveImageSelector> mResponsiveSelector;
 
 private:
-  bool SourceElementMatches(nsIContent* aSourceNode);
-
   static void MapAttributesIntoRule(const nsMappedAttributes* aAttributes,
                                     nsRuleData* aData);
 
-  bool mInDocResponsiveContent;
-  nsRefPtr<ImageLoadTask> mPendingImageLoadTask;
+  nsCOMPtr<nsIRunnable> mPendingImageLoadTask;
 };
 
 } // namespace dom

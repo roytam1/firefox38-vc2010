@@ -62,6 +62,8 @@
 #include "Layers.h"
 #include <limits>
 #include "nsIAsyncVerifyRedirectCallback.h"
+#include "nsIAppShell.h"
+#include "nsWidgetsCID.h"
 #include "nsMediaFragmentURIParser.h"
 #include "nsURIHashKey.h"
 #include "nsJSUtils.h"
@@ -760,10 +762,13 @@ public:
   }
 };
 
+static NS_DEFINE_CID(kAppShellCID, NS_APPSHELL_CID);
+
 void HTMLMediaElement::RunInStableState(nsIRunnable* aRunnable)
 {
   nsCOMPtr<nsIRunnable> event = new nsSyncSection(this, aRunnable);
-  nsContentUtils::RunInStableState(event.forget());
+  nsCOMPtr<nsIAppShell> appShell = do_GetService(kAppShellCID);
+  appShell->RunInStableState(event);
 }
 
 void HTMLMediaElement::QueueLoadFromSourceTask()
@@ -1623,7 +1628,8 @@ already_AddRefed<TimeRanges>
 HTMLMediaElement::Seekable() const
 {
   nsRefPtr<TimeRanges> ranges = new TimeRanges();
-  if (mDecoder && mReadyState > nsIDOMHTMLMediaElement::HAVE_NOTHING) {
+  if (mMediaSource ||
+      (mDecoder && mReadyState > nsIDOMHTMLMediaElement::HAVE_NOTHING)) {
     mDecoder->GetSeekable().ToTimeRanges(ranges);
   }
   return ranges.forget();
@@ -3279,7 +3285,7 @@ void HTMLMediaElement::MetadataLoaded(const MediaInfo* aInfo,
     NotifyOwnerDocumentActivityChanged();
   }
 
-  if (mDefaultPlaybackStartPosition > 0) {
+  if (mDefaultPlaybackStartPosition != 0.0) {
     SetCurrentTime(mDefaultPlaybackStartPosition);
     mDefaultPlaybackStartPosition = 0.0;
   }

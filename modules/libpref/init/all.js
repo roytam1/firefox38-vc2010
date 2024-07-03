@@ -316,6 +316,8 @@ pref("media.jxr.autoaccept", true);
 // updated with the new type. This pref is mainly for testing and should be
 // removed once the preferred type (most likely "image/jxr") has been chosen.
 pref("media.jxr.advertised_mime_type", "image/jxr");
+// Work around a JPEG-XR encoding bug for incorrect Alpha Plane bytecounts.
+pref("media.jxr.workaround_alphaplane_bug", true);
 #endif
 #ifdef MOZ_DIRECTSHOW
 pref("media.directshow.enabled", true);
@@ -682,12 +684,12 @@ pref("gfx.canvas.azure.backends", "direct2d1.1,direct2d,skia,cairo");
 pref("gfx.content.azure.backends", "direct2d1.1,direct2d,cairo");
 #else
 #ifdef XP_MACOSX
-pref("gfx.content.azure.backends", "cg");
-pref("gfx.canvas.azure.backends", "cg");
+pref("gfx.canvas.azure.backends", "skia,cg");
 // Accelerated cg canvas where available (10.7+)
-pref("gfx.canvas.azure.accelerated", false);
+pref("gfx.canvas.azure.accelerated", true);
+pref("gfx.content.azure.backends", "cg");
 #else
-pref("gfx.canvas.azure.backends", "cairo");
+pref("gfx.canvas.azure.backends", "skia,cairo");
 pref("gfx.content.azure.backends", "cairo");
 #endif
 #endif

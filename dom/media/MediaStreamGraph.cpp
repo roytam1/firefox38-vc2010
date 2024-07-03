@@ -10,9 +10,11 @@
 #include "AudioSegment.h"
 #include "VideoSegment.h"
 #include "nsContentUtils.h"
+#include "nsIAppShell.h"
 #include "nsIObserver.h"
 #include "nsPrintfCString.h"
 #include "nsServiceManagerUtils.h"
+#include "nsWidgetsCID.h"
 #include "prerror.h"
 #include "prlog.h"
 #include "mozilla/Attributes.h"
@@ -194,14 +196,12 @@ MediaStreamGraphImpl::ExtractPendingInput(SourceMediaStream* aStream,
       aStream->ApplyTrackDisabling(data->mID, data->mData);
       for (uint32_t j = 0; j < aStream->mListeners.Length(); ++j) {
         MediaStreamListener* l = aStream->mListeners[j];
-        StreamBuffer::Track* track = aStream->mBuffer.FindTrack(data->mID);
-        StreamTime offset = ((data->mCommands & SourceMediaStream::TRACK_CREATE) || !track)
-            ? data->mStart : track->GetSegment()->GetDuration();
+        StreamTime offset = (data->mCommands & SourceMediaStream::TRACK_CREATE)
+            ? data->mStart : aStream->mBuffer.FindTrack(data->mID)->GetSegment()->GetDuration();
         l->NotifyQueuedTrackChanges(this, data->mID,
                                     offset, data->mCommands, *data->mData);
       }
-      StreamBuffer::Track* track = aStream->mBuffer.FindTrack(data->mID);
-      if ((data->mCommands & SourceMediaStream::TRACK_CREATE) || !track) {
+      if (data->mCommands & SourceMediaStream::TRACK_CREATE) {
         MediaSegment* segment = data->mData.forget();
         STREAM_LOG(PR_LOG_DEBUG, ("SourceMediaStream %p creating track %d, start %lld, initial end %lld",
                                   aStream, data->mID, int64_t(data->mStart),
@@ -215,7 +215,7 @@ MediaStreamGraphImpl::ExtractPendingInput(SourceMediaStream* aStream,
         data->mCommands &= ~SourceMediaStream::TRACK_CREATE;
         notifiedTrackCreated = true;
       } else if (data->mData->GetDuration() > 0) {
-        MediaSegment* dest = track->GetSegment();
+        MediaSegment* dest = aStream->mBuffer.FindTrack(data->mID)->GetSegment();
         STREAM_LOG(PR_LOG_DEBUG+1, ("SourceMediaStream %p track %d, advancing end from %lld to %lld",
                                     aStream, data->mID,
                                     int64_t(dest->GetDuration()),
@@ -223,8 +223,8 @@ MediaStreamGraphImpl::ExtractPendingInput(SourceMediaStream* aStream,
         data->mEndOfFlushedData += data->mData->GetDuration();
         dest->AppendFrom(data->mData);
       }
-      if ((data->mCommands & SourceMediaStream::TRACK_END) && track) {
-        track->SetEnded();
+      if (data->mCommands & SourceMediaStream::TRACK_END) {
+        aStream->mBuffer.FindTrack(data->mID)->SetEnded();
         aStream->mUpdateTracks.RemoveElementAt(i);
       }
     }
@@ -263,9 +263,6 @@ MediaStreamGraphImpl::UpdateBufferSufficiencyState(SourceMediaStream* aStream)
         continue;
       }
       StreamBuffer::Track* track = aStream->mBuffer.FindTrack(data->mID);
-      if (!track) {
-        continue;
-      }        
       // Note that track->IsEnded() must be false, otherwise we would have
       // removed the track from mUpdateTracks already.
       NS_ASSERTION(!track->IsEnded(), "What is this track doing here?");
@@ -1761,6 +1758,8 @@ MediaStreamGraphImpl::RunInStableState(bool aSourceIsMSG)
 }
 
 
+static NS_DEFINE_CID(kAppShellCID, NS_APPSHELL_CID);
+
 void
 MediaStreamGraphImpl::EnsureRunInStableState()
 {
@@ -1770,7 +1769,12 @@ MediaStreamGraphImpl::EnsureRunInStableState()
     return;
   mPostedRunInStableState = true;
   nsCOMPtr<nsIRunnable> event = new MediaStreamGraphStableStateRunnable(this, false);
-  nsContentUtils::RunInStableState(event.forget());
+  nsCOMPtr<nsIAppShell> appShell = do_GetService(kAppShellCID);
+  if (appShell) {
+    appShell->RunInStableState(event);
+  } else {
+    NS_ERROR("Appshell already destroyed?");
+  }
 }
 
 void

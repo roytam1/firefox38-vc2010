@@ -876,11 +876,6 @@ public:
   static bool IsChildOfSameType(nsIDocument* aDoc);
 
   /**
-  '* Returns true if the content-type is any of the supported script types.
-   */
-  static bool IsScriptType(const nsACString& aContentType);
-
-  /**
   '* Returns true if the content-type will be rendered as plain-text.
    */
   static bool IsPlainTextType(const nsACString& aContentType);
@@ -1567,29 +1562,6 @@ public:
    * optional as it is only used for showing the URL in the console.
    */
   static void WarnScriptWasIgnored(nsIDocument* aDocument);
-
-  /**
-   * Whether to assert that RunInStableState() succeeds, or ignore failure,
-   * which may happen late in shutdown.
-   */
-MOZ_BEGIN_NESTED_ENUM_CLASS(DispatchFailureHandling)
-  AssertSuccess, IgnoreFailure
-MOZ_END_NESTED_ENUM_CLASS(DispatchFailureHandling)
-
-  /**
-   * Add a "synchronous section", in the form of an nsIRunnable run once the
-   * event loop has reached a "stable state". |aRunnable| must not cause any
-   * queued events to be processed (i.e. must not spin the event loop).
-   * We've reached a stable state when the currently executing task/event has
-   * finished, see
-   * http://www.whatwg.org/specs/web-apps/current-work/multipage/webappapis.html#synchronous-section
-   * In practice this runs aRunnable once the currently executing event
-   * finishes. If called multiple times per task/event, all the runnables will
-   * be executed, in the order in which RunInStableState() was called.
-   */
-  static void RunInStableState(already_AddRefed<nsIRunnable> aRunnable,
-                               DispatchFailureHandling aHandling =
-                                 DispatchFailureHandling::AssertSuccess);
 
   /**
    * Retrieve information about the viewport as a data structure.
