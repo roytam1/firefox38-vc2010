@@ -295,7 +295,7 @@ public:
 
   virtual ~RectTextureImage();
 
-  TemporaryRef<gfx::DrawTarget>
+  already_AddRefed<gfx::DrawTarget>
     BeginUpdate(const nsIntSize& aNewSize,
                 const nsIntRegion& aDirtyRegion = nsIntRegion());
   void EndUpdate(bool aKeepSurface = false);
@@ -2511,7 +2511,7 @@ nsChildView::EnsureVibrancyManager()
   return *mVibrancyManager;
 }
 
-TemporaryRef<gfx::DrawTarget>
+already_AddRefed<gfx::DrawTarget>
 nsChildView::StartRemoteDrawing()
 {
   if (!mGLPresenter) {
@@ -2538,7 +2538,7 @@ nsChildView::StartRemoteDrawing()
     return nullptr;
   }
 
-  return drawTarget;
+  return drawTarget.forget();
 }
 
 void
@@ -2628,7 +2628,7 @@ RectTextureImage::TextureSizeForSize(const nsIntSize& aSize)
                    gfx::NextPowerOfTwo(aSize.height));
 }
 
-TemporaryRef<gfx::DrawTarget>
+already_AddRefed<gfx::DrawTarget>
 RectTextureImage::BeginUpdate(const nsIntSize& aNewSize,
                               const nsIntRegion& aDirtyRegion)
 {
@@ -2655,7 +2655,7 @@ RectTextureImage::BeginUpdate(const nsIntSize& aNewSize,
   mInUpdate = true;
 
   RefPtr<gfx::DrawTarget> drawTarget = mUpdateDrawTarget;
-  return drawTarget;
+  return drawTarget.forget();
 }
 
 #define NSFoundationVersionWithProperStrideSupportForSubtextureUpload NSFoundationVersionNumber10_6_3

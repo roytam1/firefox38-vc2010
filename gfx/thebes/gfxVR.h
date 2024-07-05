@@ -9,7 +9,7 @@
 #include "nsTArray.h"
 #include "nsIScreen.h"
 #include "nsCOMPtr.h"
-#include "nsRefPtr.h"
+#include "mozilla/nsRefPtr.h"
 #include "mozilla/TypedEnum.h"
 
 #include "mozilla/gfx/2D.h"

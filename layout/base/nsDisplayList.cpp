@@ -590,10 +590,11 @@ nsDisplayListBuilder::nsDisplayListBuilder(nsIFrame* aReferenceFrame,
       mAncestorHasApzAwareEventHandler(false),
       mHaveScrollableDisplayPort(false),
       mWindowDraggingAllowed(false),
-      mIsBuildingForPopup(nsLayoutUtils::IsPopup(aReferenceFrame))
+      mIsBuildingForPopup(nsLayoutUtils::IsPopup(aReferenceFrame)),
+      mForceLayerForScrollParent(false)
 {
   MOZ_COUNT_CTOR(nsDisplayListBuilder);
-  PL_InitArenaPool(&mPool, "displayListArena", 1024,
+  PL_InitArenaPool(&mPool, "displayListArena", 4096,
                    std::max(NS_ALIGNMENT_OF(void*),NS_ALIGNMENT_OF(double))-1);
   RecomputeCurrentAnimatedGeometryRoot();
 
@@ -1074,7 +1075,6 @@ void
 nsDisplayListBuilder::MarkFramesForDisplayList(nsIFrame* aDirtyFrame,
                                                const nsFrameList& aFrames,
                                                const nsRect& aDirtyRect) {
-  mFramesMarkedForDisplay.SetCapacity(mFramesMarkedForDisplay.Length() + aFrames.GetLength());
   for (nsFrameList::Enumerator e(aFrames); !e.AtEnd(); e.Next()) {
     mFramesMarkedForDisplay.AppendElement(e.get());
     MarkOutOfFlowFrameForDisplay(aDirtyFrame, e.get(), aDirtyRect);
@@ -3198,6 +3198,10 @@ nsDisplayLayerEventRegions::AddFrame(nsDisplayListBuilder* aBuilder,
   if (borderBoxHasRoundedCorners ||
       (aFrame->GetStateBits() & NS_FRAME_SVG_LAYOUT)) {
     mMaybeHitRegion.Or(mMaybeHitRegion, borderBox);
+
+    // Avoid quadratic performance as a result of the region growing to include
+    // an arbitrarily large number of rects, which can happen on some pages.
+    mMaybeHitRegion.SimplifyOutward(8);
   } else {
     mHitRegion.Or(mHitRegion, borderBox);
   }

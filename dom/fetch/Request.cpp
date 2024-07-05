@@ -229,7 +229,7 @@ Request::Constructor(const GlobalObject& aGlobal,
       return nullptr;
     }
 
-    const OwningArrayBufferOrArrayBufferViewOrBlobOrUSVStringOrURLSearchParams& bodyInit = aInit.mBody.Value();
+    const OwningArrayBufferOrArrayBufferViewOrBlobOrFormDataOrUSVStringOrURLSearchParams& bodyInit = aInit.mBody.Value();
     nsCOMPtr<nsIInputStream> stream;
     nsCString contentType;
     aRv = ExtractByteStreamFromBody(bodyInit,

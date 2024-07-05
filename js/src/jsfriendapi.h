@@ -93,32 +93,6 @@ JS_IsDeadWrapper(JSObject* obj);
 extern JS_FRIEND_API(void)
 JS_TraceShapeCycleCollectorChildren(JSTracer* trc, JS::GCCellPtr shape);
 
-enum {
-    JS_TELEMETRY_GC_REASON,
-    JS_TELEMETRY_GC_IS_COMPARTMENTAL,
-    JS_TELEMETRY_GC_MS,
-    JS_TELEMETRY_GC_MAX_PAUSE_MS,
-    JS_TELEMETRY_GC_MARK_MS,
-    JS_TELEMETRY_GC_SWEEP_MS,
-    JS_TELEMETRY_GC_MARK_ROOTS_MS,
-    JS_TELEMETRY_GC_MARK_GRAY_MS,
-    JS_TELEMETRY_GC_SLICE_MS,
-    JS_TELEMETRY_GC_MMU_50,
-    JS_TELEMETRY_GC_RESET,
-    JS_TELEMETRY_GC_INCREMENTAL_DISABLED,
-    JS_TELEMETRY_GC_NON_INCREMENTAL,
-    JS_TELEMETRY_GC_SCC_SWEEP_TOTAL_MS,
-    JS_TELEMETRY_GC_SCC_SWEEP_MAX_PAUSE_MS,
-    JS_TELEMETRY_DEPRECATED_LANGUAGE_EXTENSIONS_IN_CONTENT,
-    JS_TELEMETRY_ADDON_EXCEPTIONS
-};
-
-typedef void
-(*JSAccumulateTelemetryDataCallback)(int id, uint32_t sample, const char* key);
-
-extern JS_FRIEND_API(void)
-JS_SetAccumulateTelemetryCallback(JSRuntime* rt, JSAccumulateTelemetryDataCallback callback);
-
 extern JS_FRIEND_API(JSPrincipals*)
 JS_GetCompartmentPrincipals(JSCompartment* compartment);
 
@@ -141,22 +115,21 @@ extern JS_FRIEND_API(JSObject*)
 JS_ObjectToOuterObject(JSContext* cx, JS::HandleObject obj);
 
 extern JS_FRIEND_API(JSObject*)
-JS_CloneObject(JSContext* cx, JS::HandleObject obj, JS::HandleObject proto,
-               JS::HandleObject parent);
+JS_CloneObject(JSContext* cx, JS::HandleObject obj, JS::HandleObject proto);
 
 extern JS_FRIEND_API(JSString*)
 JS_BasicObjectToString(JSContext* cx, JS::HandleObject obj);
 
-JS_FRIEND_API(void)
-js_ReportOverRecursed(JSContext* maybecx);
+namespace js {
 
 JS_FRIEND_API(bool)
-js_ObjectClassIs(JSContext* cx, JS::HandleObject obj, js::ESClassValue classValue);
+ObjectClassIs(JSContext* cx, JS::HandleObject obj, ESClassValue classValue);
 
 JS_FRIEND_API(const char*)
-js_ObjectClassName(JSContext* cx, JS::HandleObject obj);
+ObjectClassName(JSContext* cx, JS::HandleObject obj);
 
-namespace js {
+JS_FRIEND_API(void)
+ReportOverRecursed(JSContext* maybecx);
 
 JS_FRIEND_API(bool)
 AddRawValueRoot(JSContext* cx, JS::Value* vp, const char* name);
@@ -164,41 +137,48 @@ AddRawValueRoot(JSContext* cx, JS::Value* vp, const char* name);
 JS_FRIEND_API(void)
 RemoveRawValueRoot(JSContext* cx, JS::Value* vp);
 
-} /* namespace js */
-
 #ifdef JS_DEBUG
 
 /*
  * Routines to print out values during debugging.  These are FRIEND_API to help
- * the debugger find them and to support temporarily hacking js_Dump* calls
+ * the debugger find them and to support temporarily hacking js::Dump* calls
  * into other code.
  */
 
 extern JS_FRIEND_API(void)
-js_DumpString(JSString* str);
+DumpString(JSString *str);
 
 extern JS_FRIEND_API(void)
-js_DumpAtom(JSAtom* atom);
+DumpAtom(JSAtom *atom);
 
 extern JS_FRIEND_API(void)
-js_DumpObject(JSObject* obj);
+DumpObject(JSObject *obj);
 
 extern JS_FRIEND_API(void)
-js_DumpChars(const char16_t* s, size_t n);
+DumpChars(const char16_t *s, size_t n);
 
 extern JS_FRIEND_API(void)
-js_DumpValue(const JS::Value& val);
+DumpValue(const JS::Value &val);
 
 extern JS_FRIEND_API(void)
-js_DumpId(jsid id);
+DumpId(jsid id);
 
 extern JS_FRIEND_API(void)
-js_DumpInterpreterFrame(JSContext* cx, js::InterpreterFrame* start = nullptr);
+DumpInterpreterFrame(JSContext *cx, InterpreterFrame *start = nullptr);
+
+extern JS_FRIEND_API(bool)
+DumpPC(JSContext *cx);
+
+extern JS_FRIEND_API(bool)
+DumpScript(JSContext *cx, JSScript *scriptArg);
 
 #endif
 
 extern JS_FRIEND_API(void)
-js_DumpBacktrace(JSContext* cx);
+DumpBacktrace(JSContext *cx);
+
+
+} // namespace js
 
 namespace JS {
 
@@ -331,7 +311,8 @@ proxy_LookupProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::M
                     JS::MutableHandle<Shape*> propp);
 extern JS_FRIEND_API(bool)
 proxy_DefineProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, JS::HandleValue value,
-                     JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs);
+                     JSPropertyOp getter, JSStrictPropertyOp setter, unsigned attrs,
+                     JS::ObjectOpResult &result);
 extern JS_FRIEND_API(bool)
 proxy_HasProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* foundp);
 extern JS_FRIEND_API(bool)
@@ -339,12 +320,13 @@ proxy_GetProperty(JSContext* cx, JS::HandleObject obj, JS::HandleObject receiver
                   JS::MutableHandleValue vp);
 extern JS_FRIEND_API(bool)
 proxy_SetProperty(JSContext* cx, JS::HandleObject obj, JS::HandleObject receiver, JS::HandleId id,
-                  JS::MutableHandleValue bp, bool strict);
+                  JS::MutableHandleValue bp, JS::ObjectOpResult &result);
 extern JS_FRIEND_API(bool)
 proxy_GetOwnPropertyDescriptor(JSContext* cx, JS::HandleObject obj, JS::HandleId id,
                                JS::MutableHandle<JSPropertyDescriptor> desc);
 extern JS_FRIEND_API(bool)
-proxy_DeleteProperty(JSContext* cx, JS::HandleObject obj, JS::HandleId id, bool* succeeded);
+proxy_DeleteProperty(JSContext *cx, JS::HandleObject obj, JS::HandleId id,
+                     JS::ObjectOpResult &result);
 
 extern JS_FRIEND_API(void)
 proxy_Trace(JSTracer* trc, JSObject* obj);
@@ -978,7 +960,7 @@ GetNativeStackLimit(JSContext* cx, int extraAllowance = 0)
     JS_BEGIN_MACRO                                                              \
         int stackDummy_;                                                        \
         if (!JS_CHECK_STACK_SIZE(limit, &stackDummy_)) {                        \
-            js_ReportOverRecursed(cx);                                          \
+            js::ReportOverRecursed(cx);                                         \
             onerror;                                                            \
         }                                                                       \
     JS_END_MACRO
@@ -1004,7 +986,7 @@ GetNativeStackLimit(JSContext* cx, int extraAllowance = 0)
 #define JS_CHECK_RECURSION_WITH_SP(cx, sp, onerror)                             \
     JS_BEGIN_MACRO                                                              \
         if (!JS_CHECK_STACK_SIZE(js::GetNativeStackLimit(cx), sp)) {            \
-            js_ReportOverRecursed(cx);                                          \
+            js::ReportOverRecursed(cx);                                         \
             onerror;                                                            \
         }                                                                       \
     JS_END_MACRO
@@ -1236,10 +1218,10 @@ typedef enum JSErrNum {
     JSErr_Limit
 } JSErrNum;
 
-extern JS_FRIEND_API(const JSErrorFormatString*)
-js_GetErrorMessage(void* userRef, const unsigned errorNumber);
-
 namespace js {
+
+extern JS_FRIEND_API(const JSErrorFormatString*)
+GetErrorMessage(void* userRef, const unsigned errorNumber);
 
 // AutoStableStringChars is here so we can use it in ErrorReport.  It
 // should get moved out of here if we can manage it.  See bug 1040316.
@@ -1376,15 +1358,10 @@ struct MOZ_STACK_CLASS JS_FRIEND_API(ErrorReport)
     bool ownsMessageAndReport;
 };
 
-} /* namespace js */
-
-
-/* Implemented in jsclone.cpp. */
-
+/* Implemented in vm/StructuredClone.cpp. */
 extern JS_FRIEND_API(uint64_t)
-js_GetSCOffset(JSStructuredCloneWriter* writer);
+GetSCOffset(JSStructuredCloneWriter *writer);
 
-namespace js {
 namespace Scalar {
 
 /* Scalar types which can appear in typed arrays and typed objects.  The enum
@@ -2575,7 +2552,8 @@ JS_FRIEND_API(bool)
 SetPropertyIgnoringNamedGetter(JSContext* cx, const BaseProxyHandler* handler,
                                JS::HandleObject proxy, JS::HandleObject receiver,
                                JS::HandleId id, JS::MutableHandle<JSPropertyDescriptor> desc,
-                               bool descIsOwn, bool strict, JS::MutableHandleValue vp);
+                               bool descIsOwn, JS::MutableHandleValue vp,
+                               JS::ObjectOpResult &result);
 
 JS_FRIEND_API(void)
 ReportErrorWithId(JSContext* cx, const char* msg, JS::HandleId id);
@@ -2641,14 +2619,14 @@ GetSavedFramePrincipals(JS::HandleObject savedFrame);
 extern JS_FRIEND_API(JSObject*)
 GetFirstSubsumedSavedFrame(JSContext* cx, JS::HandleObject savedFrame);
 
+extern JS_FRIEND_API(bool)
+ReportIsNotFunction(JSContext* cx, JS::HandleValue v);
+
+extern JS_FRIEND_API(bool)
+DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
+                  JS::Handle<JSPropertyDescriptor> descriptor, JS::ObjectOpResult &result);
+
 } /* namespace js */
-
-extern JS_FRIEND_API(bool)
-js_DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
-                     JS::Handle<JSPropertyDescriptor> descriptor, bool* bp);
-
-extern JS_FRIEND_API(bool)
-js_ReportIsNotFunction(JSContext* cx, JS::HandleValue v);
 
 extern JS_FRIEND_API(void)
 JS_StoreObjectPostBarrierCallback(JSContext* cx,

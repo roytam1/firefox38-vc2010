@@ -8,24 +8,23 @@
 #include "SourceSurfaceSkia.h"
 #include "ScaledFontBase.h"
 #include "ScaledFontCairo.h"
-#include "skia/SkGpuDevice.h"
-#include "skia/SkBitmapDevice.h"
+#include "skia/include/core/SkBitmapDevice.h"
 #include "FilterNodeSoftware.h"
 
 #ifdef USE_SKIA_GPU
-#include "skia/SkGpuDevice.h"
-#include "skia/GrGLInterface.h"
+#include "skia/include/gpu/SkGpuDevice.h"
+#include "skia/include/gpu/gl/GrGLInterface.h"
 #endif
 
-#include "skia/SkTypeface.h"
-#include "skia/SkGradientShader.h"
-#include "skia/SkBlurDrawLooper.h"
-#include "skia/SkBlurMaskFilter.h"
-#include "skia/SkColorFilter.h"
-#include "skia/SkDropShadowImageFilter.h"
-#include "skia/SkLayerRasterizer.h"
-#include "skia/SkLayerDrawLooper.h"
-#include "skia/SkDashPathEffect.h"
+#include "skia/include/core/SkTypeface.h"
+#include "skia/include/effects/SkGradientShader.h"
+#include "skia/include/effects/SkBlurDrawLooper.h"
+#include "skia/include/effects/SkBlurMaskFilter.h"
+#include "skia/include/core/SkColorFilter.h"
+#include "skia/include/effects/SkDropShadowImageFilter.h"
+#include "skia/include/effects/SkLayerRasterizer.h"
+#include "skia/include/effects/SkLayerDrawLooper.h"
+#include "skia/include/effects/SkDashPathEffect.h"
 #include "Logging.h"
 #include "Tools.h"
 #include "DataSurfaceHelpers.h"
@@ -134,7 +133,7 @@ DrawTargetSkia::~DrawTargetSkia()
 {
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetSkia::Snapshot()
 {
   RefPtr<SourceSurfaceSkia> snapshot = mSnapshot;
@@ -609,7 +608,7 @@ DrawTargetSkia::MaskSurface(const Pattern &aSource,
   }
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetSkia::CreateSourceSurfaceFromData(unsigned char *aData,
                                             const IntSize &aSize,
                                             int32_t aStride,
@@ -625,7 +624,7 @@ DrawTargetSkia::CreateSourceSurfaceFromData(unsigned char *aData,
   return newSurf.forget();
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 DrawTargetSkia::CreateSimilarDrawTarget(const IntSize &aSize, SurfaceFormat aFormat) const
 {
   RefPtr<DrawTargetSkia> target = new DrawTargetSkia();
@@ -645,11 +644,12 @@ DrawTargetSkia::UsingSkiaGPU() const
 #endif
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetSkia::OptimizeSourceSurface(SourceSurface *aSurface) const
 {
   if (aSurface->GetType() == SurfaceType::SKIA) {
-    return aSurface;
+    RefPtr<SourceSurface> surface(aSurface);
+    return surface.forget();
   }
 
   if (!UsingSkiaGPU()) {
@@ -676,7 +676,7 @@ DrawTargetSkia::OptimizeSourceSurface(SourceSurface *aSurface) const
   return result.forget();
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetSkia::CreateSourceSurfaceFromNativeSurface(const NativeSurface &aSurface) const
 {
   if (aSurface.mType == NativeSurfaceType::CAIRO_SURFACE) {
@@ -686,13 +686,13 @@ DrawTargetSkia::CreateSourceSurfaceFromNativeSurface(const NativeSurface &aSurfa
       return nullptr;
     }
     cairo_surface_t* surf = static_cast<cairo_surface_t*>(aSurface.mSurface);
-    return new SourceSurfaceCairo(surf, aSurface.mSize, aSurface.mFormat);
+    return MakeAndAddRef<SourceSurfaceCairo>(surf, aSurface.mSize, aSurface.mFormat);
 #if USE_SKIA_GPU
   } else if (aSurface.mType == NativeSurfaceType::OPENGL_TEXTURE) {
     RefPtr<SourceSurfaceSkia> newSurf = new SourceSurfaceSkia();
     unsigned int texture = (unsigned int)((uintptr_t)aSurface.mSurface);
     if (UsingSkiaGPU() && newSurf->InitFromTexture((DrawTargetSkia*)this, texture, aSurface.mSize, aSurface.mFormat)) {
-      return newSurf;
+      return newSurf.forget();
     }
     return nullptr;
 #endif
@@ -870,10 +870,10 @@ DrawTargetSkia::GetNativeSurface(NativeSurfaceType aType)
 }
 
 
-TemporaryRef<PathBuilder>
+already_AddRefed<PathBuilder>
 DrawTargetSkia::CreatePathBuilder(FillRule aFillRule) const
 {
-  return new PathBuilderSkia(aFillRule);
+  return MakeAndAddRef<PathBuilderSkia>(aFillRule);
 }
 
 void
@@ -916,7 +916,7 @@ DrawTargetSkia::PopClip()
   mCanvas->restore();
 }
 
-TemporaryRef<GradientStops>
+already_AddRefed<GradientStops>
 DrawTargetSkia::CreateGradientStops(GradientStop *aStops, uint32_t aNumStops, ExtendMode aExtendMode) const
 {
   std::vector<GradientStop> stops;
@@ -926,10 +926,10 @@ DrawTargetSkia::CreateGradientStops(GradientStop *aStops, uint32_t aNumStops, Ex
   }
   std::stable_sort(stops.begin(), stops.end());
 
-  return new GradientStopsSkia(stops, aNumStops, aExtendMode);
+  return MakeAndAddRef<GradientStopsSkia>(stops, aNumStops, aExtendMode);
 }
 
-TemporaryRef<FilterNode>
+already_AddRefed<FilterNode>
 DrawTargetSkia::CreateFilter(FilterType aType)
 {
   return FilterNodeSoftware::Create(aType);

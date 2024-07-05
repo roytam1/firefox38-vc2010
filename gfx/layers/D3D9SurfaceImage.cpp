@@ -202,17 +202,17 @@ D3D9SurfaceImage::GetTextureClient(CompositableClient* aClient)
 {
   EnsureSynchronized();
   if (!mTextureClient) {
-    RefPtr<SharedTextureClientD3D9> textureClient =
-      new SharedTextureClientD3D9(aClient->GetForwarder(),
-                                  gfx::SurfaceFormat::B8G8R8X8,
-                                  TextureFlags::DEFAULT);
-    textureClient->InitWith(mTexture, mShareHandle, mDesc);
-    mTextureClient = textureClient;
+    mTextureClient = SharedTextureClientD3D9::Create(aClient->GetForwarder(),
+                                                     gfx::SurfaceFormat::B8G8R8X8,
+                                                     TextureFlags::DEFAULT,
+                                                     mTexture,
+                                                     mShareHandle,
+                                                     mDesc);
   }
   return mTextureClient;
 }
 
-TemporaryRef<gfx::SourceSurface>
+already_AddRefed<gfx::SourceSurface>
 D3D9SurfaceImage::GetAsSourceSurface()
 {
   NS_ENSURE_TRUE(mTexture, nullptr);
@@ -269,7 +269,7 @@ D3D9SurfaceImage::GetAsSourceSurface()
   systemMemorySurface->UnlockRect();
   surface->Unmap();
 
-  return surface;
+  return surface.forget();
 }
 
 } /* layers */

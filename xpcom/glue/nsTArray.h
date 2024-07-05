@@ -30,6 +30,7 @@
 namespace JS {
 template<class T>
 class Heap;
+class ObjectPtr;
 } /* namespace JS */
 
 class nsRegion;
@@ -639,6 +640,12 @@ template<class E>
 struct nsTArray_CopyChooser<JS::Heap<E>>
 {
   typedef nsTArray_CopyWithConstructors<JS::Heap<E>> Type;
+};
+
+template<>
+struct nsTArray_CopyChooser<JS::ObjectPtr>
+{
+  typedef nsTArray_CopyWithConstructors<JS::ObjectPtr> Type;
 };
 
 template<>

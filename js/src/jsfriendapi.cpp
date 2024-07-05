@@ -252,13 +252,13 @@ JS_DefineFunctionsWithHelp(JSContext* cx, HandleObject obj, const JSFunctionSpec
 }
 
 JS_FRIEND_API(bool)
-js_ObjectClassIs(JSContext* cx, HandleObject obj, ESClassValue classValue)
+js::ObjectClassIs(JSContext* cx, HandleObject obj, ESClassValue classValue)
 {
     return ObjectClassIs(obj, classValue, cx);
 }
 
 JS_FRIEND_API(const char*)
-js_ObjectClassName(JSContext* cx, HandleObject obj)
+js::ObjectClassName(JSContext* cx, HandleObject obj)
 {
     return GetObjectClassName(cx, obj);
 }
@@ -605,34 +605,28 @@ js::StringToLinearStringSlow(JSContext* cx, JSString* str)
     return str->ensureLinear(cx);
 }
 
-JS_FRIEND_API(void)
-JS_SetAccumulateTelemetryCallback(JSRuntime* rt, JSAccumulateTelemetryDataCallback callback)
-{
-    rt->setTelemetryCallback(rt, callback);
-}
-
 JS_FRIEND_API(JSObject*)
-JS_CloneObject(JSContext* cx, HandleObject obj, HandleObject protoArg, HandleObject parent)
+JS_CloneObject(JSContext* cx, HandleObject obj, HandleObject protoArg)
 {
     Rooted<TaggedProto> proto(cx, TaggedProto(protoArg.get()));
-    return CloneObject(cx, obj, proto, parent);
+    return CloneObject(cx, obj, proto);
 }
 
 #ifdef DEBUG
 JS_FRIEND_API(void)
-js_DumpString(JSString* str)
+js::DumpString(JSString *str)
 {
     str->dump();
 }
 
 JS_FRIEND_API(void)
-js_DumpAtom(JSAtom* atom)
+js::DumpAtom(JSAtom *atom)
 {
     atom->dump();
 }
 
 JS_FRIEND_API(void)
-js_DumpChars(const char16_t* s, size_t n)
+js::DumpChars(const char16_t *s, size_t n)
 {
     fprintf(stderr, "char16_t * (%p) = ", (void*) s);
     JSString::dumpChars(s, n);
@@ -640,7 +634,7 @@ js_DumpChars(const char16_t* s, size_t n)
 }
 
 JS_FRIEND_API(void)
-js_DumpObject(JSObject* obj)
+js::DumpObject(JSObject *obj)
 {
     if (!obj) {
         fprintf(stderr, "NULL\n");
@@ -1174,12 +1168,12 @@ js::GetObjectMetadata(JSObject* obj)
 }
 
 JS_FRIEND_API(bool)
-js_DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
-                     JS::Handle<js::PropertyDescriptor> descriptor, bool* bp)
+js::DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
+                      JS::Handle<js::PropertyDescriptor> descriptor, ObjectOpResult &result)
 {
     RootedObject obj(cx, objArg);
     RootedId id(cx, idArg);
-    js::AssertHeapIsIdle(cx);
+    AssertHeapIsIdle(cx);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, id, descriptor.value());
     if (descriptor.hasGetterObject())
@@ -1187,13 +1181,13 @@ js_DefineOwnProperty(JSContext* cx, JSObject* objArg, jsid idArg,
     if (descriptor.hasSetterObject())
         assertSameCompartment(cx, descriptor.setterObject());
 
-    return StandardDefineProperty(cx, obj, id, descriptor, bp);
+    return StandardDefineProperty(cx, obj, id, descriptor, result);
 }
 
 JS_FRIEND_API(bool)
-js_ReportIsNotFunction(JSContext* cx, JS::HandleValue v)
+js::ReportIsNotFunction(JSContext* cx, HandleValue v)
 {
-    return ReportIsNotFunction(cx, v);
+    return ReportIsNotFunction(cx, v, -1);
 }
 
 JS_FRIEND_API(void)

@@ -114,7 +114,7 @@ js::GetPrototype(JSContext* cx, js::HandleObject obj, js::MutableHandleObject pr
 {
     if (obj->getTaggedProto().isLazy()) {
         MOZ_ASSERT(obj->is<js::ProxyObject>());
-        return js::Proxy::getPrototypeOf(cx, obj, protop);
+        return js::Proxy::getPrototype(cx, obj, protop);
     } else {
         protop.set(obj->getTaggedProto().toObjectOrNull());
         return true;
@@ -163,21 +163,21 @@ js::GetElementNoGC(JSContext* cx, JSObject* obj, JSObject* receiver, uint32_t in
 }
 
 inline bool
-js::DeleteProperty(JSContext* cx, HandleObject obj, HandleId id, bool* succeeded)
+js::DeleteProperty(JSContext *cx, HandleObject obj, HandleId id, ObjectOpResult &result)
 {
     MarkTypePropertyNonData(cx, obj, id);
     if (DeletePropertyOp op = obj->getOps()->deleteProperty)
-        return op(cx, obj, id, succeeded);
-    return NativeDeleteProperty(cx, obj.as<NativeObject>(), id, succeeded);
+        return op(cx, obj, id, result);
+    return NativeDeleteProperty(cx, obj.as<NativeObject>(), id, result);
 }
 
 inline bool
-js::DeleteElement(JSContext* cx, HandleObject obj, uint32_t index, bool* succeeded)
+js::DeleteElement(JSContext *cx, HandleObject obj, uint32_t index, ObjectOpResult &result)
 {
     RootedId id(cx);
     if (!IndexToId(cx, index, &id))
         return false;
-    return DeleteProperty(cx, obj, id, succeeded);
+    return DeleteProperty(cx, obj, id, result);
 }
 
 
@@ -413,7 +413,7 @@ ToPrimitive(JSContext* cx, MutableHandleValue vp)
     if (obj->is<StringObject>()) {
         jsid id = NameToId(cx->names().valueOf);
         StringObject* nobj = &obj->as<StringObject>();
-        if (ClassMethodIsNative(cx, nobj, &StringObject::class_, id, js_str_toString)) {
+        if (ClassMethodIsNative(cx, nobj, &StringObject::class_, id, str_toString)) {
             vp.setString(nobj->unbox());
             return true;
         }
@@ -423,7 +423,7 @@ ToPrimitive(JSContext* cx, MutableHandleValue vp)
     if (obj->is<NumberObject>()) {
         jsid id = NameToId(cx->names().valueOf);
         NumberObject* nobj = &obj->as<NumberObject>();
-        if (ClassMethodIsNative(cx, nobj, &NumberObject::class_, id, js_num_valueOf)) {
+        if (ClassMethodIsNative(cx, nobj, &NumberObject::class_, id, num_valueOf)) {
             vp.setNumber(nobj->unbox());
             return true;
         }
@@ -453,7 +453,9 @@ inline bool
 IsInternalFunctionObject(JSObject* funobj)
 {
     JSFunction* fun = &funobj->as<JSFunction>();
-    return fun->isLambda() && !funobj->getParent();
+    MOZ_ASSERT_IF(fun->isLambda(),
+                  fun->isInterpreted() || fun->isAsmJSNative());
+    return fun->isLambda() && fun->isInterpreted() && !fun->environment();
 }
 
 class AutoPropDescVector : public AutoVectorRooter<PropDesc>
@@ -785,14 +787,15 @@ ApplyAttributes(unsigned attrs, bool enumerable, bool writable, bool configurabl
     return attrs;
 }
 
-} /* namespace js */
 
 extern js::NativeObject*
-js_InitClass(JSContext* cx, js::HandleObject obj, js::HandleObject parent_proto,
-             const js::Class* clasp, JSNative constructor, unsigned nargs,
-             const JSPropertySpec* ps, const JSFunctionSpec* fs,
-             const JSPropertySpec* static_ps, const JSFunctionSpec* static_fs,
-             js::NativeObject** ctorp = nullptr,
-             js::gc::AllocKind ctorKind = JSFunction::FinalizeKind);
+InitClass(JSContext* cx, js::HandleObject obj, HandleObject parent_proto,
+          const Class* clasp, JSNative constructor, unsigned nargs,
+          const JSPropertySpec* ps, const JSFunctionSpec* fs,
+          const JSPropertySpec* static_ps, const JSFunctionSpec* static_fs,
+          NativeObject** ctorp = nullptr,
+          gc::AllocKind ctorKind = JSFunction::FinalizeKind);
+
+} /* namespace js */
 
 #endif /* jsobjinlines_h */

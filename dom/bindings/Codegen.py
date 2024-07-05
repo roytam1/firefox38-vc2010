@@ -255,7 +255,7 @@ class CGNativePropertyHooks(CGThing):
         self.properties = properties
 
     def declare(self):
-        if self.descriptor.workers:
+        if not self.descriptor.wantsXrays:
             return ""
         return dedent("""
             // We declare this as an array so that retrieving a pointer to this
@@ -269,7 +269,7 @@ class CGNativePropertyHooks(CGThing):
             """)
 
     def define(self):
-        if self.descriptor.workers:
+        if not self.descriptor.wantsXrays:
             return ""
         if self.descriptor.concrete and self.descriptor.proxy:
             resolveOwnProperty = "ResolveOwnProperty"
@@ -323,7 +323,7 @@ class CGNativePropertyHooks(CGThing):
 
 
 def NativePropertyHooks(descriptor):
-    return "&sWorkerNativePropertyHooks" if descriptor.workers else "sNativePropertyHooks"
+    return "&sEmptyNativePropertyHooks" if not descriptor.wantsXrays else "sNativePropertyHooks"
 
 
 def DOMClass(descriptor):
@@ -381,7 +381,7 @@ class CGDOMJSClass(CGThing):
             classFlags += "JSCLASS_DOM_GLOBAL | JSCLASS_GLOBAL_FLAGS_WITH_SLOTS(DOM_GLOBAL_SLOTS) | JSCLASS_IMPLEMENTS_BARRIERS"
             traceHook = "JS_GlobalObjectTraceHook"
             reservedSlots = "JSCLASS_GLOBAL_APPLICATION_SLOTS"
-            if not self.descriptor.workers:
+            if self.descriptor.interface.identifier.name == "Window":
                 classExtensionAndObjectOps = fill(
                     """
                     {
@@ -523,69 +523,9 @@ def MemberIsUnforgeable(member, descriptor):
                  descriptor.interface.getExtendedAttribute("Unforgeable")))
 
 
-def UseHolderForUnforgeable(descriptor):
-    return (descriptor.concrete and
-            descriptor.proxy and
-            any(m for m in descriptor.interface.members
-                if MemberIsUnforgeable(m, descriptor)))
-
-
-def CallOnUnforgeableHolder(descriptor, code, isXrayCheck=None,
-                            useSharedRoot=False):
-    """
-    Generate the code to execute the code in "code" on an unforgeable holder if
-    needed. code should be a string containing the code to execute. If it
-    contains a ${holder} string parameter it will be replaced with the
-    unforgeable holder object.
-
-    If isXrayCheck is not None it should be a string that contains a statement
-    returning whether proxy is an Xray. If isXrayCheck is None the generated
-    code won't try to unwrap Xrays.
-
-    If useSharedRoot is true, we will use an existing
-    JS::Rooted<JSObject*> sharedRoot for storing our unforgeable holder instead
-    of declaring a new Rooted.
-    """
-    if isXrayCheck is not None:
-        pre = fill(
-            """
-            // Scope for 'global', 'ac' and 'unforgeableHolder'
-            {
-              JS::Rooted<JSObject*> global(cx);
-              Maybe<JSAutoCompartment> ac;
-              if (${isXrayCheck}) {
-                global = js::GetGlobalForObjectCrossCompartment(js::UncheckedUnwrap(proxy));
-                ac.emplace(cx, global);
-              } else {
-                global = js::GetGlobalForObjectCrossCompartment(proxy);
-              }
-            """,
-            isXrayCheck=isXrayCheck)
-    else:
-        pre = dedent("""
-            // Scope for 'global' and 'unforgeableHolder'
-            {
-              JSObject* global = js::GetGlobalForObjectCrossCompartment(proxy);
-            """)
-
-    if useSharedRoot:
-        holderDecl = "JS::Rooted<JSObject*>& unforgeableHolder(sharedRoot);\n"
-    else:
-        holderDecl = "JS::Rooted<JSObject*> unforgeableHolder(cx);\n"
-
-    code = string.Template(code).substitute({"holder": "unforgeableHolder"})
-    return fill(
-        """
-        $*{pre}
-          $*{holderDecl}
-          unforgeableHolder = GetUnforgeableHolder(global, prototypes::id::${name});
-          $*{code}
-        }
-        """,
-        pre=pre,
-        holderDecl=holderDecl,
-        name=descriptor.name,
-        code=code)
+def HasUnforgeableMembers(descriptor):
+    return any(MemberIsUnforgeable(m, descriptor) for m in
+               descriptor.interface.members)
 
 
 def InterfacePrototypeObjectProtoGetter(descriptor):
@@ -631,8 +571,6 @@ class CGPrototypeJSClass(CGThing):
     def define(self):
         prototypeID, depth = PrototypeIDAndDepth(self.descriptor)
         slotCount = "DOM_INTERFACE_PROTO_SLOTS_BASE"
-        if UseHolderForUnforgeable(self.descriptor):
-            slotCount += " + 1 /* slot for the JSObject holding the unforgeable properties */"
         (protoGetter, _) = InterfacePrototypeObjectProtoGetter(self.descriptor)
         type = "eGlobalInterfacePrototype" if self.descriptor.isGlobal() else "eInterfacePrototype"
         return fill(
@@ -1958,8 +1896,7 @@ class PropertyDefiner:
         return "nullptr"
 
     def usedForXrays(self):
-        # No Xrays in workers.
-        return not self.descriptor.workers
+        return self.descriptor.wantsXrays
 
     def __str__(self):
         # We only need to generate id arrays for things that will end
@@ -2619,9 +2556,8 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
         assert needInterfaceObject or needInterfacePrototypeObject
 
         idsToInit = []
-        # There is no need to init any IDs in workers, because worker bindings
-        # don't have Xrays.
-        if not self.descriptor.workers:
+        # There is no need to init any IDs in bindings that don't want Xrays.
+        if self.descriptor.wantsXrays:
             for var in self.properties.arrayNames():
                 props = getattr(self.properties, var)
                 # We only have non-chrome ids to init if we have no chrome ids.
@@ -2657,22 +2593,6 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
                                   post="}\n")
         else:
             prefCache = None
-
-        if UseHolderForUnforgeable(self.descriptor):
-            createUnforgeableHolder = CGGeneric(dedent("""
-                JS::Rooted<JSObject*> unforgeableHolder(aCx,
-                  JS_NewObjectWithGivenProto(aCx, nullptr, JS::NullPtr(), JS::NullPtr()));
-                if (!unforgeableHolder) {
-                  return;
-                }
-                """))
-            defineUnforgeables = InitUnforgeablePropertiesOnObject(self.descriptor,
-                                                                   "unforgeableHolder",
-                                                                   self.properties)
-            createUnforgeableHolder = CGList(
-                [createUnforgeableHolder, defineUnforgeables])
-        else:
-            createUnforgeableHolder = None
 
         getParentProto = fill(
             """
@@ -2758,22 +2678,9 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
             chromeProperties=chromeProperties,
             name='"' + self.descriptor.interface.identifier.name + '"' if needInterfaceObject else "nullptr")
 
-        if UseHolderForUnforgeable(self.descriptor):
-            assert needInterfacePrototypeObject
-            setUnforgeableHolder = CGGeneric(fill(
-                """
-                JSObject* proto = aProtoAndIfaceCache.EntrySlotOrCreate(prototypes::id::${name});
-                if (proto) {
-                  js::SetReservedSlot(proto, DOM_INTERFACE_PROTO_SLOTS_BASE,
-                                      JS::ObjectValue(*unforgeableHolder));
-                }
-                """,
-                name=self.descriptor.name))
-        else:
-            setUnforgeableHolder = None
         return CGList(
             [CGGeneric(getParentProto), CGGeneric(getConstructorProto), initIds,
-             prefCache, createUnforgeableHolder, CGGeneric(call), setUnforgeableHolder],
+             prefCache, CGGeneric(call)],
             "\n").define()
 
 
@@ -3053,7 +2960,7 @@ def CreateBindingJSObject(descriptor, properties):
         create = dedent(
             """
             creator.CreateProxyObject(aCx, &Class.mBase, DOMProxyHandler::getInstance(),
-                                      proto, global, aObject, aReflector);
+                                      proto, aObject, aReflector);
             if (!aReflector) {
               return false;
             }
@@ -3068,7 +2975,7 @@ def CreateBindingJSObject(descriptor, properties):
     else:
         create = dedent(
             """
-            creator.CreateObject(aCx, Class.ToJSClass(), proto, global, aObject, aReflector);
+            creator.CreateObject(aCx, Class.ToJSClass(), proto, aObject, aReflector);
             if (!aReflector) {
               return false;
             }
@@ -3076,33 +2983,68 @@ def CreateBindingJSObject(descriptor, properties):
     return objDecl + create
 
 
-def InitUnforgeablePropertiesOnObject(descriptor, obj, properties, failureReturnValue=""):
+def InitUnforgeableProperties(descriptor, properties, wrapperCache):
     """
     properties is a PropertyArrays instance
     """
-    unforgeables = []
+    unforgeableAttrs = properties.unforgeableAttrs
+    if not unforgeableAttrs.hasNonChromeOnly() and not unforgeableAttrs.hasChromeOnly():
+        return ""
 
-    if failureReturnValue:
-        failureReturnValue = " " + failureReturnValue
+    unforgeables = [
+        CGGeneric(dedent(
+            """
+            // Important: do unforgeable property setup after we have handed
+            // over ownership of the C++ object to obj as needed, so that if
+            // we fail and it ends up GCed it won't have problems in the
+            // finalizer trying to drop its ownership of the C++ object.
+            """))
+    ]
+
+    if wrapperCache:
+        cleanup = dedent(
+            """
+            aCache->ReleaseWrapper(aObject);
+            aCache->ClearWrapper();
+            """)
     else:
-        failureReturnValue = ""
+        cleanup = ""
+
+    # For proxies, we want to define on the expando object, not directly on the
+    # reflector, so we can make sure we don't get confused by named getters.
+    if descriptor.proxy:
+        unforgeables.append(CGGeneric(fill(
+            """
+            JS::Rooted<JSObject*> expando(aCx,
+              DOMProxyHandler::EnsureExpandoObject(aCx, aReflector));
+            if (!expando) {
+              $*{cleanup}
+              return false;
+            }
+            """,
+            cleanup=cleanup)))
+        obj = "expando"
+    else:
+        obj = "aReflector"
 
     defineUnforgeableAttrs = fill(
         """
         if (!DefineUnforgeableAttributes(aCx, ${obj}, %s)) {
-          return${rv};
+          $*{cleanup}
+          return false;
         }
         """,
         obj=obj,
-        rv=failureReturnValue)
+        cleanup=cleanup)
     defineUnforgeableMethods = fill(
         """
         if (!DefineUnforgeableMethods(aCx, ${obj}, %s)) {
-          return${rv};
+          $*{cleanup}
+          return false;
         }
         """,
         obj=obj,
-        rv=failureReturnValue)
+        cleanup=cleanup)
 
     unforgeableMembers = [
         (defineUnforgeableAttrs, properties.unforgeableAttrs),
@@ -3123,36 +3065,14 @@ def InitUnforgeablePropertiesOnObject(descriptor, obj, properties, failureReturn
             """
             if (!JS_DefineProperty(aCx, ${obj}, "toJSON", JS::UndefinedHandleValue,
                                    JSPROP_READONLY | JSPROP_ENUMERATE | JSPROP_PERMANENT)) {
-              return${rv};
+              $*{cleanup}
+              return false;
             }
             """,
             obj=obj,
-            rv=failureReturnValue)))
+            cleanup=cleanup)))
 
-    return CGList(unforgeables)
-
-
-def InitUnforgeableProperties(descriptor, properties):
-    """
-    properties is a PropertyArrays instance
-    """
-    unforgeableAttrs = properties.unforgeableAttrs
-    if not unforgeableAttrs.hasNonChromeOnly() and not unforgeableAttrs.hasChromeOnly():
-        return ""
-
-    if descriptor.proxy:
-        unforgeableProperties = CGGeneric(
-            "// Unforgeable properties on proxy-based bindings are stored in an object held\n"
-            "// by the interface prototype object.\n")
-    else:
-        unforgeableProperties = CGWrapper(
-            InitUnforgeablePropertiesOnObject(descriptor, "aReflector", properties, "false"),
-            pre=(
-                "// Important: do unforgeable property setup after we have handed\n"
-                "// over ownership of the C++ object to obj as needed, so that if\n"
-                "// we fail and it ends up GCed it won't have problems in the\n"
-                "// finalizer trying to drop its ownership of the C++ object.\n"))
-    return CGWrapper(unforgeableProperties, pre="\n").define()
+    return CGWrapper(CGList(unforgeables), pre="\n").define()
 
 
 def AssertInheritanceChain(descriptor):
@@ -3181,13 +3101,21 @@ def InitMemberSlots(descriptor, wrapperCache):
     if not descriptor.interface.hasMembersInSlots():
         return ""
     if wrapperCache:
-        clearWrapper = "  aCache->ClearWrapper();\n"
+        clearWrapper = dedent(
+            """
+            aCache->ReleaseWrapper(aObject);
+            aCache->ClearWrapper();
+            """)
     else:
         clearWrapper = ""
-    return ("if (!UpdateMemberSlots(aCx, aReflector, aObject)) {\n"
-            "%s"
-            "  return false;\n"
-            "}\n" % clearWrapper)
+    return fill(
+        """
+        if (!UpdateMemberSlots(aCx, aReflector, aObject)) {
+          $*{clearWrapper}
+          return false;
+        }
+        """,
+        clearWrapper=clearWrapper)
 
 
 class CGWrapWithCacheMethod(CGAbstractMethod):
@@ -3206,6 +3134,16 @@ class CGWrapWithCacheMethod(CGAbstractMethod):
         self.properties = properties
 
     def definition_body(self):
+        # For proxies, we have to SetWrapper() before we init unforgeables.  But
+        # for non-proxies we'd rather do it the other way around, so our
+        # unforgeables don't force preservation of the wrapper.
+        setWrapper = "aCache->SetWrapper(aReflector);\n"
+        if self.descriptor.proxy:
+            setWrapperProxy = setWrapper
+            setWrapperNonProxy = ""
+        else:
+            setWrapperProxy = ""
+            setWrapperNonProxy = setWrapper
         return fill(
             """
             $*{assertion}
@@ -3234,16 +3172,18 @@ class CGWrapWithCacheMethod(CGAbstractMethod):
 
             $*{createObject}
 
+            $*{setWrapperProxy}
             $*{unforgeable}
-
-            aCache->SetWrapper(aReflector);
+            $*{setWrapperNonProxy}
             $*{slots}
             creator.InitializationSucceeded();
             return true;
             """,
             assertion=AssertInheritanceChain(self.descriptor),
             createObject=CreateBindingJSObject(self.descriptor, self.properties),
-            unforgeable=InitUnforgeableProperties(self.descriptor, self.properties),
+            setWrapperProxy=setWrapperProxy,
+            unforgeable=InitUnforgeableProperties(self.descriptor, self.properties, True),
+            setWrapperNonProxy=setWrapperNonProxy,
             slots=InitMemberSlots(self.descriptor, True))
 
 
@@ -3300,7 +3240,7 @@ class CGWrapNonWrapperCacheMethod(CGAbstractMethod):
             """,
             assertions=AssertInheritanceChain(self.descriptor),
             createObject=CreateBindingJSObject(self.descriptor, self.properties),
-            unforgeable=InitUnforgeableProperties(self.descriptor, self.properties),
+            unforgeable=InitUnforgeableProperties(self.descriptor, self.properties, False),
             slots=InitMemberSlots(self.descriptor, False))
 
 
@@ -3377,7 +3317,7 @@ class CGWrapGlobalMethod(CGAbstractMethod):
             nativeType=self.descriptor.nativeType,
             properties=properties,
             chromeProperties=chromeProperties,
-            unforgeable=InitUnforgeableProperties(self.descriptor, self.properties),
+            unforgeable=InitUnforgeableProperties(self.descriptor, self.properties, True),
             slots=InitMemberSlots(self.descriptor, True),
             fireOnNewGlobal=fireOnNewGlobal)
 
@@ -4636,10 +4576,7 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
         descriptor = descriptorProvider.getDescriptor(
             type.unroll().inner.identifier.name)
 
-        if descriptor.nativeType == 'JSObject':
-            # XXXbz Workers code does this sometimes
-            assert descriptor.workers
-            return handleJSObjectType(type, isMember, failureCode, exceptionCode, sourceDescription)
+        assert descriptor.nativeType != 'JSObject'
 
         if descriptor.interface.isCallback():
             name = descriptor.interface.identifier.name
@@ -4716,9 +4653,10 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
                     exceptionCode,
                     isCallbackReturnValue,
                     firstCap(sourceDescription)))
-        elif descriptor.workers:
-            return handleJSObjectType(type, isMember, failureCode, exceptionCode, sourceDescription)
         else:
+            # Worker descriptors can't end up here, because all of our
+            # "external" stuff is not exposed in workers.
+            assert not descriptor.workers
             # Either external, or new-binding non-castable.  We always have a
             # holder for these, because we don't actually know whether we have
             # to addref when unwrapping or not.  So we just pass an
@@ -7621,10 +7559,7 @@ class CGResolveHook(CGAbstractBindingMethod):
             // has already defined it on the object.  Don't try to also
             // define it.
             if (!desc.value().isUndefined() &&
-                !JS_DefinePropertyById(cx, obj, id, desc.value(),
-                                       desc.attributes() | JSPROP_PROPOP_ACCESSORS,
-                                       JS_PROPERTYOP_GETTER(desc.getter()),
-                                       JS_PROPERTYOP_SETTER(desc.setter()))) {
+                !JS_DefinePropertyById(cx, obj, id, desc)) {
               return false;
             }
             *resolvedp = true;
@@ -9619,10 +9554,7 @@ class CGResolveOwnPropertyViaResolve(CGAbstractBindingMethod):
               // try to also define it.
               if (objDesc.object() &&
                   !objDesc.value().isUndefined() &&
-                  !JS_DefinePropertyById(cx, obj, id, objDesc.value(),
-                                         objDesc.attributes() | JSPROP_PROPOP_ACCESSORS,
-                                         JS_PROPERTYOP_GETTER(objDesc.getter()),
-                                         JS_PROPERTYOP_SETTER(objDesc.setter()))) {
+                  !JS_DefinePropertyById(cx, obj, id, objDesc)) {
                 return false;
               }
             }
@@ -10080,31 +10012,6 @@ class CGDOMJSProxyHandler_getOwnPropDescriptor(ClassMethod):
         else:
             getIndexed = ""
 
-        if UseHolderForUnforgeable(self.descriptor):
-            tryHolder = dedent("""
-                if (!JS_GetPropertyDescriptorById(cx, ${holder}, id, desc)) {
-                  return false;
-                }
-                MOZ_ASSERT_IF(desc.object(), desc.object() == ${holder});
-                """)
-
-            # We don't want to look at the unforgeable holder at all
-            # in the xray case; that part got handled already.
-            getUnforgeable = fill(
-                """
-                if (!isXray) {
-                  $*{callOnUnforgeable}
-                  if (desc.object()) {
-                    desc.object().set(proxy);
-                    return true;
-                  }
-                }
-
-                """,
-                callOnUnforgeable=CallOnUnforgeableHolder(self.descriptor, tryHolder))
-        else:
-            getUnforgeable = ""
-
         if self.descriptor.supportsNamedProperties():
             operations = self.descriptor.operations
             readonly = toStringBool(operations['NamedSetter'] is None)
@@ -10161,7 +10068,6 @@ class CGDOMJSProxyHandler_getOwnPropDescriptor(ClassMethod):
             """
             bool isXray = xpc::WrapperFactory::IsXrayWrapper(proxy);
             $*{getIndexed}
-            $*{getUnforgeable}
             JS::Rooted<JSObject*> expando(cx);
             if (!isXray && (expando = GetExpandoObject(proxy))) {
               if (!JS_GetPropertyDescriptorById(cx, expando, id, desc)) {
@@ -10179,16 +10085,18 @@ class CGDOMJSProxyHandler_getOwnPropDescriptor(ClassMethod):
             return true;
             """,
             getIndexed=getIndexed,
-            getUnforgeable=getUnforgeable,
             namedGet=namedGet)
 
 
 class CGDOMJSProxyHandler_defineProperty(ClassMethod):
     def __init__(self, descriptor):
+        # The usual convention is to name the ObjectOpResult out-parameter
+        # `result`, but that name is a bit overloaded around here.
         args = [Argument('JSContext*', 'cx'),
                 Argument('JS::Handle<JSObject*>', 'proxy'),
                 Argument('JS::Handle<jsid>', 'id'),
                 Argument('JS::MutableHandle<JSPropertyDescriptor>', 'desc'),
+                Argument('JS::ObjectOpResult&', 'opresult'),
                 Argument('bool*', 'defined')]
         ClassMethod.__init__(self, "defineProperty", "bool", args, virtual=True, override=True, const=True)
         self.descriptor = descriptor
@@ -10206,7 +10114,7 @@ class CGDOMJSProxyHandler_defineProperty(ClassMethod):
                 if (IsArrayIndex(index)) {
                   *defined = true;
                   $*{callSetter}
-                  return true;
+                  return opresult.succeed();
                 }
                 """,
                 callSetter=CGProxyIndexedSetter(self.descriptor).define())
@@ -10219,30 +10127,19 @@ class CGDOMJSProxyHandler_defineProperty(ClassMethod):
             set += fill(
                 """
                 if (IsArrayIndex(GetArrayIndexFromId(cx, id))) {
-                  return js::IsInNonStrictPropertySet(cx) || ThrowErrorMessage(cx, MSG_NO_INDEXED_SETTER, "${name}");
+                  return js::IsInNonStrictPropertySet(cx)
+                         ? opresult.succeed()
+                         : ThrowErrorMessage(cx, MSG_NO_INDEXED_SETTER, "${name}");
                 }
                 """,
                 name=self.descriptor.name)
 
-        if UseHolderForUnforgeable(self.descriptor):
-            # It's OK to do the defineOnUnforgeable thing even in the Xray case,
-            # since in practice it won't let us change anything; we just want
-            # the js_DefineOwnProperty call for error reporting purposes.
-            defineOnUnforgeable = ("bool hasUnforgeable;\n"
-                                   "if (!JS_HasPropertyById(cx, ${holder}, id, &hasUnforgeable)) {\n"
-                                   "  return false;\n"
-                                   "}\n"
-                                   "if (hasUnforgeable) {\n"
-                                   "  *defined = true;\n"
-                                   "  bool unused;\n"
-                                   "  return js_DefineOwnProperty(cx, ${holder}, id, desc, &unused);\n"
-                                   "}\n")
-            set += CallOnUnforgeableHolder(self.descriptor,
-                                           defineOnUnforgeable,
-                                           "xpc::WrapperFactory::IsXrayWrapper(proxy)")
-
         namedSetter = self.descriptor.operations['NamedSetter']
         if namedSetter:
+            if HasUnforgeableMembers(self.descriptor):
+                raise TypeError("Can't handle a named setter on an interface "
+                                "that has unforgeables.  Figure out how that "
+                                "should work!")
             if self.descriptor.operations['NamedCreator'] is not namedSetter:
                 raise TypeError("Can't handle creator that's different from the setter")
             # If we support indexed properties, we won't get down here for
@@ -10252,7 +10149,7 @@ class CGDOMJSProxyHandler_defineProperty(ClassMethod):
                 *defined = true;
                 $*{callSetter}
 
-                return true;
+                return opresult.succeed();
                 """,
                 callSetter=CGProxyNamedSetter(self.descriptor).define())
         else:
@@ -10268,7 +10165,9 @@ class CGDOMJSProxyHandler_defineProperty(ClassMethod):
                     $*{presenceChecker}
 
                     if (found) {
-                      return js::IsInNonStrictPropertySet(cx) || ThrowErrorMessage(cx, MSG_NO_NAMED_SETTER, "${name}");
+                      return js::IsInNonStrictPropertySet(cx)
+                             ? opresult.succeed()
+                             : ThrowErrorMessage(cx, MSG_NO_NAMED_SETTER, "${name}");
                     }
                     """,
                     presenceChecker=CGProxyNamedPresenceChecker(self.descriptor, foundVar="found").define(),
@@ -10283,7 +10182,7 @@ class CGDOMJSProxyHandler_delete(ClassMethod):
         args = [Argument('JSContext*', 'cx'),
                 Argument('JS::Handle<JSObject*>', 'proxy'),
                 Argument('JS::Handle<jsid>', 'id'),
-                Argument('bool*', 'bp')]
+                Argument('JS::ObjectOpResult&', 'opresult')]
         ClassMethod.__init__(self, "delete_", "bool", args,
                              virtual=True, override=True, const=True)
         self.descriptor = descriptor
@@ -10292,33 +10191,48 @@ class CGDOMJSProxyHandler_delete(ClassMethod):
         def getDeleterBody(type, foundVar=None):
             """
             type should be "Named" or "Indexed"
+
+            The possible outcomes:
+            - an error happened                       (the emitted code returns false)
+            - own property not found                  (foundVar=false, deleteSucceeded=true)
+            - own property found and deleted          (foundVar=true,  deleteSucceeded=true)
+            - own property found but can't be deleted (foundVar=true,  deleteSucceeded=false)
             """
             assert type in ("Named", "Indexed")
             deleter = self.descriptor.operations[type + 'Deleter']
             if deleter:
-                decls = ""
-                if (not deleter.signatures()[0][0].isPrimitive() or
-                    deleter.signatures()[0][0].nullable() or
-                    deleter.signatures()[0][0].tag() != IDLType.Tags.bool):
-                    setBp = "*bp = true;\n"
-                else:
-                    decls += "bool result;\n"
+                if HasUnforgeableMembers(self.descriptor):
+                    raise TypeError("Can't handle a deleter on an interface "
+                                    "that has unforgeables.  Figure out how "
+                                    "that should work!")
+                # See if the deleter method is fallible.
+                t = deleter.signatures()[0][0]
+                if t.isPrimitive() and not t.nullable() and t.tag() == IDLType.Tags.bool:
+                    # The deleter method has a boolean out-parameter. When a
+                    # property is found, the out-param indicates whether it was
+                    # successfully deleted.
+                    decls = "bool result;\n"
                     if foundVar is None:
                         foundVar = "found"
                         decls += "bool found = false;\n"
-                    setBp = fill(
+                    setDS = fill(
                         """
-                        if (${foundVar}) {
-                          *bp = result;
-                        } else {
-                          *bp = true;
+                        if (!${foundVar}) {
+                          deleteSucceeded = true;
                         }
                         """,
                         foundVar=foundVar)
+                else:
+                    # No boolean out-parameter: if a property is found,
+                    # deleting it always succeeds.
+                    decls = ""
+                    setDS = "deleteSucceeded = true;\n"
+
                 deleterClass = globals()["CGProxy%sDeleter" % type]
                 body = (decls +
-                        deleterClass(self.descriptor, resultVar="result", foundVar=foundVar).define() +
-                        setBp)
+                        deleterClass(self.descriptor, resultVar="deleteSucceeded",
+                                     foundVar=foundVar).define() +
+                        setDS)
             elif getattr(self.descriptor, "supports%sProperties" % type)():
                 presenceCheckerClass = globals()["CGProxy%sPresenceChecker" % type]
                 foundDecl = ""
@@ -10329,7 +10243,7 @@ class CGDOMJSProxyHandler_delete(ClassMethod):
                     """
                     $*{foundDecl}
                     $*{presenceChecker}
-                    *bp = !${foundVar};
+                    deleteSucceeded = !${foundVar};
                     """,
                     foundDecl=foundDecl,
                     presenceChecker=presenceCheckerClass(self.descriptor, foundVar=foundVar).define(),
@@ -10350,26 +10264,12 @@ class CGDOMJSProxyHandler_delete(ClassMethod):
                 """
                 int32_t index = GetArrayIndexFromId(cx, id);
                 if (IsArrayIndex(index)) {
+                  bool deleteSucceeded;
                   $*{indexedBody}
-                  // We always return here, even if the property was not found
-                  return true;
+                  return deleteSucceeded ? opresult.succeed() : opresult.failCantDelete();
                 }
                 """,
                 indexedBody=indexedBody)
-
-        if UseHolderForUnforgeable(self.descriptor):
-            unforgeable = dedent("""
-                bool hasUnforgeable;
-                if (!JS_HasPropertyById(cx, ${holder}, id, &hasUnforgeable)) {
-                  return false;
-                }
-                if (hasUnforgeable) {
-                  *bp = false;
-                  return true;
-                }
-                """)
-            delete += CallOnUnforgeableHolder(self.descriptor, unforgeable)
-            delete += "\n"
 
         namedBody = getDeleterBody("Named", foundVar="found")
         if namedBody is not None:
@@ -10379,9 +10279,10 @@ class CGDOMJSProxyHandler_delete(ClassMethod):
             delete += fill(
                 """
                 bool found = false;
+                bool deleteSucceeded;
                 $*{namedBody}
                 if (found) {
-                  return true;
+                  return deleteSucceeded ? opresult.succeed() : opresult.failCantDelete();
                 }
                 """,
                 namedBody=namedBody)
@@ -10399,7 +10300,7 @@ class CGDOMJSProxyHandler_delete(ClassMethod):
 
         delete += dedent("""
 
-            return dom::DOMProxyHandler::delete_(cx, proxy, id, bp);
+            return dom::DOMProxyHandler::delete_(cx, proxy, id, opresult);
             """)
 
         return delete
@@ -10431,18 +10332,6 @@ class CGDOMJSProxyHandler_ownPropNames(ClassMethod):
         else:
             addIndices = ""
 
-        if UseHolderForUnforgeable(self.descriptor):
-            addUnforgeable = dedent("""
-                if (!js::GetPropertyKeys(cx, ${holder}, flags, &props)) {
-                  return false;
-                }
-                """)
-            addUnforgeable = CallOnUnforgeableHolder(self.descriptor,
-                                                     addUnforgeable,
-                                                     "isXray")
-        else:
-            addUnforgeable = ""
-
         if self.descriptor.supportsNamedProperties():
             if self.descriptor.interface.getExtendedAttribute('OverrideBuiltins'):
                 shadow = "!isXray"
@@ -10465,7 +10354,6 @@ class CGDOMJSProxyHandler_ownPropNames(ClassMethod):
             """
             bool isXray = xpc::WrapperFactory::IsXrayWrapper(proxy);
             $*{addIndices}
-            $*{addUnforgeable}
             $*{addNames}
 
             JS::Rooted<JSObject*> expando(cx);
@@ -10477,7 +10365,6 @@ class CGDOMJSProxyHandler_ownPropNames(ClassMethod):
             return true;
             """,
             addIndices=addIndices,
-            addUnforgeable=addUnforgeable,
             addNames=addNames)
 
 
@@ -10508,19 +10395,6 @@ class CGDOMJSProxyHandler_hasOwn(ClassMethod):
                 presenceChecker=CGProxyIndexedPresenceChecker(self.descriptor, foundVar="found").define())
         else:
             indexed = ""
-
-        if UseHolderForUnforgeable(self.descriptor):
-            unforgeable = dedent("""
-                bool b = true;
-                bool ok = JS_AlreadyHasOwnPropertyById(cx, ${holder}, id, &b);
-                *bp = !!b;
-                if (!ok || *bp) {
-                  return ok;
-                }
-                """)
-            unforgeable = CallOnUnforgeableHolder(self.descriptor, unforgeable)
-        else:
-            unforgeable = ""
 
         if self.descriptor.supportsNamedProperties():
             # If we support indexed properties we always return above for index
@@ -10557,7 +10431,6 @@ class CGDOMJSProxyHandler_hasOwn(ClassMethod):
                       "Should not have a XrayWrapper here");
 
             $*{indexed}
-            $*{unforgeable}
 
             JS::Rooted<JSObject*> expando(cx, GetExpandoObject(proxy));
             if (expando) {
@@ -10573,7 +10446,6 @@ class CGDOMJSProxyHandler_hasOwn(ClassMethod):
             return true;
             """,
             indexed=indexed,
-            unforgeable=unforgeable,
             named=named)
 
 
@@ -10589,24 +10461,9 @@ class CGDOMJSProxyHandler_get(ClassMethod):
         self.descriptor = descriptor
 
     def getBody(self):
-        getUnforgeableOrExpando = "JS::Rooted<JSObject*> sharedRoot(cx);\n"
-        if UseHolderForUnforgeable(self.descriptor):
-            hasUnforgeable = dedent("""
-                bool hasUnforgeable;
-                if (!JS_AlreadyHasOwnPropertyById(cx, ${holder}, id, &hasUnforgeable)) {
-                  return false;
-                }
-                if (hasUnforgeable) {
-                  return JS_ForwardGetPropertyTo(cx, ${holder}, id, proxy, vp);
-                }
-                """)
-            getUnforgeableOrExpando += CallOnUnforgeableHolder(self.descriptor,
-                                                               hasUnforgeable,
-                                                               useSharedRoot=True)
-        getUnforgeableOrExpando += dedent("""
+        getUnforgeableOrExpando = dedent("""
             { // Scope for expando
-              JS::Rooted<JSObject*>& expando(sharedRoot);
-              expando = DOMProxyHandler::GetExpandoObject(proxy);
+              JS::Rooted<JSObject*> expando(cx, DOMProxyHandler::GetExpandoObject(proxy));
               if (expando) {
                 bool hasProp;
                 if (!JS_HasPropertyById(cx, expando, id, &hasProp)) {
@@ -10706,7 +10563,7 @@ class CGDOMJSProxyHandler_setCustom(ClassMethod):
             if self.descriptor.operations['NamedCreator'] is not namedSetter:
                 raise ValueError("In interface " + self.descriptor.name + ": " +
                                  "Can't cope with named setter that is not also a named creator")
-            if UseHolderForUnforgeable(self.descriptor):
+            if HasUnforgeableMembers(self.descriptor):
                 raise ValueError("In interface " + self.descriptor.name + ": " +
                                  "Can't cope with [OverrideBuiltins] and unforgeable members")
 
@@ -10776,7 +10633,8 @@ class CGDOMJSProxyHandler_finalize(ClassMethod):
         self.descriptor = descriptor
 
     def getBody(self):
-        return ("%s* self = UnwrapProxy(proxy);\n\n" % self.descriptor.nativeType +
+        return (("%s* self = UnwrapPossiblyNotInitializedDOMObject<%s>(proxy);\n" %
+                 (self.descriptor.nativeType, self.descriptor.nativeType)) +
                 finalizeHook(self.descriptor, FINALIZE_HOOK_NAME, self.args[0].name).define())
 
 
@@ -11173,14 +11031,14 @@ class CGDescriptor(CGThing):
         cgThings.append(CGGeneric(define=str(properties)))
         cgThings.append(CGNativeProperties(descriptor, properties))
 
-        # Set up our Xray callbacks as needed.  Note that we don't need to do
-        # it in workers.
-        if not descriptor.workers and descriptor.concrete and descriptor.proxy:
-            cgThings.append(CGResolveOwnProperty(descriptor))
-            cgThings.append(CGEnumerateOwnProperties(descriptor))
-        elif descriptor.needsXrayResolveHooks():
-            cgThings.append(CGResolveOwnPropertyViaResolve(descriptor))
-            cgThings.append(CGEnumerateOwnPropertiesViaGetOwnPropertyNames(descriptor))
+        # Set up our Xray callbacks as needed.
+        if descriptor.wantsXrays:
+            if descriptor.concrete and descriptor.proxy:
+                cgThings.append(CGResolveOwnProperty(descriptor))
+                cgThings.append(CGEnumerateOwnProperties(descriptor))
+            elif descriptor.needsXrayResolveHooks():
+                cgThings.append(CGResolveOwnPropertyViaResolve(descriptor))
+                cgThings.append(CGEnumerateOwnPropertiesViaGetOwnPropertyNames(descriptor))
 
         # Now that we have our ResolveOwnProperty/EnumerateOwnProperties stuff
         # done, set up our NativePropertyHooks.

@@ -53,14 +53,14 @@ protected:
   void SetSize(const gfx::IntSize& aSize) { mSize = aSize; }
 
   // Helper methods for creating and copying textures.
-  TemporaryRef<IDirect3DTexture9> InitTextures(
+  already_AddRefed<IDirect3DTexture9> InitTextures(
     DeviceManagerD3D9* aDeviceManager,
     const gfx::IntSize &aSize,
     _D3DFORMAT aFormat,
     RefPtr<IDirect3DSurface9>& aSurface,
     D3DLOCKED_RECT& aLockedRect);
 
-  TemporaryRef<IDirect3DTexture9> DataToTexture(
+  already_AddRefed<IDirect3DTexture9> DataToTexture(
     DeviceManagerD3D9* aDeviceManager,
     unsigned char *aData,
     int aStride,
@@ -70,13 +70,13 @@ protected:
 
   // aTexture should be in SYSTEMMEM, returns a texture in the default
   // pool (that is, in video memory).
-  TemporaryRef<IDirect3DTexture9> TextureToTexture(
+  already_AddRefed<IDirect3DTexture9> TextureToTexture(
     DeviceManagerD3D9* aDeviceManager,
     IDirect3DTexture9* aTexture,
     const gfx::IntSize& aSize,
     _D3DFORMAT aFormat);
 
-  TemporaryRef<IDirect3DTexture9> SurfaceToTexture(
+  already_AddRefed<IDirect3DTexture9> SurfaceToTexture(
     DeviceManagerD3D9* aDeviceManager,
     gfxWindowsSurface* aSurface,
     const gfx::IntSize& aSize,
@@ -217,7 +217,7 @@ public:
 
   virtual bool HasInternalBuffer() const override { return true; }
 
-  virtual TemporaryRef<TextureClient>
+  virtual already_AddRefed<TextureClient>
   CreateSimilar(TextureFlags aFlags = TextureFlags::DEFAULT,
                 TextureAllocationFlags aAllocFlags = ALLOC_DEFAULT) const override;
 
@@ -248,6 +248,15 @@ public:
 
   virtual ~SharedTextureClientD3D9();
 
+  // Creates a TextureClient and init width.
+  static already_AddRefed<SharedTextureClientD3D9>
+  Create(ISurfaceAllocator* aAllocator,
+         gfx::SurfaceFormat aFormat,
+         TextureFlags aFlags,
+         IDirect3DTexture9* aTexture,
+         HANDLE aSharedHandle,
+         D3DSURFACE_DESC aDesc);
+
   // TextureClient
 
   virtual bool IsAllocated() const override { return !!mTexture; }
@@ -260,17 +269,6 @@ public:
 
   virtual bool ToSurfaceDescriptor(SurfaceDescriptor& aOutDescriptor) override;
 
-  void InitWith(IDirect3DTexture9* aTexture, HANDLE aSharedHandle, D3DSURFACE_DESC aDesc)
-  {
-    MOZ_ASSERT(!mTexture);
-    mTexture = aTexture;
-    mHandle = aSharedHandle;
-    mDesc = aDesc;
-    if (mTexture) {
-      gfxWindowsPlatform::sD3D9SharedTextureUsed += mDesc.Width * mDesc.Height * 4;
-    }
-  }
-
   virtual gfx::IntSize GetSize() const
   {
     return gfx::IntSize(mDesc.Width, mDesc.Height);
@@ -281,7 +279,7 @@ public:
   // This TextureClient should not be used in a context where we use CreateSimilar
   // (ex. component alpha) because the underlying texture data is always created by
   // an external producer.
-  virtual TemporaryRef<TextureClient>
+  virtual already_AddRefed<TextureClient>
   CreateSimilar(TextureFlags, TextureAllocationFlags) const override { return nullptr; }
 
 private:
@@ -314,7 +312,7 @@ public:
 
   virtual gfx::IntSize GetSize() const override { return mSize; }
 
-  virtual TemporaryRef<gfx::DataSourceSurface> GetAsSurface() override
+  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override
   {
     return nullptr;
   }
@@ -353,7 +351,7 @@ public:
 
   virtual void Unlock() override;
 
-  virtual TemporaryRef<gfx::DataSourceSurface> GetAsSurface() override
+  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override
   {
     return nullptr; // TODO: cf bug 872568
   }
@@ -369,6 +367,43 @@ protected:
   gfx::IntSize mSize;
   bool mIsLocked;
 };
+
+class DXGIYCbCrTextureHostD3D9 : public TextureHost
+{
+public:
+  DXGIYCbCrTextureHostD3D9(TextureFlags aFlags,
+                           const SurfaceDescriptorDXGIYCbCr& aDescriptor);
+
+  virtual TextureSource* GetTextureSources() override;
+
+  virtual void DeallocateDeviceData() override {}
+
+  virtual void SetCompositor(Compositor* aCompositor) override;
+
+  virtual gfx::SurfaceFormat GetFormat() const override { return gfx::SurfaceFormat::YUV; }
+
+  virtual bool Lock() override;
+  virtual void Unlock() override;
+  virtual gfx::IntSize GetSize() const override { return mSize; }
+
+  virtual already_AddRefed<gfx::DataSourceSurface> GetAsSurface() override
+  {
+    return nullptr;
+  }
+
+ protected:
+  IDirect3DDevice9* GetDevice();
+
+  HANDLE mHandles[3];
+  RefPtr<IDirect3DTexture9> mTextures[3];
+  RefPtr<DataTextureSourceD3D9> mTextureSources[3];
+
+  RefPtr<CompositorD3D9> mCompositor;
+  gfx::IntSize mSize;
+  gfx::IntSize mSizeY;
+  gfx::IntSize mSizeCbCr;
+  bool mIsLocked;
+ };
 
 class CompositingRenderTargetD3D9 : public CompositingRenderTarget,
                                     public TextureSourceD3D9

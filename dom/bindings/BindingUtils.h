@@ -1713,10 +1713,10 @@ GetCallbackFromCallbackObject(T& aObj)
 }
 
 static inline bool
-InternJSString(JSContext* cx, jsid& id, const char* chars)
+InternJSString(JSContext* cx, jsid& jid, const char* chars)
 {
   if (JSString *str = ::JS_InternString(cx, chars)) {
-    id = INTERNED_STRING_TO_JSID(cx, str);
+    jid = INTERNED_STRING_TO_JSID(cx, str);
     return true;
   }
   return false;
@@ -2400,12 +2400,17 @@ XrayResolveOwnProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
  * wrapper is the Xray JS object.
  * obj is the target object of the Xray, a binding's instance object or a
  *     interface or interface prototype object.
+ * id and desc are the parameters for the property to be defined.
+ * result is the out-parameter indicating success (read it only if
+ *     this returns true and also sets *defined to true).
  * defined will be set to true if a property was set as a result of this call.
  */
 bool
 XrayDefineProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                    JS::Handle<JSObject*> obj, JS::Handle<jsid> id,
-                   JS::MutableHandle<JSPropertyDescriptor> desc, bool* defined);
+                   JS::MutableHandle<JSPropertyDescriptor> desc,
+                   JS::ObjectOpResult &result,
+                   bool *defined);
 
 /**
  * Add to props the property keys of all indexed or named properties of obj and
@@ -2461,7 +2466,7 @@ XrayGetNativeProto(JSContext* cx, JS::Handle<JSObject*> obj,
   return JS_WrapObject(cx, protop);
 }
 
-extern NativePropertyHooks sWorkerNativePropertyHooks;
+extern NativePropertyHooks sEmptyNativePropertyHooks;
 
 inline bool
 UseDOMXray(JSObject* obj)
@@ -2738,15 +2743,14 @@ public:
   void
   CreateProxyObject(JSContext* aCx, const js::Class* aClass,
                     const DOMProxyHandler* aHandler,
-                    JS::Handle<JSObject*> aProto,
-                    JS::Handle<JSObject*> aParent, T* aNative,
+                    JS::Handle<JSObject*> aProto, T* aNative,
                     JS::MutableHandle<JSObject*> aReflector)
   {
     js::ProxyOptions options;
     options.setClass(aClass);
     JS::Rooted<JS::Value> proxyPrivateVal(aCx, JS::PrivateValue(aNative));
     aReflector.set(js::NewProxyObject(aCx, aHandler, proxyPrivateVal, aProto,
-                                      aParent, options));
+                                      options));
     if (aReflector) {
       mNative = aNative;
       mReflector = aReflector;
@@ -2755,10 +2759,10 @@ public:
 
   void
   CreateObject(JSContext* aCx, const JSClass* aClass,
-               JS::Handle<JSObject*> aProto, JS::Handle<JSObject*> aParent,
+               JS::Handle<JSObject*> aProto,
                T* aNative, JS::MutableHandle<JSObject*> aReflector)
   {
-    aReflector.set(JS_NewObjectWithGivenProto(aCx, aClass, aProto, aParent));
+    aReflector.set(JS_NewObjectWithGivenProto(aCx, aClass, aProto));
     if (aReflector) {
       js::SetReservedSlot(aReflector, DOM_OBJECT_SLOT, JS::PrivateValue(aNative));
       mNative = aNative;
@@ -3046,26 +3050,26 @@ CreateGlobal(JSContext* aCx, T* aNative, nsWrapperCache* aCache,
  */
 class InternedStringId
 {
-  jsid id;
+  jsid jid;
 
  public:
-  InternedStringId() : id(JSID_VOID) {}
+  InternedStringId() : jid(JSID_VOID) {}
 
   bool init(JSContext *cx, const char *string) {
     JSString* str = JS_InternString(cx, string);
     if (!str)
       return false;
-    id = INTERNED_STRING_TO_JSID(cx, str);
+    jid = INTERNED_STRING_TO_JSID(cx, str);
     return true;
   }
 
   operator const jsid& () {
-    return id;
+    return jid;
   }
 
   operator JS::Handle<jsid> () {
     /* This is safe because we have interned the string. */
-    return JS::Handle<jsid>::fromMarkedLocation(&id);
+    return JS::Handle<jsid>::fromMarkedLocation(&jid);
   }
 };
 

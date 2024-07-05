@@ -26,7 +26,7 @@ DtlsIdentity::~DtlsIdentity() {
 
 const std::string DtlsIdentity::DEFAULT_HASH_ALGORITHM = "sha-256";
 
-TemporaryRef<DtlsIdentity> DtlsIdentity::Generate() {
+already_AddRefed<DtlsIdentity> DtlsIdentity::Generate() {
 
   ScopedPK11SlotInfo slot(PK11_GetInternalSlot());
   if (!slot) {
@@ -150,7 +150,9 @@ TemporaryRef<DtlsIdentity> DtlsIdentity::Generate() {
   }
   certificate->derCert = *signedCert;
 
-  return new DtlsIdentity(private_key.forget(), certificate.forget());
+  RefPtr<DtlsIdentity> identity =
+    new DtlsIdentity(private_key.forget(), certificate.forget());
+  return identity.forget();
 }
 
 

@@ -208,6 +208,7 @@ private:
   void GetImageRectString(nsIURI* aURI,
                           const nsStyleSides& aCropRect,
                           nsString& aString);
+  mozilla::dom::CSSValue* GetScrollSnapPoints(const nsStyleCoord& aCoord);
   void AppendTimingFunction(nsDOMCSSValueList *aValueList,
                             const nsTimingFunction& aTimingFunction);
 
@@ -433,6 +434,13 @@ private:
   mozilla::dom::CSSValue* DoGetTransformStyle();
   mozilla::dom::CSSValue* DoGetOrient();
   mozilla::dom::CSSValue* DoGetScrollBehavior();
+  mozilla::dom::CSSValue* DoGetScrollSnapType();
+  mozilla::dom::CSSValue* DoGetScrollSnapTypeX();
+  mozilla::dom::CSSValue* DoGetScrollSnapTypeY();
+  mozilla::dom::CSSValue* DoGetScrollSnapPointsX();
+  mozilla::dom::CSSValue* DoGetScrollSnapPointsY();
+  mozilla::dom::CSSValue* DoGetScrollSnapDestination();
+  mozilla::dom::CSSValue* DoGetScrollSnapCoordinate();
 
   /* User interface properties */
   mozilla::dom::CSSValue* DoGetCursor();
@@ -470,16 +478,21 @@ private:
   mozilla::dom::CSSValue* DoGetAnimationPlayState();
 
   /* CSS Flexbox properties */
-  mozilla::dom::CSSValue* DoGetAlignContent();
-  mozilla::dom::CSSValue* DoGetAlignItems();
-  mozilla::dom::CSSValue* DoGetAlignSelf();
   mozilla::dom::CSSValue* DoGetFlexBasis();
   mozilla::dom::CSSValue* DoGetFlexDirection();
   mozilla::dom::CSSValue* DoGetFlexGrow();
   mozilla::dom::CSSValue* DoGetFlexShrink();
   mozilla::dom::CSSValue* DoGetFlexWrap();
+
+  /* CSS Flexbox/Grid properties */
   mozilla::dom::CSSValue* DoGetOrder();
+
+  /* CSS Box Alignment properties */
+  mozilla::dom::CSSValue* DoGetAlignContent();
+  mozilla::dom::CSSValue* DoGetAlignItems();
+  mozilla::dom::CSSValue* DoGetAlignSelf();
   mozilla::dom::CSSValue* DoGetJustifyContent();
+  mozilla::dom::CSSValue* DoGetJustifyItems();
 
   /* SVG properties */
   mozilla::dom::CSSValue* DoGetFill();

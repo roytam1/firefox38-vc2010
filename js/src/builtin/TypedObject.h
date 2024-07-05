@@ -39,7 +39,7 @@
  * Currently, all "globals" related to typed objects are packaged
  * within a single "module" object `TypedObject`. This module has its
  * own js::Class and when that class is initialized, we also create
- * and define all other values (in `js_InitTypedObjectModuleClass()`).
+ * and define all other values (in `js::InitTypedObjectModuleClass()`).
  *
  * - Type objects, meta type objects, and type representations:
  *
@@ -528,7 +528,8 @@ class TypedObject : public JSObject
                                   MutableHandleObject objp, MutableHandleShape propp);
 
     static bool obj_defineProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
-                                   PropertyOp getter, StrictPropertyOp setter, unsigned attrs);
+                                   PropertyOp getter, StrictPropertyOp setter, unsigned attrs,
+                                   ObjectOpResult &result);
 
     static bool obj_hasProperty(JSContext* cx, HandleObject obj, HandleId id, bool* foundp);
 
@@ -539,12 +540,13 @@ class TypedObject : public JSObject
                                uint32_t index, MutableHandleValue vp);
 
     static bool obj_setProperty(JSContext* cx, HandleObject obj, HandleObject receiver,
-                                HandleId id, MutableHandleValue vp, bool strict);
+                                HandleId id, MutableHandleValue vp, ObjectOpResult &result);
 
     static bool obj_getOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
                                              MutableHandle<JSPropertyDescriptor> desc);
 
-    static bool obj_deleteProperty(JSContext* cx, HandleObject obj, HandleId id, bool* succeeded);
+    static bool obj_deleteProperty(JSContext *cx, HandleObject obj, HandleId id,
+                                   ObjectOpResult &result);
 
     static bool obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties);
 
@@ -1042,10 +1044,10 @@ class LazyArrayBufferTable
     size_t sizeOfIncludingThis(mozilla::MallocSizeOf mallocSizeOf);
 };
 
-} // namespace js
-
 JSObject*
-js_InitTypedObjectModuleObject(JSContext* cx, JS::HandleObject obj);
+InitTypedObjectModuleObject(JSContext* cx, JS::HandleObject obj);
+
+} // namespace js
 
 template <>
 inline bool

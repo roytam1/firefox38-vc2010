@@ -255,6 +255,9 @@ APZEventState::ProcessAPZStateChange(const nsCOMPtr<nsIDocument>& aDocument,
   case APZStateChange::TransformBegin:
   {
     nsIScrollableFrame* sf = nsLayoutUtils::FindScrollableFrameFor(aViewId);
+    if (sf) {
+      sf->SetTransformingByAPZ(true);
+    }
     nsIScrollbarMediator* scrollbarMediator = do_QueryFrame(sf);
     if (scrollbarMediator) {
       scrollbarMediator->ScrollbarActivityStarted();
@@ -272,6 +275,9 @@ APZEventState::ProcessAPZStateChange(const nsCOMPtr<nsIDocument>& aDocument,
   case APZStateChange::TransformEnd:
   {
     nsIScrollableFrame* sf = nsLayoutUtils::FindScrollableFrameFor(aViewId);
+    if (sf) {
+      sf->SetTransformingByAPZ(false);
+    }
     nsIScrollbarMediator* scrollbarMediator = do_QueryFrame(sf);
     if (scrollbarMediator) {
       scrollbarMediator->ScrollbarActivityStopped();

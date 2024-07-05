@@ -15,15 +15,14 @@ TextureClient*
 MacIOSurfaceImage::GetTextureClient(CompositableClient* aClient)
 {
   if (!mTextureClient) {
-    RefPtr<MacIOSurfaceTextureClientOGL> buffer =
-      new MacIOSurfaceTextureClientOGL(aClient->GetForwarder(), TextureFlags::DEFAULT);
-    buffer->InitWith(mSurface);
-    mTextureClient = buffer;
+    mTextureClient = MacIOSurfaceTextureClientOGL::Create(aClient->GetForwarder(),
+                                                          TextureFlags::DEFAULT,
+                                                          mSurface);
   }
   return mTextureClient;
 }
 
-TemporaryRef<gfx::SourceSurface>
+already_AddRefed<gfx::SourceSurface>
 MacIOSurfaceImage::GetAsSourceSurface()
 {
   mSurface->Lock();
@@ -52,5 +51,5 @@ MacIOSurfaceImage::GetAsSourceSurface()
   dataSurface->Unmap();
   mSurface->Unlock();
 
-  return dataSurface;
+  return dataSurface.forget();
 }

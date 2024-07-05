@@ -763,6 +763,11 @@ protected:
   bool ParseGridColumnRow(nsCSSProperty aStartPropID,
                           nsCSSProperty aEndPropID);
   bool ParseGridArea();
+ 
+  // parsing 'align/justify-items/self' from the css-align spec
+  bool ParseAlignJustifyPosition(nsCSSValue& aResult,
+                                 const KTableValue aTable[]);
+  bool ParseJustifyItems();
 
   // for 'clip' and '-moz-image-region'
   bool ParseRect(nsCSSProperty aPropID);
@@ -839,6 +844,10 @@ protected:
   bool ParseMarker();
   bool ParsePaintOrder();
   bool ParseAll();
+  bool ParseScrollSnapType();
+  bool ParseScrollSnapPoints(nsCSSValue& aValue, nsCSSProperty aPropID);
+  bool ParseScrollSnapDestination(nsCSSValue& aValue);
+  bool ParseScrollSnapCoordinate(nsCSSValue& aValue);
 
   /**
    * Parses a variable value from a custom property declaration.
@@ -923,6 +932,19 @@ protected:
   bool ParseNonNegativeInteger(nsCSSValue& aValue)
   {
     return ParseNonNegativeVariant(aValue, VARIANT_INTEGER, nullptr);
+  }
+
+  // Variant parsing methods that are guaranteed to UngetToken any token
+  // consumed on failure
+  bool ParseSingleTokenVariant(nsCSSValue& aValue,
+                               int32_t aVariantMask,
+                               const KTableValue aKeywordTable[])
+  {
+    MOZ_ASSERT(!(aVariantMask & VARIANT_MULTIPLE_TOKENS),
+               "use ParseVariant for variants in VARIANT_MULTIPLE_TOKENS");
+    CSSParseResult result = (CSSParseResult)ParseVariant(aValue, aVariantMask, aKeywordTable);
+    MOZ_ASSERT(result != CSSParseResult::Error);
+    return result == CSSParseResult::Ok;
   }
 
   // http://dev.w3.org/csswg/css-values/#custom-idents
@@ -6679,9 +6701,9 @@ static const nsCSSProperty kBorderBlockEndIDs[] = {
   eCSSProperty_border_block_end_color
 };
 static const nsCSSProperty kColumnRuleIDs[] = {
-  eCSSProperty__moz_column_rule_width,
-  eCSSProperty__moz_column_rule_style,
-  eCSSProperty__moz_column_rule_color
+  eCSSProperty_column_rule_width,
+  eCSSProperty_column_rule_style,
+  eCSSProperty_column_rule_color
 };
 
 bool
@@ -8814,6 +8836,73 @@ CSSParserImpl::ParseGridArea()
   return true;
 }
 
+// [ $aTable && <overflow-position>? ] ?
+// $aTable is for <content-position> or <self-position>
+bool
+CSSParserImpl::ParseAlignJustifyPosition(nsCSSValue& aResult,
+                                         const KTableValue aTable[])
+{
+  nsCSSValue pos, overflowPos;
+  int32_t value = 0;
+  if (ParseEnum(pos, aTable)) {
+    value = pos.GetIntValue();
+    if (ParseEnum(overflowPos, nsCSSProps::kAlignOverflowPosition)) {
+      value |= overflowPos.GetIntValue();
+    }
+    aResult.SetIntValue(value, eCSSUnit_Enumerated);
+    return true;
+  }
+  if (ParseEnum(overflowPos, nsCSSProps::kAlignOverflowPosition)) {
+    if (ParseEnum(pos, aTable)) {
+      aResult.SetIntValue(pos.GetIntValue() | overflowPos.GetIntValue(),
+                          eCSSUnit_Enumerated);
+      return true;
+    }
+    return false; // <overflow-position> must be followed by a value in $table
+  }
+  return true;
+}
+
+// auto | stretch | <baseline-position> |
+// [ <self-position> && <overflow-position>? ] |
+// [ legacy && [ left | right | center ] ]
+bool
+CSSParserImpl::ParseJustifyItems()
+{
+  nsCSSValue value;
+  if (!ParseSingleTokenVariant(value, VARIANT_INHERIT, nullptr)) {
+    if (MOZ_UNLIKELY(ParseEnum(value, nsCSSProps::kAlignLegacy))) {
+      nsCSSValue legacy;
+      if (!ParseEnum(legacy, nsCSSProps::kAlignLegacyPosition)) {
+        return false; // leading 'legacy' not followed by 'left' etc is an error
+      }
+      value.SetIntValue(value.GetIntValue() | legacy.GetIntValue(),
+                        eCSSUnit_Enumerated);
+    } else {
+      if (!ParseEnum(value, nsCSSProps::kAlignAutoStretchBaseline)) {
+        if (!ParseAlignJustifyPosition(value, nsCSSProps::kAlignSelfPosition) ||
+            value.GetUnit() == eCSSUnit_Null) {
+          return false;
+        }
+        // check for a trailing 'legacy' after 'left' etc
+        auto val = value.GetIntValue();
+        if (val == NS_STYLE_JUSTIFY_CENTER ||
+            val == NS_STYLE_JUSTIFY_LEFT   ||
+            val == NS_STYLE_JUSTIFY_RIGHT) {
+          nsCSSValue legacy;
+          if (ParseEnum(legacy, nsCSSProps::kAlignLegacy)) {
+            value.SetIntValue(val | legacy.GetIntValue(), eCSSUnit_Enumerated);
+          }
+        }
+      }
+    }
+  }
+  AppendValue(eCSSProperty_justify_items, value);
+  return true;
+}
+
+
+
 // <color-stop> : <color> [ <percentage> | <length> ]?
 bool
 CSSParserImpl::ParseColorStop(nsCSSValueGradient* aGradient)
@@ -9800,9 +9889,9 @@ CSSParserImpl::ParsePropertyByFunction(nsCSSProperty aPropID)
 
   case eCSSProperty_clip:
     return ParseRect(eCSSProperty_clip);
-  case eCSSProperty__moz_columns:
+  case eCSSProperty_columns:
     return ParseColumns();
-  case eCSSProperty__moz_column_rule:
+  case eCSSProperty_column_rule:
     return ParseBorderSide(kColumnRuleIDs, false);
   case eCSSProperty_content:
     return ParseContent();
@@ -9850,6 +9939,8 @@ CSSParserImpl::ParsePropertyByFunction(nsCSSProperty aPropID)
     return ParseGridArea();
   case eCSSProperty_image_region:
     return ParseRect(eCSSProperty_image_region);
+  case eCSSProperty_justify_items:
+    return ParseJustifyItems();
   case eCSSProperty_list_style:
     return ParseListStyle();
   case eCSSProperty_margin:
@@ -9895,6 +9986,8 @@ CSSParserImpl::ParsePropertyByFunction(nsCSSProperty aPropID)
     return ParsePaintOrder();
   case eCSSProperty_clip_path:
     return ParseClipPath();
+  case eCSSProperty_scroll_snap_type:
+    return ParseScrollSnapType();
   case eCSSProperty_all:
     return ParseAll();
   default:
@@ -9955,6 +10048,14 @@ CSSParserImpl::ParseSingleValueProperty(nsCSSValue& aValue,
         return ParseListStyleType(aValue);
       case eCSSProperty_marks:
         return ParseMarks(aValue);
+      case eCSSProperty_scroll_snap_points_x:
+        return ParseScrollSnapPoints(aValue, eCSSProperty_scroll_snap_points_x);
+      case eCSSProperty_scroll_snap_points_y:
+        return ParseScrollSnapPoints(aValue, eCSSProperty_scroll_snap_points_y);
+      case eCSSProperty_scroll_snap_destination:
+        return ParseScrollSnapDestination(aValue);
+      case eCSSProperty_scroll_snap_coordinate:
+        return ParseScrollSnapCoordinate(aValue);
       case eCSSProperty_text_align:
         return ParseTextAlign(aValue);
       case eCSSProperty_text_align_last:
@@ -10360,8 +10461,8 @@ CSSParserImpl::ParseBackgroundItem(CSSParserImpl::BackgroundParseState& aState)
   return haveSomething;
 }
 
-// This function is very similar to ParseBackgroundPosition and
-// ParseBackgroundSize.
+// This function is very similar to ParseScrollSnapCoordinate,
+// ParseBackgroundPosition, and ParseBackgroundSize.
 bool
 CSSParserImpl::ParseValueList(nsCSSProperty aPropID)
 {
@@ -10436,7 +10537,8 @@ CSSParserImpl::ParseBackgroundRepeatValues(nsCSSValuePair& aValue)
   return false;
 }
 
-// This function is very similar to ParseBackgroundList and ParseBackgroundSize.
+// This function is very similar to ParseScrollSnapCoordinate,
+// ParseBackgroundList, and ParseBackgroundSize.
 bool
 CSSParserImpl::ParseBackgroundPosition()
 {
@@ -10740,8 +10842,8 @@ CSSParserImpl::ParsePositionValue(nsCSSValue& aOut)
   return true;
 }
 
-// This function is very similar to ParseBackgroundList and
-// ParseBackgroundPosition.
+// This function is very similar to ParseScrollSnapCoordinate,
+// ParseBackgroundList, and ParseBackgroundPosition.
 bool
 CSSParserImpl::ParseBackgroundSize()
 {
@@ -11516,8 +11618,8 @@ CSSParserImpl::ParseColumns()
   // find.
   static const nsCSSProperty columnIDs[] = {
     eCSSPropertyExtra_x_auto_value,
-    eCSSProperty__moz_column_count,
-    eCSSProperty__moz_column_width
+    eCSSProperty_column_count,
+    eCSSProperty_column_width
   };
   const int32_t numProps = MOZ_ARRAY_LENGTH(columnIDs);
 
@@ -14815,6 +14917,94 @@ CSSParserImpl::ParseVariableDeclaration(CSSVariableDeclarations::Type* aType,
 
   *aType = type;
   aValue = variableValue;
+  return true;
+}
+
+bool
+CSSParserImpl::ParseScrollSnapType()
+{
+  nsCSSValue value;
+  if (!ParseVariant(value, VARIANT_HK, nsCSSProps::kScrollSnapTypeKTable)) {
+    return false;
+  }
+  AppendValue(eCSSProperty_scroll_snap_type_x, value);
+  AppendValue(eCSSProperty_scroll_snap_type_y, value);
+  return true;
+}
+
+bool
+CSSParserImpl::ParseScrollSnapPoints(nsCSSValue& aValue, nsCSSProperty aPropID)
+{
+  if (ParseVariant(aValue, VARIANT_INHERIT | VARIANT_NONE, nullptr)) {
+    return true;
+  }
+  if (!GetToken(true)) {
+    return false;
+  }
+  if (mToken.mType == eCSSToken_Function &&
+      nsCSSKeywords::LookupKeyword(mToken.mIdent) == eCSSKeyword_repeat) {
+    nsCSSValue lengthValue;
+    if (!ParseNonNegativeVariant(lengthValue,
+                                 VARIANT_LENGTH | VARIANT_PERCENT | VARIANT_CALC,
+                                 nullptr)) {
+      REPORT_UNEXPECTED(PEExpectedNonnegativeNP);
+      SkipUntil(')');
+      return false;
+    }
+    if (!ExpectSymbol(')', true)) {
+      REPORT_UNEXPECTED(PEExpectedCloseParen);
+      SkipUntil(')');
+      return false;
+    }
+    nsRefPtr<nsCSSValue::Array> functionArray =
+      aValue.InitFunction(eCSSKeyword_repeat, 1);
+    functionArray->Item(1) = lengthValue;
+    return true;
+  }
+  return false;
+}
+
+
+bool
+CSSParserImpl::ParseScrollSnapDestination(nsCSSValue& aValue)
+{
+  if (ParseVariant(aValue, VARIANT_INHERIT, nullptr)) {
+    return true;
+  }
+  nsCSSValue itemValue;
+  if (!ParsePositionValue(aValue)) {
+    REPORT_UNEXPECTED_TOKEN(PEExpectedPosition);
+    return false;
+  }
+  return true;
+}
+
+// This function is very similar to ParseBackgroundPosition, ParseBackgroundList
+// and ParseBackgroundSize.
+bool
+CSSParserImpl::ParseScrollSnapCoordinate(nsCSSValue& aValue)
+{
+  if (ParseVariant(aValue, VARIANT_INHERIT | VARIANT_NONE, nullptr)) {
+    return true;
+  }
+  nsCSSValue itemValue;
+  if (!ParsePositionValue(itemValue)) {
+    REPORT_UNEXPECTED_TOKEN(PEExpectedPosition);
+    return false;
+  }
+  nsCSSValueList* item = aValue.SetListValue();
+  for (;;) {
+    item->mValue = itemValue;
+    if (!ExpectSymbol(',', true)) {
+      break;
+    }
+    if (!ParsePositionValue(itemValue)) {
+      REPORT_UNEXPECTED_TOKEN(PEExpectedPosition);
+      return false;
+    }
+    item->mNext = new nsCSSValueList;
+    item = item->mNext;
+  }
   return true;
 }
 

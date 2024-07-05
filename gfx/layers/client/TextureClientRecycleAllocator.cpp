@@ -31,7 +31,7 @@ public:
   }
 
   // Creates and allocates a TextureClient.
-  TemporaryRef<TextureClient>
+  already_AddRefed<TextureClient>
   CreateOrRecycleForDrawing(gfx::SurfaceFormat aFormat,
                             gfx::IntSize aSize,
                             gfx::BackendType aMoz2dBackend,
@@ -132,7 +132,7 @@ TextureClientRecycleAllocatorImp::~TextureClientRecycleAllocatorImp()
   MOZ_ASSERT(mInUseClients.empty());
 }
 
-TemporaryRef<TextureClient>
+already_AddRefed<TextureClient>
 TextureClientRecycleAllocatorImp::CreateOrRecycleForDrawing(
                                              gfx::SurfaceFormat aFormat,
                                              gfx::IntSize aSize,
@@ -193,7 +193,8 @@ TextureClientRecycleAllocatorImp::CreateOrRecycleForDrawing(
     mInUseClients[textureHolder->GetTextureClient()] = textureHolder;
   }
   textureHolder->GetTextureClient()->SetRecycleCallback(TextureClientRecycleAllocatorImp::RecycleCallback, this);
-  return textureHolder->GetTextureClient();
+  RefPtr<TextureClient> client(textureHolder->GetTextureClient());
+  return client.forget();
 }
 
 void
@@ -250,7 +251,7 @@ TextureClientRecycleAllocator::SetMaxPoolSize(uint32_t aMax)
   mAllocator->SetMaxPoolSize(aMax);
 }
 
-TemporaryRef<TextureClient>
+already_AddRefed<TextureClient>
 TextureClientRecycleAllocator::CreateOrRecycleForDrawing(
                                             gfx::SurfaceFormat aFormat,
                                             gfx::IntSize aSize,

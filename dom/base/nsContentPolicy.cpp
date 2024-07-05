@@ -13,6 +13,7 @@
 #include "nsISupports.h"
 #include "nsXPCOM.h"
 #include "nsContentPolicyUtils.h"
+#include "mozilla/dom/nsCSPService.h"
 #include "nsContentPolicy.h"
 #include "nsIURI.h"
 #include "nsIDOMNode.h"
@@ -23,6 +24,7 @@
 #include "nsIDocShell.h"
 #include "nsCOMPtr.h"
 #include "nsIDOMElement.h"
+#include "mozilla/dom/nsMixedContentBlocker.h"
 
 NS_IMPL_ISUPPORTS(nsContentPolicy, nsIContentPolicy)
 
@@ -118,6 +120,21 @@ nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
         }
     }
 
+    nsContentPolicyType externalType =
+        nsContentUtils::InternalContentPolicyTypeToExternal(contentType);
+
+    nsContentPolicyType externalTypeOrMCBInternal =
+        nsContentUtils::InternalContentPolicyTypeToExternalOrMCBInternal(contentType);
+
+    nsContentPolicyType externalTypeOrCSPInternal =
+       nsContentUtils::InternalContentPolicyTypeToExternalOrCSPInternal(contentType);
+
+    nsCOMPtr<nsIContentPolicy> mixedContentBlocker =
+        do_GetService(NS_MIXEDCONTENTBLOCKER_CONTRACTID);
+
+    nsCOMPtr<nsIContentPolicy> cspService =
+      do_GetService(CSPSERVICE_CONTRACTID);
+
     /* 
      * Enumerate mPolicies and ask each of them, taking the logical AND of
      * their permissions.
@@ -156,9 +173,7 @@ nsContentPolicy::CheckPolicy(CPMethod          policyMethod,
         MOZ_ASSERT(window->IsOuterWindow());
 
         if (topFrameElement) {
-            nsCOMPtr<nsIDOMWindow> topWindow;
-            window->GetScriptableTop(getter_AddRefs(topWindow));
-            isTopLevel = topWindow == static_cast<nsIDOMWindow*>(window);
+            nsCOMPtr<nsPIDOMWindow> topWindow = window->GetScriptableTop();
         } else {
             // If we don't have a top frame element, then requestingContext is
             // part of the top-level XUL document. Presumably it's the <browser>

@@ -336,14 +336,14 @@ SurfaceFactory::NewSharedSurface(const gfx::IntSize& size)
     return CreateShared(size);
 }
 
-TemporaryRef<ShSurfHandle>
+already_AddRefed<ShSurfHandle>
 SurfaceFactory::NewShSurfHandle(const gfx::IntSize& size)
 {
     auto surf = NewSharedSurface(size);
     if (!surf)
         return nullptr;
 
-    return new ShSurfHandle(this, Move(surf));
+    return MakeAndAddRef<ShSurfHandle>(this, Move(surf));
 }
 
 // Auto-deletes surfs of the wrong type.

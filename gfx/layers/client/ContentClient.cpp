@@ -59,7 +59,7 @@ static TextureFlags TextureFlagsForRotatedContentBufferFlags(uint32_t aBufferFla
   return result;
 }
 
-/* static */ TemporaryRef<ContentClient>
+/* static */ already_AddRefed<ContentClient>
 ContentClient::CreateContentClient(CompositableForwarder* aForwarder)
 {
   LayersBackend backend = aForwarder->GetCompositorBackendType();
@@ -91,14 +91,14 @@ ContentClient::CreateContentClient(CompositableForwarder* aForwarder)
   }
 
   if (useDoubleBuffering || PR_GetEnv("MOZ_FORCE_DOUBLE_BUFFERING")) {
-    return new ContentClientDoubleBuffered(aForwarder);
+    return MakeAndAddRef<ContentClientDoubleBuffered>(aForwarder);
   }
 #ifdef XP_MACOSX
   if (backend == LayersBackend::LAYERS_OPENGL) {
-    return new ContentClientIncremental(aForwarder);
+    return MakeAndAddRef<ContentClientIncremental>(aForwarder);
   }
 #endif
-  return new ContentClientSingleBuffered(aForwarder);
+  return MakeAndAddRef<ContentClientSingleBuffered>(aForwarder);
 }
 
 void
@@ -1000,7 +1000,7 @@ ContentClientIncremental::Updated(const nsIntRegion& aRegionToDraw,
 
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 ContentClientIncremental::GetUpdateSurface(BufferType aType,
                                            const nsIntRegion& aUpdateRegion)
 {

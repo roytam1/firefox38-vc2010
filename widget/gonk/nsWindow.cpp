@@ -683,7 +683,7 @@ HalFormatToSurfaceFormat(int aHalFormat, int* bytepp)
     }
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 nsWindow::StartRemoteDrawing()
 {
     GonkDisplay* display = GetGonkDisplay();
@@ -710,7 +710,8 @@ nsWindow::StartRemoteDrawing()
         mBackBuffer = mFramebufferTarget->CreateSimilarDrawTarget(
             mFramebufferTarget->GetSize(), mFramebufferTarget->GetFormat());
     }
-    return mBackBuffer;
+    RefPtr<DrawTarget> buffer(mBackBuffer);
+    return buffer.forget();
 }
 
 void

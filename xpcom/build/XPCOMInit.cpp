@@ -114,7 +114,6 @@ extern nsresult nsStringInputStreamConstructor(nsISupports*, REFNSIID, void**);
 #include "mozilla/Services.h"
 #include "mozilla/Omnijar.h"
 #include "mozilla/HangMonitor.h"
-#include "mozilla/Telemetry.h"
 #include "mozilla/BackgroundHangMonitor.h"
 
 #include "nsChromeRegistry.h"
@@ -142,10 +141,6 @@ extern nsresult nsStringInputStreamConstructor(nsISupports*, REFNSIID, void**);
 #endif
 
 #include "ogg/ogg.h"
-
-#ifdef MOZ_WEBM
-#include "nestegg/nestegg.h"
-#endif
 
 #include "GeckoProfiler.h"
 
@@ -450,33 +445,6 @@ NS_IMPL_ISUPPORTS(VPXReporter, nsIMemoryReporter)
 CountingAllocatorBase<VPXReporter>::sAmount(0);
 #endif /* MOZ_VPX */
 
-#ifdef MOZ_WEBM
-class NesteggReporter final
-  : public nsIMemoryReporter
-  , public CountingAllocatorBase<NesteggReporter>
-{
-public:
-  NS_DECL_ISUPPORTS
-
-private:
-  NS_IMETHODIMP
-  CollectReports(nsIHandleReportCallback* aHandleReport, nsISupports* aData,
-                 bool aAnonymize) override
-  {
-    return MOZ_COLLECT_REPORT(
-      "explicit/media/libnestegg", KIND_HEAP, UNITS_BYTES, MemoryAllocated(),
-      "Memory allocated through libnestegg for WebM media files.");
-  }
-
-  ~NesteggReporter() {}
-};
-
-NS_IMPL_ISUPPORTS(NesteggReporter, nsIMemoryReporter)
-
-/* static */ template<> Atomic<size_t>
-CountingAllocatorBase<NesteggReporter>::sAmount(0);
-#endif /* MOZ_WEBM */
-
 // Note that on OSX, aBinDirectory will point to .app/Contents/Resources/browser
 EXPORT_XPCOM_API(nsresult)
 NS_InitXPCOM2(nsIServiceManager** aResult,
@@ -678,13 +646,6 @@ NS_InitXPCOM2(nsIServiceManager** aResult,
                         OggReporter::CountingRealloc,
                         OggReporter::CountingFree);
 
-#ifdef MOZ_WEBM
-  // And for libnestegg.
-  // libnestegg expects that its realloc implementation will free
-  // the pointer argument when a size of 0 is passed in, so we need
-  // the special version of the counting realloc.
-  nestegg_set_halloc_func(NesteggReporter::CountingFreeingRealloc);
-#endif
 
   // Initialize the JS engine.
   if (!JS_Init()) {
@@ -739,11 +700,6 @@ NS_InitXPCOM2(nsIServiceManager** aResult,
 #ifdef MOZ_VPX
   RegisterStrongMemoryReporter(new VPXReporter());
 #endif
-#ifdef MOZ_WEBM
-  RegisterStrongMemoryReporter(new NesteggReporter());
-#endif
-
-  mozilla::Telemetry::Init();
 
   mozilla::HangMonitor::Startup();
   mozilla::BackgroundHangMonitor::Startup();

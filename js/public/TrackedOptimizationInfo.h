@@ -22,6 +22,8 @@ namespace JS {
       "getprop constant")                               \
     _(GetProp_StaticName,                               \
       "getprop static name")                            \
+    _(GetProp_SimdGetter,                               \
+      "getprop SIMD getter")                            \
     _(GetProp_TypedObject,                              \
       "getprop TypedObject")                            \
     _(GetProp_DefiniteSlot,                             \
@@ -148,8 +150,10 @@ namespace JS {
       "TypedObject array of unknown length")                            \
     _(AccessNotDense,                                                   \
       "access not on dense native (check receiver, index, and result types)") \
+    _(AccessNotSimdObject,                                              \
+      "access not on SIMD object (check receiver)")                     \
     _(AccessNotTypedObject,                                             \
-      "access not on typed array (check receiver and index types)")     \
+      "access not on typed object (check receiver and index types)")    \
     _(AccessNotTypedArray,                                              \
       "access not on typed array (check receiver, index, and result types)") \
     _(AccessNotString,                                                  \
@@ -168,6 +172,12 @@ namespace JS {
       "index type must be int32, string, or symbol")                    \
     _(SetElemNonDenseNonTANotCached,                                    \
       "setelem on non-dense non-TAs are not inline cached")             \
+    _(NoSimdJitSupport,                                                 \
+      "SIMD isn't optimized in Ion on this platform yet")               \
+    _(SimdTypeNotOptimized,                                             \
+      "given SIMD type isn't optimized in Ion yet")                     \
+    _(UnknownSimdProperty,                                              \
+      "getelem on an unknown SIMD property ")                           \
                                                                         \
     _(CantInlineGeneric,                                                \
       "can't inline")                                                   \
@@ -207,6 +217,8 @@ namespace JS {
       "can't inline: not hot enough")                                   \
     _(CantInlineNotInDispatch,                                          \
       "can't inline: not in dispatch table")                            \
+    _(CantInlineUnreachable,                                            \
+      "can't inline: unreachable due to incomplete types for this/arguments") \
     _(CantInlineNativeBadForm,                                          \
       "can't inline native: bad form (arity mismatch/constructing)")    \
     _(CantInlineNativeBadType,                                          \
@@ -283,7 +295,8 @@ struct ForEachTrackedOptimizationAttemptOp
 
 JS_PUBLIC_API(void)
 ForEachTrackedOptimizationAttempt(JSRuntime* rt, void* addr,
-                                  ForEachTrackedOptimizationAttemptOp& op);
+                                  ForEachTrackedOptimizationAttemptOp &op,
+                                  JSScript **scriptOut, jsbytecode **pcOut);
 
 struct ForEachTrackedOptimizationTypeInfoOp
 {
@@ -297,15 +310,28 @@ struct ForEachTrackedOptimizationTypeInfoOp
     //                   function.
     //   - "alloc site"  for object types tied to an allocation site.
     //   - "prototype"   for object types tied neither to a constructor nor
-    //                   to an allocation site.
+    //                   to an allocation site, but to a prototype.
+    //   - "singleton"   for object types which only has a single value.
+    //   - "function"    for object types referring to scripted functions.
+    //   - "native"      for object types referring to native functions.
     //
     // The name parameter is the string representation of the type. If the
     // type is keyed by "constructor", or if the type itself refers to a
-    // scripted function, the name is the function's displayAtom.
+    // scripted function, the name is the function's displayAtom. If the type
+    // is keyed by "native", this is nullptr.
     //
-    // If the type is keyed by "constructor", "alloc site", or if the type
-    // itself refers to a scripted function, the location and lineno
-    // parameters will be respectively non-nullptr and non-0.
+    // The location parameter is the filename if the type is keyed by
+    // "constructor", "alloc site", or if the type itself refers to a scripted
+    // function. If the type is keyed by "native", it is the offset of the
+    // native function, suitable for use with addr2line on Linux or atos on OS
+    // X. Otherwise it is nullptr.
+    //
+    // The lineno parameter is the line number if the type is keyed by
+    // "constructor", "alloc site", or if the type itself refers to a scripted
+    // function. Otherwise it is UINT32_MAX.
+    //
+    // The location parameter is the only one that may need escaping if being
+    // quoted.
     virtual void readType(const char* keyedBy, const char* name,
                           const char* location, unsigned lineno) = 0;
 

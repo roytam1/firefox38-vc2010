@@ -6,6 +6,8 @@
 
 #include "jit/JitFrames-inl.h"
 
+#include "mozilla/SizePrintfMacros.h"
+
 #include "jsfun.h"
 #include "jsobj.h"
 #include "jsscript.h"
@@ -896,7 +898,7 @@ HandleException(ResumeFromException* rfe)
 
         if (overrecursed) {
             // We hit an overrecursion error during bailout. Report it now.
-            js_ReportOverRecursed(cx);
+            ReportOverRecursed(cx);
         }
     }
 
@@ -1314,7 +1316,7 @@ MarkJitExitFrame(JSTracer* trc, const JitFrameIterator& frame)
     }
 
     if (frame.isExitFrameLayout<IonOOLNativeExitFrameLayout>()) {
-        IonOOLNativeExitFrameLayout* oolnative =
+        IonOOLNativeExitFrameLayout *oolnative =
             frame.exitFrame()->as<IonOOLNativeExitFrameLayout>();
         gc::MarkJitCodeRoot(trc, oolnative->stubCode(), "ion-ool-native-code");
         gc::MarkValueRoot(trc, oolnative->vp(), "iol-ool-native-vp");
@@ -1323,15 +1325,23 @@ MarkJitExitFrame(JSTracer* trc, const JitFrameIterator& frame)
         return;
     }
 
-    if (frame.isExitFrameLayout<IonOOLPropertyOpExitFrameLayout>()) {
-        IonOOLPropertyOpExitFrameLayout* oolgetter =
-            frame.exitFrame()->as<IonOOLPropertyOpExitFrameLayout>();
+    if (frame.isExitFrameLayout<IonOOLPropertyOpExitFrameLayout>() ||
+        frame.isExitFrameLayout<IonOOLSetterOpExitFrameLayout>())
+    {
+        // A SetterOp frame is a different size, but that's the only relevant
+        // difference between the two. The fields that need marking are all in
+        // the common base class.
+        IonOOLPropertyOpExitFrameLayout *oolgetter =
+            frame.isExitFrameLayout<IonOOLPropertyOpExitFrameLayout>()
+            ? frame.exitFrame()->as<IonOOLPropertyOpExitFrameLayout>()
+            : frame.exitFrame()->as<IonOOLSetterOpExitFrameLayout>();
         gc::MarkJitCodeRoot(trc, oolgetter->stubCode(), "ion-ool-property-op-code");
         gc::MarkValueRoot(trc, oolgetter->vp(), "ion-ool-property-op-vp");
         gc::MarkIdRoot(trc, oolgetter->id(), "ion-ool-property-op-id");
         gc::MarkObjectRoot(trc, oolgetter->obj(), "ion-ool-property-op-obj");
         return;
     }
+
 
     if (frame.isExitFrameLayout<IonOOLProxyExitFrameLayout>()) {
         IonOOLProxyExitFrameLayout* oolproxy = frame.exitFrame()->as<IonOOLProxyExitFrameLayout>();
@@ -2574,7 +2584,7 @@ struct DumpOp {
     void operator()(const Value& v) {
         fprintf(stderr, "  actual (arg %d): ", i_);
 #ifdef DEBUG
-        js_DumpValue(v);
+        DumpValue(v);
 #else
         fprintf(stderr, "?\n");
 #endif
@@ -2591,7 +2601,7 @@ JitFrameIterator::dumpBaseline() const
     if (isFunctionFrame()) {
         fprintf(stderr, "  callee fun: ");
 #ifdef DEBUG
-        js_DumpObject(callee());
+        DumpObject(callee());
 #else
         fprintf(stderr, "?\n");
 #endif
@@ -2599,8 +2609,8 @@ JitFrameIterator::dumpBaseline() const
         fprintf(stderr, "  global frame, no callee\n");
     }
 
-    fprintf(stderr, "  file %s line %u\n",
-            script()->filename(), (unsigned) script()->lineno());
+    fprintf(stderr, "  file %s line %" PRIuSIZE "\n",
+            script()->filename(), script()->lineno());
 
     JSContext* cx = GetJSContextFromJitCode();
     RootedScript script(cx);
@@ -2618,7 +2628,7 @@ JitFrameIterator::dumpBaseline() const
         fprintf(stderr, "  slot %u: ", i);
 #ifdef DEBUG
         Value* v = frame->valueSlot(i);
-        js_DumpValue(*v);
+        DumpValue(*v);
 #else
         fprintf(stderr, "?\n");
 #endif
@@ -2640,7 +2650,7 @@ InlineFrameIterator::dump() const
         isFunction = true;
         fprintf(stderr, "  callee fun: ");
 #ifdef DEBUG
-        js_DumpObject(callee(fallback));
+        DumpObject(callee(fallback));
 #else
         fprintf(stderr, "?\n");
 #endif
@@ -2648,8 +2658,8 @@ InlineFrameIterator::dump() const
         fprintf(stderr, "  global frame, no callee\n");
     }
 
-    fprintf(stderr, "  file %s line %u\n",
-            script()->filename(), (unsigned) script()->lineno());
+    fprintf(stderr, "  file %s line %" PRIuSIZE "\n",
+            script()->filename(), script()->lineno());
 
     fprintf(stderr, "  script = %p, pc = %p\n", (void*) script(), pc());
     fprintf(stderr, "  current op: %s\n", js_CodeName[*pc()]);
@@ -2679,7 +2689,7 @@ InlineFrameIterator::dump() const
         } else
             fprintf(stderr, "  slot %u: ", i);
 #ifdef DEBUG
-        js_DumpValue(si.maybeRead(fallback));
+        DumpValue(si.maybeRead(fallback));
 #else
         fprintf(stderr, "?\n");
 #endif
@@ -2778,9 +2788,9 @@ JitFrameIterator::verifyReturnAddressUsingNativeToBytecodeMap()
 
     JitSpew(JitSpew_Profiling, "Found bytecode location of depth %d:", depth);
     for (size_t i = 0; i < location.length(); i++) {
-        JitSpew(JitSpew_Profiling, "   %s:%d - %d",
+        JitSpew(JitSpew_Profiling, "   %s:%" PRIuSIZE " - %" PRIuSIZE,
                 location[i].script->filename(), location[i].script->lineno(),
-                (int) (location[i].pc - location[i].script->code()));
+                size_t(location[i].pc - location[i].script->code()));
     }
 
     if (type_ == JitFrame_IonJS) {
@@ -2790,14 +2800,15 @@ JitFrameIterator::verifyReturnAddressUsingNativeToBytecodeMap()
             MOZ_ASSERT(idx < location.length());
             MOZ_ASSERT_IF(idx < location.length() - 1, inlineFrames.more());
 
-            JitSpew(JitSpew_Profiling, "Match %d: ION %s:%d(%d) vs N2B %s:%d(%d)",
+            JitSpew(JitSpew_Profiling,
+                    "Match %d: ION %s:%" PRIuSIZE "(%" PRIuSIZE ") vs N2B %s:%" PRIuSIZE "(%" PRIuSIZE ")",
                     (int)idx,
                     inlineFrames.script()->filename(),
                     inlineFrames.script()->lineno(),
-                    inlineFrames.pc() - inlineFrames.script()->code(),
+                    size_t(inlineFrames.pc() - inlineFrames.script()->code()),
                     location[idx].script->filename(),
                     location[idx].script->lineno(),
-                    location[idx].pc - location[idx].script->code());
+                    size_t(location[idx].pc - location[idx].script->code()));
 
             MOZ_ASSERT(inlineFrames.script() == location[idx].script);
 
@@ -2889,7 +2900,6 @@ GetPreviousRawFrame(FrameType* frame)
 
 JitProfilingFrameIterator::JitProfilingFrameIterator(void* exitFrame)
 {
-    // Exit frame was en
     ExitFrameLayout* frame = (ExitFrameLayout*) exitFrame;
     FrameType prevType = frame->prevType();
 

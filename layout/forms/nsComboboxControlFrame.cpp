@@ -46,6 +46,7 @@
 #include "mozilla/LookAndFeel.h"
 #include "mozilla/MouseEvents.h"
 #include "mozilla/unused.h"
+#include "nsIContentInlines.h"
 
 using namespace mozilla;
 using namespace mozilla::gfx;
@@ -1000,6 +1001,9 @@ nsComboboxControlFrame::HandleRedisplayTextEvent()
   mRedisplayTextEvent.Forget();
 
   ActuallyDisplayText(true);
+  if (!weakThis.IsAlive()) {
+    return;
+  }
   // XXXbz This should perhaps be eResize.  Check.
   PresContext()->PresShell()->FrameNeedsReflow(mDisplayFrame,
                                                nsIPresShell::eStyleChange,
@@ -1011,13 +1015,14 @@ nsComboboxControlFrame::HandleRedisplayTextEvent()
 void
 nsComboboxControlFrame::ActuallyDisplayText(bool aNotify)
 {
+  nsCOMPtr<nsIContent> displayContent = mDisplayContent;
   if (mDisplayedOptionText.IsEmpty()) {
     // Have to use a non-breaking space for line-height calculations
     // to be right
     static const char16_t space = 0xA0;
-    mDisplayContent->SetText(&space, 1, aNotify);
+    displayContent->SetText(&space, 1, aNotify);
   } else {
-    mDisplayContent->SetText(mDisplayedOptionText, aNotify);
+    displayContent->SetText(mDisplayedOptionText, aNotify);
   }
 }
 

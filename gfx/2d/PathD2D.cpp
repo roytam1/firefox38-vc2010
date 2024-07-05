@@ -290,7 +290,7 @@ PathBuilderD2D::EnsureActive(const Point &aPoint)
   }
 }
 
-TemporaryRef<Path>
+already_AddRefed<Path>
 PathBuilderD2D::Finish()
 {
   if (mFigureActive) {
@@ -303,16 +303,16 @@ PathBuilderD2D::Finish()
     return nullptr;
   }
 
-  return new PathD2D(mGeometry, mFigureActive, mCurrentPoint, mFillRule, mBackendType);
+  return MakeAndAddRef<PathD2D>(mGeometry, mFigureActive, mCurrentPoint, mFillRule, mBackendType);
 }
 
-TemporaryRef<PathBuilder>
+already_AddRefed<PathBuilder>
 PathD2D::CopyToBuilder(FillRule aFillRule) const
 {
   return TransformedCopyToBuilder(Matrix(), aFillRule);
 }
 
-TemporaryRef<PathBuilder>
+already_AddRefed<PathBuilder>
 PathD2D::TransformedCopyToBuilder(const Matrix &aTransform, FillRule aFillRule) const
 {
   RefPtr<ID2D1PathGeometry> path;

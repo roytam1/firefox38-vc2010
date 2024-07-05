@@ -89,13 +89,13 @@ CompositorD3D9::GetMaxTextureSize() const
   return mDeviceManager ? mDeviceManager->GetMaxTextureSize() : INT32_MAX;
 }
 
-TemporaryRef<DataTextureSource>
+already_AddRefed<DataTextureSource>
 CompositorD3D9::CreateDataTextureSource(TextureFlags aFlags)
 {
-  return new DataTextureSourceD3D9(SurfaceFormat::UNKNOWN, this, aFlags);
+  return MakeAndAddRef<DataTextureSourceD3D9>(SurfaceFormat::UNKNOWN, this, aFlags);
 }
 
-TemporaryRef<CompositingRenderTarget>
+already_AddRefed<CompositingRenderTarget>
 CompositorD3D9::CreateRenderTarget(const gfx::IntRect &aRect,
                                    SurfaceInitMode aInit)
 {
@@ -120,13 +120,10 @@ CompositorD3D9::CreateRenderTarget(const gfx::IntRect &aRect,
     return nullptr;
   }
 
-  RefPtr<CompositingRenderTargetD3D9> rt =
-    new CompositingRenderTargetD3D9(texture, aInit, aRect);
-
-  return rt;
+  return MakeAndAddRef<CompositingRenderTargetD3D9>(texture, aInit, aRect);
 }
 
-TemporaryRef<CompositingRenderTarget>
+already_AddRefed<CompositingRenderTarget>
 CompositorD3D9::CreateRenderTargetFromSource(const gfx::IntRect &aRect,
                                              const CompositingRenderTarget *aSource,
                                              const gfx::IntPoint &aSourcePoint)
@@ -187,12 +184,9 @@ CompositorD3D9::CreateRenderTargetFromSource(const gfx::IntRect &aRect,
     }
   }
 
-  RefPtr<CompositingRenderTargetD3D9> rt =
-    new CompositingRenderTargetD3D9(texture,
-                                    INIT_MODE_NONE,
-                                    aRect);
-
-  return rt;
+  return MakeAndAddRef<CompositingRenderTargetD3D9>(texture,
+                                                    INIT_MODE_NONE,
+                                                    aRect);
 }
 
 void

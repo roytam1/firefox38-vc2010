@@ -151,9 +151,9 @@ private:
   nsresult DoAdmissionDNS();
   nsresult StartWebsocketData();
   uint16_t ResultToCloseCode(nsresult resultCode);
-  void     ReportConnectionTelemetry();
 
   void StopSession(nsresult reason);
+  void DoStopSession(nsresult reason);
   void AbortSession(nsresult reason);
   void ReleaseSession();
   void CleanupConnection();
@@ -272,6 +272,8 @@ private:
   nsCOMPtr<nsIDashboardEventNotifier> mConnectionLogService;
   uint32_t mSerial;
   static uint32_t sSerialSeed;
+
+  mozilla::Mutex mMutex;
 
 // These members are used for network per-app metering (bug 855949)
 // Currently, they are only available on gonk.

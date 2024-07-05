@@ -135,10 +135,8 @@ public:
     }
 
     // Trying to found the top window (equivalent to window.top).
-    nsCOMPtr<nsIDOMWindow> top;
-    window->GetTop(getter_AddRefs(top));
-    if (top) {
-      window = static_cast<nsPIDOMWindow*>(top.get());
+    if (nsCOMPtr<nsPIDOMWindow> top = window->GetTop()) {
+      window = top;
     }
 
     if (window->GetFocusedNode()) {
@@ -2248,8 +2246,7 @@ nsGenericHTMLFormElement::PreHandleEvent(EventChainPreVisitor& aVisitor)
 bool
 nsGenericHTMLFormElement::IsDisabled() const
 {
-  return HasAttr(kNameSpaceID_None, nsGkAtoms::disabled) ||
-         (mFieldSet && mFieldSet->IsDisabled());
+  return State().HasState(NS_EVENT_STATE_DISABLED);
 }
 
 void
@@ -2295,17 +2292,6 @@ nsGenericHTMLFormElement::IntrinsicState() const
   // implement IntrinsicState() and are affected by that attribute.
   EventStates state = nsGenericHTMLElement::IntrinsicState();
 
-  if (CanBeDisabled()) {
-    // :enabled/:disabled
-    if (IsDisabled()) {
-      state |= NS_EVENT_STATE_DISABLED;
-      state &= ~NS_EVENT_STATE_ENABLED;
-    } else {
-      state &= ~NS_EVENT_STATE_DISABLED;
-      state |= NS_EVENT_STATE_ENABLED;
-    }
-  }
-  
   if (mForm && mForm->IsDefaultSubmitElement(this)) {
       NS_ASSERTION(IsSubmitControl(),
                    "Default submit element that isn't a submit control.");
@@ -2568,10 +2554,37 @@ nsGenericHTMLFormElement::UpdateFieldSet(bool aNotify)
   }
 }
 
+void nsGenericHTMLFormElement::UpdateDisabledState(bool aNotify)
+{
+  if (!CanBeDisabled()) {
+    return;
+  }
+
+  bool isDisabled = HasAttr(kNameSpaceID_None, nsGkAtoms::disabled);
+
+  if (!isDisabled && mFieldSet) {
+    isDisabled = mFieldSet->IsDisabled();
+  }
+
+  EventStates disabledStates;
+  if (isDisabled) {
+    disabledStates |= NS_EVENT_STATE_DISABLED;
+  } else {
+    disabledStates |= NS_EVENT_STATE_ENABLED;
+  }
+
+  EventStates oldDisabledStates = State() & DISABLED_STATES;
+  EventStates changedStates = disabledStates ^ oldDisabledStates;
+
+  if (!changedStates.IsEmpty()) {
+    ToggleStates(changedStates, aNotify);
+  }
+}
+
 void
 nsGenericHTMLFormElement::FieldSetDisabledChanged(bool aNotify)
 {
-  UpdateState(aNotify);
+  UpdateDisabledState(aNotify);
 }
 
 bool

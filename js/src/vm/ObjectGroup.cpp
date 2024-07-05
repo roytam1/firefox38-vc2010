@@ -44,6 +44,7 @@ ObjectGroup::finalize(FreeOp* fop)
 {
     fop->delete_(newScriptDontCheckGeneration());
     fop->delete_(maybeUnboxedLayoutDontCheckGeneration());
+    fop->delete_(maybePreliminaryObjectsDontCheckGeneration());
 }
 
 void
@@ -78,12 +79,20 @@ ObjectGroup::setAddendum(AddendumKind kind, void* addendum, bool writeBarrier /*
     MOZ_ASSERT(kind <= (OBJECT_FLAG_ADDENDUM_MASK >> OBJECT_FLAG_ADDENDUM_SHIFT));
 
     if (writeBarrier) {
-        // Manually trigger barriers if we are clearing a TypeNewScript. Other
-        // kinds of addendums are immutable.
-        if (newScript())
+        // Manually trigger barriers if we are clearing new script or
+        // preliminary object information. Other addendums are immutable.
+        switch (addendumKind()) {
+          case Addendum_PreliminaryObjects:
+            PreliminaryObjectArrayWithTemplate::writeBarrierPre(maybePreliminaryObjects());
+            break;
+          case Addendum_NewScript:
             TypeNewScript::writeBarrierPre(newScript());
-        else
-            MOZ_ASSERT(addendumKind() == Addendum_None || addendumKind() == kind);
+            break;
+          case Addendum_None:
+            break;
+          default:
+            MOZ_ASSERT(addendumKind() == kind);
+        }
     }
 
     flags_ &= ~OBJECT_FLAG_ADDENDUM_MASK;
@@ -287,13 +296,6 @@ JSObject::makeLazyGroup(JSContext* cx, HandleObject obj)
     MOZ_ASSERT(obj->hasLazyGroup());
     MOZ_ASSERT(cx->compartment() == obj->compartment());
 
-    /* De-lazification of functions can GC, so we need to do it up here. */
-    if (obj->is<JSFunction>() && obj->as<JSFunction>().isInterpretedLazy()) {
-        RootedFunction fun(cx, &obj->as<JSFunction>());
-        if (!fun->getOrCreateScript(cx))
-            return nullptr;
-    }
-
     // Find flags which need to be specified immediately on the object.
     // Don't track whether singletons are packed.
     ObjectGroupFlags initialFlags = OBJECT_FLAG_NON_PACKED;
@@ -473,13 +475,7 @@ ObjectGroup::defaultNewGroup(ExclusiveContext* cx, const Class* clasp,
         MOZ_ASSERT(!clasp);
 
         // Canonicalize new functions to use the original one associated with its script.
-        JSFunction* fun = &associated->as<JSFunction>();
-        if (fun->hasScript())
-            associated = fun->nonLazyScript()->functionNonDelazifying();
-        else if (fun->isInterpretedLazy() && !fun->isSelfHostedBuiltin())
-            associated = fun->lazyScript()->functionNonDelazifying();
-        else
-            associated = nullptr;
+	associated = associated->as<JSFunction>().maybeCanonicalFunction();
 
         // If we have previously cleared the 'new' script information for this
         // function, don't try to construct another one.
@@ -1136,12 +1132,17 @@ ObjectGroup::allocationSiteGroup(JSContext* cx, JSScript* script, jsbytecode* pc
         return nullptr;
 
     if (JSOp(*pc) == JSOP_NEWOBJECT) {
-        // This object is always constructed the same way and will not be
-        // observed by other code before all properties have been added. Mark
-        // all the properties as definite properties of the object.
-        JSObject* baseobj = script->getObject(GET_UINT32_INDEX(pc));
-        if (!res->addDefiniteProperties(cx, baseobj->lastProperty()))
-            return nullptr;
+        // Keep track of the preliminary objects with this group, so we can try
+        // to use an unboxed layout for the object once some are allocated.
+        Shape *shape = script->getObject(pc)->lastProperty();
+        if (!shape->isEmptyShape()) {
+            PreliminaryObjectArrayWithTemplate *preliminaryObjects =
+                cx->new_<PreliminaryObjectArrayWithTemplate>(shape);
+            if (preliminaryObjects)
+                res->setPreliminaryObjects(preliminaryObjects);
+            else
+                cx->recoverFromOutOfMemory();
+        }
     }
 
     if (!table->add(p, key, res))

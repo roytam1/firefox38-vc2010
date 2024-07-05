@@ -10,7 +10,7 @@
 #include "gfx2DGlue.h"
 #include "gfxPlatform.h"                // for gfxPlatform
 #include "gfxUtils.h"                   // for gfxUtils
-#include "mozilla/RefPtr.h"             // for TemporaryRef
+#include "mozilla/RefPtr.h"             // for already_AddRefed
 #include "mozilla/ipc/CrossProcessMutex.h"  // for CrossProcessMutex, etc
 #include "mozilla/layers/CompositorTypes.h"
 #include "mozilla/layers/ImageBridgeChild.h"  // for ImageBridgeChild
@@ -37,6 +37,7 @@
 #include "gfxWindowsPlatform.h"
 #include <d3d10_1.h>
 #include "D3D9SurfaceImage.h"
+#include "D3D11ShareHandleImage.h"
 #endif
 
 namespace mozilla {
@@ -95,6 +96,10 @@ ImageFactory::CreateImage(ImageFormat aFormat,
   }
 #endif
 #ifdef XP_WIN
+  if (aFormat == ImageFormat::D3D11_SHARE_HANDLE_TEXTURE) {
+    img = new D3D11ShareHandleImage();
+    return img.forget();
+  }
   if (aFormat == ImageFormat::D3D9_RGB32_TEXTURE) {
     img = new D3D9SurfaceImage();
     return img.forget();
@@ -276,7 +281,7 @@ ImageContainer::LockCurrentImage()
   return retval.forget();
 }
 
-TemporaryRef<gfx::SourceSurface>
+already_AddRefed<gfx::SourceSurface>
 ImageContainer::LockCurrentAsSourceSurface(gfx::IntSize *aSize, Image** aCurrentImage)
 {
   ReentrantMonitorAutoEnter mon(mReentrantMonitor);
@@ -299,7 +304,7 @@ ImageContainer::UnlockCurrentImage()
 {
 }
 
-TemporaryRef<gfx::SourceSurface>
+already_AddRefed<gfx::SourceSurface>
 ImageContainer::GetCurrentAsSourceSurface(gfx::IntSize *aSize)
 {
   ReentrantMonitorAutoEnter mon(mReentrantMonitor);
@@ -460,11 +465,12 @@ PlanarYCbCrImage::AllocateAndGetNewBuffer(uint32_t aSize)
   return mBuffer;
 }
 
-TemporaryRef<gfx::SourceSurface>
+already_AddRefed<gfx::SourceSurface>
 PlanarYCbCrImage::GetAsSourceSurface()
 {
   if (mSourceSurface) {
-    return mSourceSurface.get();
+    RefPtr<gfx::SourceSurface> surface(mSourceSurface);
+    return surface.forget();
   }
 
   gfx::IntSize size(mSize);

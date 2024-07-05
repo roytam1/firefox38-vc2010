@@ -422,9 +422,10 @@ dnl ========================================================
 dnl Special win32 checks
 dnl ========================================================
 
-# Target the Windows 7 SDK by default
-WINSDK_TARGETVER=601
+# Target the Windows 8.1 SDK by default
+WINSDK_TARGETVER=602
 WINVER=502
+MOZ_USE_D2D=
 
 MOZ_ARG_WITH_STRING(windows-version,
 [  --with-windows-version=WINSDK_TARGETVER
@@ -432,16 +433,24 @@ MOZ_ARG_WITH_STRING(windows-version,
                           currently the minimum supported version.],
   WINSDK_TARGETVER=$withval)
 
-# Currently only versions 603 are allowed
+# Currently only version 601 to 603 are allowed
 case "$WINSDK_TARGETVER" in
-601|603)
+601)
     MOZ_WINSDK_TARGETVER=0${WINSDK_TARGETVER}0000
     ;;
-
+602|603)
+    MOZ_WINSDK_TARGETVER=0${WINSDK_TARGETVER}0000
+    MOZ_USE_D2D=1
+    CFLAGS="$CFLAGS -DUSE_D2D1_1"
+    CXXFLAGS="$CXXFLAGS -DUSE_D2D1_1"
+    ;;
 *)
     AC_MSG_ERROR([Invalid value for --with-windows-version ($WINSDK_TARGETVER)]);
     ;;
 esac
+
+AC_DEFINE(MOZ_USE_D2D)
+AC_SUBST(MOZ_USE_D2D)
 
 case "$target" in
 *-mingw*)
@@ -1255,6 +1264,18 @@ dnl computed above.
 dnl ========================================================
 
 MOZ_ANDROID_STLPORT
+
+dnl ========================================================
+dnl = Nightly build
+dnl ========================================================
+MOZ_ARG_ENABLE_BOOL(nightly-build,
+[  --enable-nightly-build       Enable Nightly build (default=no)],
+    NIGHTLY_BUILD=1,
+    NIGHTLY_BUILD= )
+if test -n "$NIGHTLY_BUILD"; then
+    AC_DEFINE(NIGHTLY_BUILD)
+fi
+AC_SUBST(NIGHTLY_BUILD)
 
 dnl ========================================================
 dnl Suppress Clang Argument Warnings
@@ -8078,6 +8099,7 @@ dnl ========================================================
 dnl Skia
 dnl ========================================================
 if test "$MOZ_ENABLE_SKIA"; then
+  SKIA_INCLUDES="/gfx/skia /gfx/skia/skia/include/config /gfx/skia/skia/include/core"
   AC_DEFINE(MOZ_ENABLE_SKIA)
   AC_DEFINE(USE_SKIA)
   if test "${MOZ_WIDGET_TOOLKIT}" = "android" -o x"$MOZ_WIDGET_TOOLKIT" = x"gonk"; then
@@ -8085,12 +8107,14 @@ if test "$MOZ_ENABLE_SKIA"; then
   fi
 
   if test "${CPU_ARCH}" != "ppc" -a "${CPU_ARCH}" != "ppc64" -a "${CPU_ARCH}" != "sparc" -a -z "$MOZ_DISABLE_SKIA_GPU" ; then
+    SKIA_INCLUDES="$SKIA_INCLUDES /gfx/skia/skia/include/gpu /gfx/skia/skia/include/utils"
     MOZ_ENABLE_SKIA_GPU=1
     AC_DEFINE(USE_SKIA_GPU)
     AC_SUBST(MOZ_ENABLE_SKIA_GPU)
   fi
 fi
 AC_SUBST(MOZ_ENABLE_SKIA)
+AC_SUBST_LIST(SKIA_INCLUDES)
 
 dnl ========================================================
 dnl disable xul

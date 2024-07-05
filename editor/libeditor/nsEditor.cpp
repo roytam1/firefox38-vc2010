@@ -168,7 +168,14 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN(nsEditor)
  NS_IMPL_CYCLE_COLLECTION_UNLINK(mEditorObservers)
  NS_IMPL_CYCLE_COLLECTION_UNLINK(mDocStateListeners)
  NS_IMPL_CYCLE_COLLECTION_UNLINK(mEventTarget)
- NS_IMPL_CYCLE_COLLECTION_UNLINK(mEventListener)
+
+ if (tmp->mEventListener) {
+   nsEditorEventListener* listener =
+    reinterpret_cast<nsEditorEventListener*>(tmp->mEventListener.get());
+   listener->Disconnect();
+   tmp->mEventListener = nullptr;
+ }
+
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN(nsEditor)
@@ -929,23 +936,13 @@ nsEditor::EndPlaceHolderTransaction()
       selection->SetCanCacheFrameOffset(true);
     }
 
-    {
-      // Hide the caret here to avoid hiding it twice, once in EndUpdateViewBatch
-      // and once in ScrollSelectionIntoView.
-      nsRefPtr<nsCaret> caret;
-      nsCOMPtr<nsIPresShell> presShell = GetPresShell();
+    // time to turn off the batch
+    EndUpdateViewBatch();
+    // make sure selection is in view
 
-      if (presShell)
-        caret = presShell->GetCaret();
-
-      // time to turn off the batch
-      EndUpdateViewBatch();
-      // make sure selection is in view
-
-      // After ScrollSelectionIntoView(), the pending notifications might be
-      // flushed and PresShell/PresContext/Frames may be dead. See bug 418470.
-      ScrollSelectionIntoView(false);
-    }
+    // After ScrollSelectionIntoView(), the pending notifications might be
+    // flushed and PresShell/PresContext/Frames may be dead. See bug 418470.
+    ScrollSelectionIntoView(false);
 
     // cached for frame offset are Not available now
     if (selection) {

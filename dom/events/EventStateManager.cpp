@@ -479,10 +479,13 @@ EventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     return NS_ERROR_NULL_POINTER;
   }
 
+#if(0)
+// This is obnoxious, and seems to no longer be relevant.
   NS_WARN_IF_FALSE(!aTargetFrame ||
                    !aTargetFrame->GetContent() ||
                    aTargetFrame->GetContent() == aTargetContent,
                    "aTargetContent should be related with aTargetFrame");
+#endif
 
   mCurrentTarget = aTargetFrame;
   mCurrentTargetContent = nullptr;
@@ -2449,13 +2452,16 @@ EventStateManager::DoScrollText(nsIScrollableFrame* aScrollableFrame,
     actualDevPixelScrollAmount.y = 0;
   }
 
+  nsIScrollableFrame::ScrollSnapMode snapMode = nsIScrollableFrame::DISABLE_SNAP;
   nsIAtom* origin = nullptr;
   switch (aEvent->deltaMode) {
     case nsIDOMWheelEvent::DOM_DELTA_LINE:
       origin = nsGkAtoms::mouseWheel;
+      snapMode = nsIScrollableFrame::ENABLE_SNAP;
       break;
     case nsIDOMWheelEvent::DOM_DELTA_PAGE:
       origin = nsGkAtoms::pages;
+      snapMode = nsIScrollableFrame::ENABLE_SNAP;
       break;
     case nsIDOMWheelEvent::DOM_DELTA_PIXEL:
       origin = nsGkAtoms::pixels;
@@ -2508,10 +2514,14 @@ EventStateManager::DoScrollText(nsIScrollableFrame* aScrollableFrame,
       MOZ_CRASH("Invalid scrollType value comes");
   }
 
+  nsIScrollableFrame::ScrollMomentum momentum =
+    aEvent->isMomentum ? nsIScrollableFrame::SYNTHESIZED_MOMENTUM_EVENT
+                       : nsIScrollableFrame::NOT_MOMENTUM;
+
   nsIntPoint overflow;
   aScrollableFrame->ScrollBy(actualDevPixelScrollAmount,
                              nsIScrollableFrame::DEVICE_PIXELS,
-                             mode, &overflow, origin, aEvent->isMomentum);
+                             mode, &overflow, origin, momentum, snapMode);
 
   if (!scrollFrameWeak.IsAlive()) {
     // If the scroll causes changing the layout, we can think that the event
@@ -2950,17 +2960,17 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
         EnsureDocument(mPresContext);
         nsIFocusManager* fm = nsFocusManager::GetFocusManager();
         if (mDocument && fm) {
-          nsCOMPtr<nsIDOMWindow> currentWindow;
-          fm->GetFocusedWindow(getter_AddRefs(currentWindow));
+          nsCOMPtr<nsIDOMWindow> window;
+          fm->GetFocusedWindow(getter_AddRefs(window));
+          nsCOMPtr<nsPIDOMWindow> currentWindow = do_QueryInterface(window);
           if (currentWindow && mDocument->GetWindow() &&
               currentWindow != mDocument->GetWindow() &&
               !nsContentUtils::IsChromeDoc(mDocument)) {
-            nsCOMPtr<nsIDOMWindow> currentTop;
-            nsCOMPtr<nsIDOMWindow> newTop;
-            currentWindow->GetTop(getter_AddRefs(currentTop));
-            mDocument->GetWindow()->GetTop(getter_AddRefs(newTop));
-            nsCOMPtr<nsPIDOMWindow> win = do_QueryInterface(currentWindow);
-            nsCOMPtr<nsIDocument> currentDoc = win->GetExtantDoc();
+            nsCOMPtr<nsPIDOMWindow> currentTop;
+            nsCOMPtr<nsPIDOMWindow> newTop;
+            currentTop = currentWindow->GetTop();
+            newTop = mDocument->GetWindow()->GetTop();
+            nsCOMPtr<nsIDocument> currentDoc = currentWindow->GetExtantDoc();
             if (nsContentUtils::IsChromeDoc(currentDoc) ||
                 (currentTop && newTop && currentTop != newTop)) {
               fm->SetFocusedWindow(mDocument->GetWindow());
@@ -3012,6 +3022,13 @@ EventStateManager::PostHandleEvent(nsPresContext* aPresContext,
     {
       MOZ_ASSERT(aEvent->mFlags.mIsTrusted);
       ScrollbarsForWheel::MayInactivate();
+      WidgetWheelEvent* wheelEvent = aEvent->AsWheelEvent();
+      nsIScrollableFrame* scrollTarget =
+        ComputeScrollTarget(aTargetFrame, wheelEvent,
+                            COMPUTE_DEFAULT_ACTION_TARGET);
+      if (scrollTarget) {
+        scrollTarget->ScrollSnap();
+      }
     }
     break;
   case NS_WHEEL_WHEEL:
@@ -3713,12 +3730,15 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
     return nullptr;
   }
 
+  nsCOMPtr<nsIContent> targetContent = aTargetContent;
+  nsCOMPtr<nsIContent> relatedContent = aRelatedContent;
+
   nsAutoPtr<WidgetMouseEvent> dispatchEvent;
   CreateMouseOrPointerWidgetEvent(aMouseEvent, aMessage,
-                                  aRelatedContent, dispatchEvent);
+                                  relatedContent, dispatchEvent);
 
   nsWeakFrame previousTarget = mCurrentTarget;
-  mCurrentTargetContent = aTargetContent;
+  mCurrentTargetContent = targetContent;
 
   nsIFrame* targetFrame = nullptr;
 
@@ -3728,22 +3748,22 @@ EventStateManager::DispatchMouseOrPointerEvent(WidgetMouseEvent* aMouseEvent,
   }
 
   nsEventStatus status = nsEventStatus_eIgnore;
-  ESMEventCB callback(aTargetContent);
-  EventDispatcher::Dispatch(aTargetContent, mPresContext, dispatchEvent, nullptr,
+  ESMEventCB callback(targetContent);
+  EventDispatcher::Dispatch(targetContent, mPresContext, dispatchEvent, nullptr,
                             &status, &callback);
 
   if (mPresContext) {
     // Although the primary frame was checked in event callback, it may not be
     // the same object after event dispatch and handling, so refetch it.
-    targetFrame = mPresContext->GetPrimaryFrameFor(aTargetContent);
+    targetFrame = mPresContext->GetPrimaryFrameFor(targetContent);
 
     // If we are leaving remote content, dispatch a mouse exit event to the
     // remote frame.
-    if (aMessage == NS_MOUSE_EXIT_SYNTH && IsRemoteTarget(aTargetContent)) {
+    if (aMessage == NS_MOUSE_EXIT_SYNTH && IsRemoteTarget(targetContent)) {
       // For remote content, send a normal widget mouse exit event.
       nsAutoPtr<WidgetMouseEvent> remoteEvent;
       CreateMouseOrPointerWidgetEvent(aMouseEvent, NS_MOUSE_EXIT,
-                                      aRelatedContent, remoteEvent);
+                                       relatedContent, remoteEvent);
 
       // mCurrentTarget is set to the new target, so we must reset it to the
       // old target and then dispatch a cross-process event. (mCurrentTarget

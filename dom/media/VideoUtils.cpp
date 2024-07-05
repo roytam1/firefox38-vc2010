@@ -12,7 +12,6 @@
 #include "SharedThreadPool.h"
 #include "mozilla/Preferences.h"
 #include "mozilla/Base64.h"
-#include "mozilla/Telemetry.h"
 #include "mozilla/Function.h"
 #include "nsIRandomGenerator.h"
 #include "nsIServiceManager.h"
@@ -36,6 +35,13 @@ static inline CheckedInt64 SaferMultDiv(int64_t aValue, uint32_t aMul, uint32_t 
 // audio rate.
 CheckedInt64 FramesToUsecs(int64_t aFrames, uint32_t aRate) {
   return SaferMultDiv(aFrames, USECS_PER_S, aRate);
+}
+
+media::TimeUnit FramesToTimeUnit(int64_t aFrames, uint32_t aRate) {
+  int64_t major = aFrames / aRate;
+  int64_t remainder = aFrames % aRate;
+  return media::TimeUnit::FromMicroseconds(major) * USECS_PER_S +
+    (media::TimeUnit::FromMicroseconds(remainder) * USECS_PER_S) / aRate;
 }
 
 // Converts from microseconds to number of audio frames, given the specified
@@ -215,7 +221,7 @@ IsValidVideoRegion(const nsIntSize& aFrame, const nsIntRect& aPicture,
     aDisplay.width * aDisplay.height != 0;
 }
 
-TemporaryRef<SharedThreadPool> GetMediaThreadPool(MediaThreadType aType)
+already_AddRefed<SharedThreadPool> GetMediaThreadPool(MediaThreadType aType)
 {
   const char *name;
   switch (aType) {
@@ -268,24 +274,6 @@ ExtractH264CodecDetails(const nsAString& aCodec,
   } else if (aLevel <= 5) {
     aLevel *= 10;
   }
-
-  // Capture the constraint_set flag value for the purpose of Telemetry.
-  // We don't NS_ENSURE_SUCCESS here because ExtractH264CodecDetails doesn't
-  // care about this, but we make sure constraints is above 4 (constraint_set5_flag)
-  // otherwise collect 0 for unknown.
-  uint8_t constraints = PromiseFlatString(Substring(aCodec, 7, 2)).ToInteger(&rv, 16);
-  Telemetry::Accumulate(Telemetry::VIDEO_CANPLAYTYPE_H264_CONSTRAINT_SET_FLAG,
-                        constraints >= 4 ? constraints : 0);
-
-  // 244 is the highest meaningful profile value (High 4:4:4 Intra Profile)
-  // that can be represented as single hex byte, otherwise collect 0 for unknown.
-  Telemetry::Accumulate(Telemetry::VIDEO_CANPLAYTYPE_H264_PROFILE,
-                        aProfile <= 244 ? aProfile : 0);
-
-  // Make sure aLevel represents a value between levels 1 and 5.2,
-  // otherwise collect 0 for unknown.
-  Telemetry::Accumulate(Telemetry::VIDEO_CANPLAYTYPE_H264_LEVEL,
-                        (aLevel >= 10 && aLevel <= 52) ? aLevel : 0);
 
   return true;
 }

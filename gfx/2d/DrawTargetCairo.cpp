@@ -652,11 +652,12 @@ DrawTargetCairo::GetSize()
   return mSize;
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetCairo::Snapshot()
 {
   if (mSnapshot) {
-    return mSnapshot;
+    RefPtr<SourceSurface> snapshot(mSnapshot);
+    return snapshot.forget();
   }
 
   IntSize size = GetSize();
@@ -665,7 +666,8 @@ DrawTargetCairo::Snapshot()
                                      size,
                                      GfxFormatForCairoSurface(mSurface),
                                      this);
-  return mSnapshot;
+  RefPtr<SourceSurface> snapshot(mSnapshot);
+  return snapshot.forget();
 }
 
 bool
@@ -1321,10 +1323,10 @@ DrawTargetCairo::PopClip()
              "Transforms are out of sync");
 }
 
-TemporaryRef<PathBuilder>
+already_AddRefed<PathBuilder>
 DrawTargetCairo::CreatePathBuilder(FillRule aFillRule /* = FillRule::FILL_WINDING */) const
 {
-  return new PathBuilderCairo(aFillRule);
+  return MakeAndAddRef<PathBuilderCairo>(aFillRule);
 }
 
 void
@@ -1340,20 +1342,20 @@ DrawTargetCairo::ClearSurfaceForUnboundedSource(const CompositionOp &aOperator)
 }
 
 
-TemporaryRef<GradientStops>
+already_AddRefed<GradientStops>
 DrawTargetCairo::CreateGradientStops(GradientStop *aStops, uint32_t aNumStops,
                                      ExtendMode aExtendMode) const
 {
-  return new GradientStopsCairo(aStops, aNumStops, aExtendMode);
+  return MakeAndAddRef<GradientStopsCairo>(aStops, aNumStops, aExtendMode);
 }
 
-TemporaryRef<FilterNode>
+already_AddRefed<FilterNode>
 DrawTargetCairo::CreateFilter(FilterType aType)
 {
   return FilterNodeSoftware::Create(aType);
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetCairo::CreateSourceSurfaceFromData(unsigned char *aData,
                                              const IntSize &aSize,
                                              int32_t aStride,
@@ -1395,24 +1397,25 @@ DestroyPixmap(void *data)
 }
 #endif
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetCairo::OptimizeSourceSurface(SourceSurface *aSurface) const
 {
+  RefPtr<SourceSurface> surface(aSurface);
 #ifdef CAIRO_HAS_XLIB_SURFACE
   cairo_surface_type_t ctype = cairo_surface_get_type(mSurface);
   if (aSurface->GetType() == SurfaceType::CAIRO &&
       cairo_surface_get_type(
         static_cast<SourceSurfaceCairo*>(aSurface)->GetSurface()) == ctype) {
-    return aSurface;
+    return surface.forget();
   }
 
   if (ctype != CAIRO_SURFACE_TYPE_XLIB) {
-    return aSurface;
+    return surface.forget();
   }
 
   IntSize size = aSurface->GetSize();
   if (!size.width || !size.height) {
-    return aSurface;
+    return surface.forget();
   }
 
   // Although the dimension parameters in the xCreatePixmapReq wire protocol are
@@ -1422,7 +1425,7 @@ DrawTargetCairo::OptimizeSourceSurface(SourceSurface *aSurface) const
 
   if (size.width > XLIB_IMAGE_SIDE_SIZE_LIMIT ||
       size.height > XLIB_IMAGE_SIDE_SIZE_LIMIT) {
-    return aSurface;
+    return surface.forget();
   }
 
   SurfaceFormat format = aSurface->GetFormat();
@@ -1440,17 +1443,17 @@ DrawTargetCairo::OptimizeSourceSurface(SourceSurface *aSurface) const
     xrenderFormat = XRenderFindStandardFormat(dpy, PictStandardA8);
     break;
   default:
-    return aSurface;
+    return surface.forget();
   }
   if (!xrenderFormat) {
-    return aSurface;
+    return surface.forget();
   }
 
   Drawable pixmap = XCreatePixmap(dpy, RootWindowOfScreen(screen),
                                   size.width, size.height,
                                   xrenderFormat->depth);
   if (!pixmap) {
-    return aSurface;
+    return surface.forget();
   }
 
   ScopedDeletePtr<DestroyPixmapClosure> closure(
@@ -1461,7 +1464,7 @@ DrawTargetCairo::OptimizeSourceSurface(SourceSurface *aSurface) const
                                                   screen, xrenderFormat,
                                                   size.width, size.height));
   if (!csurf || cairo_surface_status(csurf)) {
-    return aSurface;
+    return surface.forget();
   }
 
   cairo_surface_set_user_data(csurf, &gDestroyPixmapKey,
@@ -1469,7 +1472,7 @@ DrawTargetCairo::OptimizeSourceSurface(SourceSurface *aSurface) const
 
   RefPtr<DrawTargetCairo> dt = new DrawTargetCairo();
   if (!dt->Init(csurf, size, &format)) {
-    return aSurface;
+    return surface.forget();
   }
 
   dt->CopySurface(aSurface,
@@ -1477,13 +1480,13 @@ DrawTargetCairo::OptimizeSourceSurface(SourceSurface *aSurface) const
                   IntPoint(0, 0));
   dt->Flush();
 
-  return new SourceSurfaceCairo(csurf, size, format);
+  surface = new SourceSurfaceCairo(csurf, size, format);
 #endif
 
-  return aSurface;
+  return surface.forget();
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetCairo::CreateSourceSurfaceFromNativeSurface(const NativeSurface &aSurface) const
 {
   if (aSurface.mType == NativeSurfaceType::CAIRO_SURFACE) {
@@ -1493,13 +1496,13 @@ DrawTargetCairo::CreateSourceSurfaceFromNativeSurface(const NativeSurface &aSurf
       return nullptr;
     }
     cairo_surface_t* surf = static_cast<cairo_surface_t*>(aSurface.mSurface);
-    return new SourceSurfaceCairo(surf, aSurface.mSize, aSurface.mFormat);
+    return MakeAndAddRef<SourceSurfaceCairo>(surf, aSurface.mSize, aSurface.mFormat);
   }
 
   return nullptr;
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 DrawTargetCairo::CreateSimilarDrawTarget(const IntSize &aSize, SurfaceFormat aFormat) const
 {
   cairo_surface_t* similar = cairo_surface_create_similar(mSurface,
@@ -1551,7 +1554,7 @@ DrawTargetCairo::InitAlreadyReferenced(cairo_surface_t* aSurface, const IntSize&
   return true;
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 DrawTargetCairo::CreateShadowDrawTarget(const IntSize &aSize, SurfaceFormat aFormat,
                                         float aSigma) const
 {

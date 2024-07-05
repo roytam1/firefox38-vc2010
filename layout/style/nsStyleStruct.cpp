@@ -1419,6 +1419,7 @@ nsStylePosition::nsStylePosition(void)
   mAlignContent = NS_STYLE_ALIGN_CONTENT_STRETCH;
   mAlignItems = NS_STYLE_ALIGN_ITEMS_INITIAL_VALUE;
   mAlignSelf = NS_STYLE_ALIGN_SELF_AUTO;
+  mJustifyItems = NS_STYLE_JUSTIFY_AUTO;
   mFlexDirection = NS_STYLE_FLEX_DIRECTION_ROW;
   mFlexWrap = NS_STYLE_FLEX_WRAP_NOWRAP;
   mJustifyContent = NS_STYLE_JUSTIFY_CONTENT_FLEX_START;
@@ -1458,6 +1459,7 @@ nsStylePosition::nsStylePosition(const nsStylePosition& aSource)
   , mAlignContent(aSource.mAlignContent)
   , mAlignItems(aSource.mAlignItems)
   , mAlignSelf(aSource.mAlignSelf)
+  , mJustifyItems(aSource.mJustifyItems)
   , mFlexDirection(aSource.mFlexDirection)
   , mFlexWrap(aSource.mFlexWrap)
   , mJustifyContent(aSource.mJustifyContent)
@@ -1568,9 +1570,10 @@ nsChangeHint nsStylePosition::CalcDifference(const nsStylePosition& aOther) cons
     return NS_CombineHint(hint, nsChangeHint_AllReflowHints);
   }
 
-  // Changing justify-content on a flexbox might affect the positioning of its
-  // children, but it won't affect any sizing.
-  if (mJustifyContent != aOther.mJustifyContent) {
+  // Changing 'justify-content/items' might affect the positioning,
+  // but it won't affect any sizing.
+  if (mJustifyContent != aOther.mJustifyContent ||
+      mJustifyItems != aOther.mJustifyItems) {
     NS_UpdateHint(hint, nsChangeHint_NeedReflow);
   }
 
@@ -1637,6 +1640,24 @@ nsStylePosition::WidthCoordDependsOnContainer(const nsStyleCoord &aCoord)
          (aCoord.GetUnit() == eStyleUnit_Enumerated &&
           (aCoord.GetIntValue() == NS_STYLE_WIDTH_FIT_CONTENT ||
            aCoord.GetIntValue() == NS_STYLE_WIDTH_AVAILABLE));
+}
+uint8_t
+nsStylePosition::ComputedJustifyItems(const nsStyleDisplay* aDisplay,
+                                      nsStyleContext* aParent) const
+{
+  if (mJustifyItems != NS_STYLE_JUSTIFY_AUTO) {
+    return mJustifyItems;
+  }
+  if (MOZ_LIKELY(aParent)) {
+    auto inheritedJustifyItems =
+      aParent->StylePosition()->ComputedJustifyItems(aParent->StyleDisplay(),
+                                                     aParent->GetParent());
+    if (inheritedJustifyItems & NS_STYLE_JUSTIFY_LEGACY) {
+      return inheritedJustifyItems;
+    }
+  }
+  return aDisplay->IsFlexOrGridDisplayType() ? NS_STYLE_JUSTIFY_STRETCH
+                                             : NS_STYLE_JUSTIFY_START;
 }
 
 // --------------------
@@ -2283,6 +2304,17 @@ nsStyleBackground::Position::SetInitialPercentValues(float aPercentVal)
   mYPosition.mHasPercent = true;
 }
 
+void
+nsStyleBackground::Position::SetInitialZeroValues()
+{
+  mXPosition.mPercent = 0;
+  mXPosition.mLength = 0;
+  mXPosition.mHasPercent = false;
+  mYPosition.mPercent = 0;
+  mYPosition.mLength = 0;
+  mYPosition.mHasPercent = false;
+}
+
 bool
 nsStyleBackground::Size::DependsOnPositioningAreaSize(const nsStyleImage& aImage) const
 {
@@ -2594,6 +2626,12 @@ nsStyleDisplay::nsStyleDisplay()
   mIsolation = NS_STYLE_ISOLATION_AUTO;
   mTouchAction = NS_STYLE_TOUCH_ACTION_AUTO;
   mScrollBehavior = NS_STYLE_SCROLL_BEHAVIOR_AUTO;
+  mScrollSnapTypeX = NS_STYLE_SCROLL_SNAP_TYPE_NONE;
+  mScrollSnapTypeY = NS_STYLE_SCROLL_SNAP_TYPE_NONE;
+  mScrollSnapPointsX.SetNoneValue();
+  mScrollSnapPointsY.SetNoneValue();
+  // Initial value for mScrollSnapDestination is "0px 0px"
+  mScrollSnapDestination.SetInitialZeroValues();
 
   mTransitions.AppendElement();
   MOZ_ASSERT(mTransitions.Length() == 1,
@@ -2644,6 +2682,12 @@ nsStyleDisplay::nsStyleDisplay(const nsStyleDisplay& aSource)
   , mWillChange(aSource.mWillChange)
   , mTouchAction(aSource.mTouchAction)
   , mScrollBehavior(aSource.mScrollBehavior)
+  , mScrollSnapTypeX(aSource.mScrollSnapTypeX)
+  , mScrollSnapTypeY(aSource.mScrollSnapTypeY)
+  , mScrollSnapPointsX(aSource.mScrollSnapPointsX)
+  , mScrollSnapPointsY(aSource.mScrollSnapPointsY)
+  , mScrollSnapDestination(aSource.mScrollSnapDestination)
+  , mScrollSnapCoordinate(aSource.mScrollSnapCoordinate)
   , mBackfaceVisibility(aSource.mBackfaceVisibility)
   , mTransformStyle(aSource.mTransformStyle)
   , mSpecifiedTransform(aSource.mSpecifiedTransform)
@@ -2684,12 +2728,19 @@ nsChangeHint nsStyleDisplay::CalcDifference(const nsStyleDisplay& aOther) const
       || mOverflowX != aOther.mOverflowX
       || mOverflowY != aOther.mOverflowY
       || mScrollBehavior != aOther.mScrollBehavior
+      || mScrollSnapTypeX != aOther.mScrollSnapTypeX
+      || mScrollSnapTypeY != aOther.mScrollSnapTypeY
+      || mScrollSnapPointsX != aOther.mScrollSnapPointsX
+      || mScrollSnapPointsY != aOther.mScrollSnapPointsY
+      || mScrollSnapDestination != aOther.mScrollSnapDestination
       || mResize != aOther.mResize)
     NS_UpdateHint(hint, nsChangeHint_ReconstructFrame);
 
-  /* Note: When mScrollBehavior is changed, the nsChangeHint_NeutralChange is
-   * not sufficient to enter nsCSSFrameConstructor::PropagateScrollToViewport.
-   * By using the same hint as used when the overflow css property changes,
+  /* Note: When mScrollBehavior, mScrollSnapTypeX, mScrollSnapTypeY,
+   * mScrollSnapPointsX, mScrollSnapPointsY, or mScrollSnapDestination are
+   * changed, nsChangeHint_NeutralChange is not sufficient to enter
+   * nsCSSFrameConstructor::PropagateScrollToViewport. By using the same hint
+   * as used when the overflow css property changes,
    * nsChangeHint_ReconstructFrame, PropagateScrollToViewport will be called.
    *
    * The scroll-behavior css property is not expected to change often (the
@@ -2868,7 +2919,8 @@ nsChangeHint nsStyleDisplay::CalcDifference(const nsStyleDisplay& aOther) const
        mAnimationDirectionCount != aOther.mAnimationDirectionCount ||
        mAnimationFillModeCount != aOther.mAnimationFillModeCount ||
        mAnimationPlayStateCount != aOther.mAnimationPlayStateCount ||
-       mAnimationIterationCountCount != aOther.mAnimationIterationCountCount)) {
+       mAnimationIterationCountCount != aOther.mAnimationIterationCountCount ||
+       mScrollSnapCoordinate != aOther.mScrollSnapCoordinate)) {
     NS_UpdateHint(hint, nsChangeHint_NeutralChange);
   }
 

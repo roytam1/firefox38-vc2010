@@ -342,7 +342,7 @@ public:
   }
 
   // Return a SourceSurface that contains the FillPaint or StrokePaint source.
-  TemporaryRef<SourceSurface>
+  already_AddRefed<SourceSurface>
   DoSourcePaint(mgfx::IntRect& aRect, CanvasRenderingContext2D::Style aStyle)
   {
     if (aRect.IsEmpty()) {
@@ -1436,8 +1436,6 @@ CanvasRenderingContext2D::GetHeight() const
 NS_IMETHODIMP
 CanvasRenderingContext2D::SetDimensions(int32_t width, int32_t height)
 {
-  ClearTarget();
-
   // Zero sized surfaces can cause problems.
   mZero = false;
   if (height == 0) {
@@ -1448,14 +1446,14 @@ CanvasRenderingContext2D::SetDimensions(int32_t width, int32_t height)
     width = 1;
     mZero = true;
   }
-  mWidth = width;
-  mHeight = height;
 
+  ClearTarget(width, height);
+  
   return NS_OK;
 }
 
 void
-CanvasRenderingContext2D::ClearTarget()
+CanvasRenderingContext2D::ClearTarget(int32_t aWidth, int32_t aHeight)
 {
   Reset();
 
@@ -1474,6 +1472,12 @@ CanvasRenderingContext2D::ClearTarget()
   state->colorStyles[Style::STROKE] = NS_RGB(0,0,0);
   state->shadowColor = NS_RGBA(0,0,0,0);
 
+  // Update dimensions only if new (strictly positive) values were passed.
+  if (aWidth > 0 && aHeight > 0) {
+    mWidth = aWidth;
+    mHeight = aHeight;
+  }  
+  
   // For vertical writing-mode, unless text-orientation is sideways,
   // we'll modify the initial value of textBaseline to 'middle'.
   nsRefPtr<nsStyleContext> canvasStyle;
@@ -4168,21 +4172,23 @@ bool CanvasRenderingContext2D::IsPointInStroke(const CanvasPath& mPath, double x
 // Returns a surface that contains only the part needed to draw aSourceRect.
 // On entry, aSourceRect is relative to aSurface, and on return aSourceRect is
 // relative to the returned surface.
-static TemporaryRef<SourceSurface>
+static already_AddRefed<SourceSurface>
 ExtractSubrect(SourceSurface* aSurface, mgfx::Rect* aSourceRect, DrawTarget* aTargetDT)
 {
   mgfx::Rect roundedOutSourceRect = *aSourceRect;
   roundedOutSourceRect.RoundOut();
   mgfx::IntRect roundedOutSourceRectInt;
   if (!roundedOutSourceRect.ToIntRect(&roundedOutSourceRectInt)) {
-    return aSurface;
+    RefPtr<SourceSurface> surface(aSurface);
+    return surface.forget();
   }
 
   RefPtr<DrawTarget> subrectDT =
     aTargetDT->CreateSimilarDrawTarget(roundedOutSourceRectInt.Size(), SurfaceFormat::B8G8R8A8);
 
   if (!subrectDT) {
-    return aSurface;
+    RefPtr<SourceSurface> surface(aSurface);
+    return surface.forget();
   }
 
   *aSourceRect -= roundedOutSourceRect.TopLeft();
@@ -5519,7 +5525,7 @@ CanvasPath::CanvasPath(nsISupports* aParent)
   mPathBuilder = gfxPlatform::GetPlatform()->ScreenReferenceDrawTarget()->CreatePathBuilder();
 }
 
-CanvasPath::CanvasPath(nsISupports* aParent, TemporaryRef<PathBuilder> aPathBuilder)
+CanvasPath::CanvasPath(nsISupports* aParent, already_AddRefed<PathBuilder> aPathBuilder)
   : mParent(aParent), mPathBuilder(aPathBuilder)
 {
   if (!mPathBuilder) {
@@ -5750,7 +5756,7 @@ CanvasPath::AddPath(CanvasPath& aCanvasPath, const Optional<NonNull<SVGMatrix>>&
   tempPath->StreamToSink(mPathBuilder);
 }
 
-TemporaryRef<gfx::Path>
+already_AddRefed<gfx::Path>
 CanvasPath::GetPath(const CanvasWindingRule& winding, const DrawTarget* aTarget) const
 {
   FillRule fillRule = FillRule::FILL_WINDING;
@@ -5761,15 +5767,18 @@ CanvasPath::GetPath(const CanvasWindingRule& winding, const DrawTarget* aTarget)
   if (mPath &&
       (mPath->GetBackendType() == aTarget->GetBackendType()) &&
       (mPath->GetFillRule() == fillRule)) {
-    return mPath;
+    RefPtr<gfx::Path> path(mPath);
+    return path.forget();
   }
 
   if (!mPath) {
     // if there is no path, there must be a pathbuilder
     MOZ_ASSERT(mPathBuilder);
     mPath = mPathBuilder->Finish();
-    if (!mPath)
-      return mPath;
+    if (!mPath) {
+      RefPtr<gfx::Path> path(mPath);
+      return path.forget();
+    }
 
     mPathBuilder = nullptr;
   }
@@ -5784,7 +5793,8 @@ CanvasPath::GetPath(const CanvasWindingRule& winding, const DrawTarget* aTarget)
     mPath = tmpPathBuilder->Finish();
   }
 
-  return mPath;
+  RefPtr<gfx::Path> path(mPath);
+  return path.forget();
 }
 
 void

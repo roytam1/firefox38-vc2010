@@ -3088,13 +3088,12 @@ public:
   {
     NS_ASSERTION(NS_IsMainThread(), "Should be on main thread.");
 
-    if (!mElement) {
-      return;
-    }
+    if (MOZ_UNLIKELY(!mElement)) return; // bug 1419363
+
     mElement->NotifyMediaStreamTracksAvailable(aStream);
   }
 private:
-  HTMLMediaElement* mElement;
+  WeakPtr<HTMLMediaElement> mElement;
 };
 
 void HTMLMediaElement::SetupSrcMediaStreamPlayback(DOMMediaStream* aStream)
@@ -4704,12 +4703,11 @@ HTMLMediaElement::GetTopLevelPrincipal()
 {
   nsRefPtr<nsIPrincipal> principal;
   nsCOMPtr<nsPIDOMWindow> window = do_QueryInterface(OwnerDoc()->GetParentObject());
-  nsCOMPtr<nsIDOMWindow> topWindow;
   if (!window) {
     return nullptr;
   }
-  window->GetTop(getter_AddRefs(topWindow));
-  nsCOMPtr<nsPIDOMWindow> top = do_QueryInterface(topWindow);
+  window = window->GetOuterWindow();
+  nsCOMPtr<nsPIDOMWindow> top = window->GetTop();
   if (!top) {
     return nullptr;
   }

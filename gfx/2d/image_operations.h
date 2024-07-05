@@ -34,10 +34,10 @@
 #include <math.h>
 #endif
 
-#include "skia/SkTypes.h"
+#include "skia/include/core/SkTypes.h"
 #include "Types.h"
 #include "convolver.h"
-#include "skia/SkRect.h"
+#include "skia/include/core/SkRect.h"
 
 class SkBitmap;
 struct SkIRect;

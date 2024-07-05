@@ -96,7 +96,7 @@ struct LayerManagerData {
   {}
 };
 
-static TemporaryRef<Compositor> CreateTestCompositor(LayersBackend backend, MockWidget* widget)
+static already_AddRefed<Compositor> CreateTestCompositor(LayersBackend backend, MockWidget* widget)
 {
   gfxPrefs::GetSingleton();
 
@@ -125,7 +125,7 @@ static TemporaryRef<Compositor> CreateTestCompositor(LayersBackend backend, Mock
     abort();
   }
 
-  return compositor;
+  return compositor.forget();
 }
 
 /**
@@ -170,12 +170,10 @@ static std::vector<LayersBackend> GetPlatformBackends()
   return backends;
 }
 
-static TemporaryRef<DrawTarget> CreateDT()
+static already_AddRefed<DrawTarget> CreateDT()
 {
-  RefPtr<DrawTarget> dt = gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(
+  return gfxPlatform::GetPlatform()->CreateOffscreenContentDrawTarget(
     IntSize(gCompWidth, gCompHeight), SurfaceFormat::B8G8R8A8);
-
-  return dt;
 }
 
 static bool CompositeAndCompare(nsRefPtr<LayerManagerComposite> layerManager, DrawTarget* refDT)

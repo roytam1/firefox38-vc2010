@@ -172,6 +172,12 @@ nsIContent::DoGetClasses() const
 NS_IMETHODIMP
 Element::QueryInterface(REFNSIID aIID, void** aInstancePtr)
 {
+  if (aIID.Equals(NS_GET_IID(Element))) {
+    NS_ADDREF_THIS();
+    *aInstancePtr = this;
+    return NS_OK;
+  }
+
   NS_ASSERTION(aInstancePtr,
                "QueryInterface requires a non-NULL destination!");
   nsresult rv = FragmentOrElement::QueryInterface(aIID, aInstancePtr);
@@ -797,6 +803,15 @@ Element::ScrollByNoFlush(int32_t aDx, int32_t aDy)
   return (before != after);
 }
 
+void
+Element::MozScrollSnap()
+{
+  nsIScrollableFrame* sf = GetScrollFrame(nullptr, false);
+  if (sf) {
+    sf->ScrollSnap();
+  }
+}
+
 static nsSize GetScrollRectSizeForOverflowVisibleFrame(nsIFrame* aFrame)
 {
   if (!aFrame) {
@@ -1209,7 +1224,9 @@ Element::RemoveAttributeNode(Attr& aAttribute,
   }
 
   OwnerDoc()->WarnOnceAbout(nsIDocument::eRemoveAttributeNode);
-  return Attributes()->RemoveNamedItem(aAttribute.NodeName(), aError);
+  nsAutoString nameSpaceURI;
+  aAttribute.NodeInfo()->GetNamespaceURI(nameSpaceURI);
+  return Attributes()->RemoveNamedItemNS(nameSpaceURI, aAttribute.NodeInfo()->LocalName(), aError);
 }
 
 void

@@ -1383,6 +1383,7 @@ nsDocShell::LoadURI(nsIURI* aURI,
   nsCOMPtr<nsIURI> referrer;
   nsCOMPtr<nsIURI> originalURI;
   bool loadReplace = false;
+  bool isFromProcessingFrameAttributes = false;
   nsCOMPtr<nsIInputStream> postStream;
   nsCOMPtr<nsIInputStream> headersStream;
   nsCOMPtr<nsISupports> owner;
@@ -1414,6 +1415,7 @@ nsDocShell::LoadURI(nsIURI* aURI,
       liESR38->GetOriginalURI(getter_AddRefs(originalURI));
       liESR38->GetLoadReplace(&loadReplace);
     }
+    aLoadInfo->GetIsFromProcessingFrameAttributes(&isFromProcessingFrameAttributes);
 
     nsDocShellInfoLoadType lt = nsIDocShellLoadInfo::loadNormal;
     aLoadInfo->GetLoadType(&lt);
@@ -1671,6 +1673,7 @@ nsDocShell::LoadURI(nsIURI* aURI,
   return InternalLoad2(aURI,
                        originalURI,
                        loadReplace,
+                       isFromProcessingFrameAttributes,
                        referrer,
                        referrerPolicy,
                        owner,
@@ -3191,7 +3194,7 @@ nsDocShell::GetSessionStorageForPrincipal(nsIPrincipal* aPrincipal,
     return NS_ERROR_UNEXPECTED;
   }
 
-  nsCOMPtr<nsIDOMWindow> domWin = do_GetInterface(GetAsSupports(this));
+  nsCOMPtr<nsPIDOMWindow> domWin = do_GetInterface(GetAsSupports(this));
 
   if (aCreate) {
     return manager->CreateStorage(domWin, aPrincipal, aDocumentURI,
@@ -3699,14 +3702,13 @@ nsDocShell::CanAccessItem(nsIDocShellTreeItem* aTargetItem,
     return false;
   }
 
-  nsCOMPtr<nsIDOMWindow> targetWindow = aTargetItem->GetWindow();
+  nsCOMPtr<nsPIDOMWindow> targetWindow = aTargetItem->GetWindow();
   if (!targetWindow) {
     NS_ERROR("This should not happen, really");
     return false;
   }
 
-  nsCOMPtr<nsIDOMWindow> targetOpener;
-  targetWindow->GetOpener(getter_AddRefs(targetOpener));
+  nsCOMPtr<nsIDOMWindow> targetOpener = targetWindow->GetOpener();
   nsCOMPtr<nsIWebNavigation> openerWebNav(do_GetInterface(targetOpener));
   nsCOMPtr<nsIDocShellTreeItem> openerItem(do_QueryInterface(openerWebNav));
 
@@ -3720,7 +3722,7 @@ nsDocShell::CanAccessItem(nsIDocShellTreeItem* aTargetItem,
 static bool
 ItemIsActive(nsIDocShellTreeItem* aItem)
 {
-  nsCOMPtr<nsIDOMWindow> window = aItem->GetWindow();
+  nsCOMPtr<nsPIDOMWindow> window = aItem->GetWindow();
 
   if (window) {
     bool isClosed;
@@ -3980,7 +3982,7 @@ PrintDocTree(nsIDocShellTreeItem* aParentNode, int aLevel)
   parentAsDocShell->GetPresContext(getter_AddRefs(presContext));
   nsIDocument* doc = presShell->GetDocument();
 
-  nsCOMPtr<nsIDOMWindow> domwin(doc->GetWindow());
+  nsCOMPtr<nsPIDOMWindow> domwin(doc->GetWindow());
 
   nsCOMPtr<nsIWidget> widget;
   nsViewManager* vm = presShell->GetViewManager();
@@ -5410,7 +5412,7 @@ nsDocShell::LoadErrorPage(nsIURI* aURI, const char16_t* aURL,
   rv = NS_NewURI(getter_AddRefs(errorPageURI), errorPageUrl);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  return InternalLoad2(errorPageURI, nullptr, false, nullptr,
+  return InternalLoad2(errorPageURI, nullptr, false, false, nullptr,
                        mozilla::net::RP_Default,
                        nullptr, INTERNAL_LOAD_FLAGS_INHERIT_OWNER, nullptr,
                        nullptr, NullString(), nullptr, nullptr, LOAD_ERROR_PAGE,
@@ -5492,6 +5494,7 @@ nsDocShell::Reload(uint32_t aReloadFlags)
     rv = InternalLoad2(currentURI,
                        originalURI,
                        loadReplace,
+                       false,           // IsFromProcessingFrameAttributes
                        referrerURI,
                        referrerPolicy,
                        principal,
@@ -6623,8 +6626,10 @@ nsDocShell::ScrollByPages(int32_t aNumPages)
 //*****************************************************************************
 
 NS_IMETHODIMP
-nsDocShell::RefreshURI(nsIURI* aURI, int32_t aDelay, bool aRepeat,
-                       bool aMetaRefresh)
+nsDocShell::RefreshURI(nsIURI* aURI,
+                       int32_t aDelay, bool aRepeat,
+                       bool aMetaRefresh,
+                       nsIPrincipal* aPrincipal)
 {
   NS_ENSURE_ARG(aURI);
 
@@ -6659,6 +6664,7 @@ nsDocShell::RefreshURI(nsIURI* aURI, int32_t aDelay, bool aRepeat,
   nsCOMPtr<nsISupports> dataRef = refreshTimer;  // Get the ref count to 1
 
   refreshTimer->mDocShell = this;
+  refreshTimer->mPrincipal = aPrincipal;
   refreshTimer->mURI = aURI;
   refreshTimer->mDelay = aDelay;
   refreshTimer->mRepeat = aRepeat;
@@ -6690,7 +6696,8 @@ nsresult
 nsDocShell::ForceRefreshURIFromTimer(nsIURI* aURI,
                                      int32_t aDelay,
                                      bool aMetaRefresh,
-                                     nsITimer* aTimer)
+                                     nsITimer* aTimer,
+                                     nsIPrincipal* aPrincipal)
 {
   NS_PRECONDITION(aTimer, "Must have a timer here");
 
@@ -6708,7 +6715,7 @@ nsDocShell::ForceRefreshURIFromTimer(nsIURI* aURI,
     }
   }
 
-  return ForceRefreshURI(aURI, aDelay, aMetaRefresh);
+  return ForceRefreshURI(aURI, aDelay, aMetaRefresh, aPrincipal);
 }
 
 bool
@@ -6742,7 +6749,7 @@ nsDocShell::DoAppRedirectIfNeeded(nsIURI* aURI,
 }
 
 NS_IMETHODIMP
-nsDocShell::ForceRefreshURI(nsIURI* aURI, int32_t aDelay, bool aMetaRefresh)
+nsDocShell::ForceRefreshURI(nsIURI* aURI, int32_t aDelay, bool aMetaRefresh, nsIPrincipal* aPrincipal)
 {
   NS_ENSURE_ARG(aURI);
 
@@ -6760,9 +6767,17 @@ nsDocShell::ForceRefreshURI(nsIURI* aURI, int32_t aDelay, bool aMetaRefresh)
    */
   loadInfo->SetReferrer(mCurrentURI);
 
-  /* Don't ever "guess" on which owner to use to avoid picking
-   * the current owner.
-   */
+  // Set the triggering pricipal to aPrincipal if available, or current
+  // document's principal otherwise.
+  nsCOMPtr<nsIPrincipal> principal = aPrincipal;
+  if (!principal) {
+    nsCOMPtr<nsIDocument> doc = GetDocument();
+    if (MOZ_UNLIKELY(!doc)) {
+      return NS_ERROR_FAILURE;
+    }
+    principal = doc->NodePrincipal();
+  }
+  loadInfo->SetOwner(principal); // equivalent for SetTriggeringPrincipal
   loadInfo->SetOwnerIsExplicit(true);
 
   /* Check if this META refresh causes a redirection
@@ -6794,7 +6809,7 @@ nsDocShell::ForceRefreshURI(nsIURI* aURI, int32_t aDelay, bool aMetaRefresh)
    * LoadURI(...) will cancel all refresh timers... This causes the
    * Timer and its refreshData instance to be released...
    */
-  LoadURI(aURI, loadInfo, nsIWebNavigation::LOAD_FLAGS_NONE, true);
+  LoadURI(aURI, loadInfo, nsIWebNavigation::LOAD_FLAGS_DISALLOW_INHERIT_OWNER, true); // XXX: LOAD_FLAGS_DISALLOW_INHERIT_PRINCIPAL
 
   return NS_OK;
 }
@@ -7030,7 +7045,7 @@ nsDocShell::SetupRefreshURIFromHeader(nsIURI* aBaseURI,
           return NS_ERROR_FAILURE;
         }
 
-        rv = RefreshURI(uri, seconds * 1000, false, true);
+        rv = RefreshURI(uri, seconds * 1000, false, true, aPrincipal);
       }
     }
   }
@@ -9504,6 +9519,7 @@ class InternalLoadEvent : public nsRunnable
 public:
   InternalLoadEvent(nsDocShell* aDocShell, nsIURI* aURI,
                     nsIURI* aOriginalURI, bool aLoadReplace,
+                    bool aIsFromProcessingFrameAttributes,
                     nsIURI* aReferrer, uint32_t aReferrerPolicy,
                     nsISupports* aOwner, uint32_t aFlags,
                     const char* aTypeHint, nsIInputStream* aPostData,
@@ -9516,6 +9532,7 @@ public:
     , mURI(aURI)
     , mOriginalURI(aOriginalURI)
     , mLoadReplace(aLoadReplace)
+    , mIsFromProcessingFrameAttributes(aIsFromProcessingFrameAttributes)
     , mReferrer(aReferrer)
     , mReferrerPolicy(aReferrerPolicy)
     , mOwner(aOwner)
@@ -9538,6 +9555,7 @@ public:
   {
     return mDocShell->InternalLoad2(mURI, mOriginalURI,
                                     mLoadReplace,
+                                    mIsFromProcessingFrameAttributes,
                                     mReferrer,
                                     mReferrerPolicy,
                                     mOwner, mFlags,
@@ -9558,6 +9576,7 @@ private:
   nsCOMPtr<nsIURI> mURI;
   nsCOMPtr<nsIURI> mOriginalURI;
   bool mLoadReplace;
+  bool mIsFromProcessingFrameAttributes;
   nsCOMPtr<nsIURI> mReferrer;
   uint32_t mReferrerPolicy;
   nsCOMPtr<nsISupports> mOwner;
@@ -9630,7 +9649,7 @@ nsDocShell::InternalLoad(nsIURI* aURI,
                          nsIDocShell** aDocShell,
                          nsIRequest** aRequest)
 {
-  return InternalLoad2(aURI, nullptr, false, aReferrer, aReferrerPolicy, aOwner,
+  return InternalLoad2(aURI, nullptr, false, false, aReferrer, aReferrerPolicy, aOwner,
                        aFlags, aWindowTarget, aTypeHint, aFileName, aPostData,
                        aHeadersData, aLoadType, aSHEntry, aFirstParty, aSrcdoc,
                        aSourceDocShell, aBaseURI, aDocShell, aRequest);
@@ -9640,6 +9659,7 @@ NS_IMETHODIMP
 nsDocShell::InternalLoad2(nsIURI* aURI,
                           nsIURI* aOriginalURI,
                           bool aLoadReplace,
+                          bool aIsFromProcessingFrameAttributes,
                           nsIURI* aReferrer,
                           uint32_t aReferrerPolicy,
                           nsISupports* aOwner,
@@ -9874,6 +9894,8 @@ nsDocShell::InternalLoad2(nsIURI* aURI,
       if (mInPrivateBrowsing) {
         features.AssignLiteral("private");
       }
+      // RM 2018-12-03 We miss all loadInfo setting up here 
+      // so we cannot set aIsFromProcessingFrameAttributes
       rv = win->OpenNoNavigate(NS_ConvertUTF8toUTF16(spec),
                                name,  // window name
                                features,
@@ -9910,6 +9932,7 @@ nsDocShell::InternalLoad2(nsIURI* aURI,
         rv = dsESR38->InternalLoad2(aURI,
                                     aOriginalURI,
                                     aLoadReplace,
+                                    aIsFromProcessingFrameAttributes,
                                     aReferrer,
                                     aReferrerPolicy,
                                     owner,
@@ -9958,7 +9981,7 @@ nsDocShell::InternalLoad2(nsIURI* aURI,
           // So, the best we can do, is to tear down the new window
           // that was just created!
           //
-          nsCOMPtr<nsIDOMWindow> domWin = targetDocShell->GetWindow();
+          nsCOMPtr<nsPIDOMWindow> domWin = targetDocShell->GetWindow();
           if (domWin) {
             domWin->Close();
           }
@@ -10013,6 +10036,7 @@ nsDocShell::InternalLoad2(nsIURI* aURI,
       // Do this asynchronously
       nsCOMPtr<nsIRunnable> ev =
         new InternalLoadEvent(this, aURI, aOriginalURI, aLoadReplace,
+                              aIsFromProcessingFrameAttributes,
                               aReferrer, aReferrerPolicy, aOwner, aFlags,
                               aTypeHint, aPostData, aHeadersData,
                               aLoadType, aSHEntry, aFirstParty, aSrcdoc,
@@ -10470,7 +10494,9 @@ nsDocShell::InternalLoad2(nsIURI* aURI,
                         nsINetworkPredictor::PREDICT_LOAD, this, nullptr);
 
   nsCOMPtr<nsIRequest> req;
-  rv = DoURILoad(aURI, aOriginalURI, aLoadReplace, aReferrer,
+  rv = DoURILoad(aURI, aOriginalURI, aLoadReplace,
+                 aIsFromProcessingFrameAttributes,
+                 aReferrer,
                  !(aFlags & INTERNAL_LOAD_FLAGS_DONT_SEND_REFERRER),
                  aReferrerPolicy,
                  owner, aTypeHint, aFileName, aPostData, aHeadersData,
@@ -10546,6 +10572,7 @@ nsresult
 nsDocShell::DoURILoad(nsIURI* aURI,
                       nsIURI* aOriginalURI,
                       bool aLoadReplace,
+                      bool aIsFromProcessingFrameAttributes,
                       nsIURI* aReferrerURI,
                       bool aSendReferrer,
                       uint32_t aReferrerPolicy,
@@ -10650,6 +10677,14 @@ nsDocShell::DoURILoad(nsIURI* aURI,
   if (isSandBoxed) {
     securityFlags |= nsILoadInfo::SEC_SANDBOXED;
   }
+
+#if(0)
+  // XXX: bug 1487964 has this code, but we have no nsILoadInfo set up yet.
+  // Do we need it?
+  if (aIsFromProcessingFrameAttributes) {
+    loadInfo->SetIsFromProcessingFrameAttributes();
+  }
+#endif
 
   if (!isSrcdoc) {
     nsCOMPtr<nsILoadInfo> loadInfo =
@@ -12227,6 +12262,7 @@ nsDocShell::LoadHistoryEntry(nsISHEntry* aEntry, uint32_t aLoadType)
   rv = InternalLoad2(uri,
                      originalURI,
                      loadReplace,
+                     false,              // IsFromProcessingFrameAttributes
                      referrerURI,
                      referrerPolicy,
                      owner,
@@ -13116,7 +13152,7 @@ nsRefreshTimer::Notify(nsITimer* aTimer)
     // Get the delay count to determine load type
     uint32_t delay = 0;
     aTimer->GetDelay(&delay);
-    mDocShell->ForceRefreshURIFromTimer(mURI, delay, mMetaRefresh, aTimer);
+    mDocShell->ForceRefreshURIFromTimer(mURI, delay, mMetaRefresh, aTimer, mPrincipal);
   }
   return NS_OK;
 }
@@ -13219,10 +13255,11 @@ nsDocShell::GetAssociatedWindow(nsIDOMWindow** aWindow)
 NS_IMETHODIMP
 nsDocShell::GetTopWindow(nsIDOMWindow** aWindow)
 {
-  nsCOMPtr<nsIDOMWindow> win = GetWindow();
+  nsCOMPtr<nsPIDOMWindow> win = GetWindow();
   if (win) {
-    win->GetTop(aWindow);
+    win = win->GetTop();
   }
+  win.forget(aWindow);
   return NS_OK;
 }
 
@@ -13230,23 +13267,19 @@ NS_IMETHODIMP
 nsDocShell::GetTopFrameElement(nsIDOMElement** aElement)
 {
   *aElement = nullptr;
-  nsCOMPtr<nsIDOMWindow> win = GetWindow();
+  nsCOMPtr<nsPIDOMWindow> win = GetWindow();
   if (!win) {
     return NS_OK;
   }
 
-  nsCOMPtr<nsIDOMWindow> top;
-  win->GetScriptableTop(getter_AddRefs(top));
+  nsCOMPtr<nsPIDOMWindow> top = win->GetScriptableTop();
   NS_ENSURE_TRUE(top, NS_ERROR_FAILURE);
-
-  nsCOMPtr<nsPIDOMWindow> piTop = do_QueryInterface(top);
-  NS_ENSURE_TRUE(piTop, NS_ERROR_FAILURE);
 
   // GetFrameElementInternal, /not/ GetScriptableFrameElement -- if |top| is
   // inside <iframe mozbrowser>, we want to return the iframe, not null.
   // And we want to cross the content/chrome boundary.
   nsCOMPtr<nsIDOMElement> elt =
-    do_QueryInterface(piTop->GetFrameElementInternal());
+    do_QueryInterface(top->GetFrameElementInternal());
   elt.forget(aElement);
   return NS_OK;
 }
@@ -13361,7 +13394,7 @@ nsDocShell::EnsureCommandHandler()
       return NS_ERROR_OUT_OF_MEMORY;
     }
 
-    nsCOMPtr<nsIDOMWindow> domWindow = GetWindow();
+    nsCOMPtr<nsPIDOMWindow> domWindow = GetWindow();
     nsresult rv = commandUpdater->Init(domWindow);
     if (NS_SUCCEEDED(rv)) {
       mCommandManager = do_QueryInterface(commandUpdater);
@@ -13697,6 +13730,7 @@ nsDocShell::OnLinkClickSync(nsIContent* aContent,
   nsresult rv = InternalLoad2(clonedURI,                 // New URI
                               nullptr,                   // Original URI
                               false,                     // LoadReplace
+                              false,                     // IsFromProcessingFrameAttributes
                               referer,                   // Referer URI
                               refererPolicy,             // Referer policy
                               aContent->NodePrincipal(), // Owner is our node's

@@ -29,6 +29,7 @@
 
 #include "js/StructuredClone.h"
 
+#include "mozilla/CheckedInt.h"
 #include "mozilla/Endian.h"
 #include "mozilla/FloatingPoint.h"
 
@@ -195,7 +196,7 @@ class SCInput {
     bool readArray(T* p, size_t nelems);
 
     bool reportTruncated() {
-         JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr,
+         JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                               JSMSG_SC_BAD_SERIALIZED_DATA, "truncated");
          return false;
      }
@@ -340,7 +341,7 @@ struct JSStructuredCloneWriter {
 };
 
 JS_FRIEND_API(uint64_t)
-js_GetSCOffset(JSStructuredCloneWriter* writer)
+js::GetSCOffset(JSStructuredCloneWriter* writer)
 {
     MOZ_ASSERT(writer);
     return writer->output().count() * sizeof(uint64_t);
@@ -356,7 +357,7 @@ ReportErrorTransferable(JSContext* cx, const JSStructuredCloneCallbacks* callbac
     if (callbacks && callbacks->reportError)
         callbacks->reportError(cx, JS_SCERR_TRANSFERABLE);
     else
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_SC_NOT_TRANSFERABLE);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_SC_NOT_TRANSFERABLE);
 }
 
 bool
@@ -683,7 +684,7 @@ SCOutput::writeArray(const T* p, size_t nelems)
         return true;
 
     if (nelems + sizeof(uint64_t) / sizeof(T) - 1 < nelems) {
-        js_ReportAllocationOverflow(context());
+        ReportAllocationOverflow(context());
         return false;
     }
     size_t nwords = JS_HOWMANY(nelems, sizeof(uint64_t) / sizeof(T));
@@ -779,7 +780,7 @@ JSStructuredCloneWriter::parseTransferable()
 
         // No duplicates allowed
         if (std::find(transferableObjects.begin(), transferableObjects.end(), tObj) != transferableObjects.end()) {
-            JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr, JSMSG_SC_DUP_TRANSFERABLE);
+            JS_ReportErrorNumber(context(), GetErrorMessage, nullptr, JSMSG_SC_DUP_TRANSFERABLE);
             return false;
         }
 
@@ -887,7 +888,7 @@ JSStructuredCloneWriter::writeArrayBuffer(HandleObject obj)
 bool
 JSStructuredCloneWriter::writeSharedArrayBuffer(HandleObject obj)
 {
-    JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr, JSMSG_SC_SHMEM_MUST_TRANSFER);
+    JS_ReportErrorNumber(context(), GetErrorMessage, nullptr, JSMSG_SC_SHMEM_MUST_TRANSFER);
     return false;
 }
 
@@ -922,7 +923,7 @@ JSStructuredCloneWriter::startObject(HandleObject obj, bool* backref)
         return false;
 
     if (memory.count() == UINT32_MAX) {
-        JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr,
+        JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
                              JSMSG_NEED_DIET, "object graph to serialize");
         return false;
     }
@@ -1093,7 +1094,7 @@ JSStructuredCloneWriter::startWrite(HandleValue v)
         /* else fall through */
     }
 
-    JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr, JSMSG_SC_UNSUPPORTED_TYPE);
+    JS_ReportErrorNumber(context(), GetErrorMessage, nullptr, JSMSG_SC_UNSUPPORTED_TYPE);
     return false;
 }
 
@@ -1288,7 +1289,7 @@ JSStructuredCloneReader::checkDouble(double d)
     jsval_layout l;
     l.asDouble = d;
     if (!JSVAL_IS_DOUBLE_IMPL(l)) {
-        JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr,
+        JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
                              JSMSG_SC_BAD_SERIALIZED_DATA, "unrecognized NaN");
         return false;
     }
@@ -1326,7 +1327,7 @@ JSString*
 JSStructuredCloneReader::readStringImpl(uint32_t nchars)
 {
     if (nchars > JSString::MAX_LENGTH) {
-        JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr,
+        JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
                              JSMSG_SC_BAD_SERIALIZED_DATA, "string length");
         return nullptr;
     }
@@ -1359,7 +1360,7 @@ JSStructuredCloneReader::readTypedArray(uint32_t arrayType, uint32_t nelems, Mut
                                         bool v1Read)
 {
     if (arrayType > Scalar::Uint8Clamped) {
-        JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr,
+        JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
                              JSMSG_SC_BAD_SERIALIZED_DATA, "unhandled typed array element type");
         return false;
     }
@@ -1384,6 +1385,11 @@ JSStructuredCloneReader::readTypedArray(uint32_t arrayType, uint32_t nelems, Mut
         if (!in.read(&n))
             return false;
         byteOffset = n;
+    }
+    if (!v.isObject() || !v.toObject().is<ArrayBufferObject>()) {
+        JS_ReportErrorNumber(context(), GetErrorMessage, nullptr, JSMSG_SC_BAD_SERIALIZED_DATA,
+                                  "typed array must be backed by an ArrayBuffer");
+        return false;
     }
     RootedObject buffer(context(), &v.toObject());
     RootedObject obj(context(), nullptr);
@@ -1433,7 +1439,7 @@ bool
 JSStructuredCloneReader::readSharedTypedArray(uint32_t arrayType, uint32_t nelems, MutableHandleValue vp)
 {
     if (arrayType > Scalar::Uint8Clamped) {
-        JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr,
+        JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
                              JSMSG_SC_BAD_SERIALIZED_DATA, "unhandled typed array element type");
         return false;
     }
@@ -1453,6 +1459,11 @@ JSStructuredCloneReader::readSharedTypedArray(uint32_t arrayType, uint32_t nelem
     if (!in.read(&n))
         return false;
     byteOffset = n;
+    if (!v.isObject() || !v.toObject().is<ArrayBufferObject>()) {
+        JS_ReportErrorNumber(context(), GetErrorMessage, nullptr, JSMSG_SC_BAD_SERIALIZED_DATA,
+                                  "DataView must be backed by an ArrayBuffer");
+        return false;
+    }
     RootedObject buffer(context(), &v.toObject());
     RootedObject obj(context());
 
@@ -1517,10 +1528,23 @@ bool
 JSStructuredCloneReader::readV1ArrayBuffer(uint32_t arrayType, uint32_t nelems,
                                            MutableHandleValue vp)
 {
-    MOZ_ASSERT(arrayType <= Scalar::Uint8Clamped);
+    if (arrayType > Scalar::Uint8Clamped) {
+        JS_ReportErrorNumber(context(), GetErrorMessage, nullptr, JSMSG_SC_BAD_SERIALIZED_DATA,
+                                  "invalid TypedArray type");
+        return false;
+    }
 
-    uint32_t nbytes = nelems << TypedArrayShift(static_cast<Scalar::Type>(arrayType));
-    JSObject* obj = ArrayBufferObject::create(context(), nbytes);
+    mozilla::CheckedInt<size_t> nbytes =
+        mozilla::CheckedInt<size_t>(nelems) *
+        TypedArrayElemSize(static_cast<Scalar::Type>(arrayType));
+    if (!nbytes.isValid() || nbytes.value() > UINT32_MAX) {
+        JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
+                             JSMSG_SC_BAD_SERIALIZED_DATA,
+                             "invalid typed array size");
+        return false;
+    }
+
+    JSObject* obj = ArrayBufferObject::create(context(), nbytes.value());
     if (!obj)
         return false;
     vp.setObject(*obj);
@@ -1611,11 +1635,11 @@ JSStructuredCloneReader::startRead(MutableHandleValue vp)
         if (!in.readDouble(&d) || !checkDouble(d))
             return false;
         if (!IsNaN(d) && d != TimeClip(d)) {
-            JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr,
+            JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
                                  JSMSG_SC_BAD_SERIALIZED_DATA, "date");
             return false;
         }
-        JSObject* obj = js_NewDateObjectMsec(context(), d);
+        JSObject* obj = NewDateObjectMsec(context(), d);
         if (!obj)
             return false;
         vp.setObject(*obj);
@@ -1628,7 +1652,7 @@ JSStructuredCloneReader::startRead(MutableHandleValue vp)
         if (!in.readPair(&tag2, &stringData))
             return false;
         if (tag2 != SCTAG_STRING) {
-            JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr,
+            JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
                                  JSMSG_SC_BAD_SERIALIZED_DATA, "regexp");
             return false;
         }
@@ -1661,7 +1685,7 @@ JSStructuredCloneReader::startRead(MutableHandleValue vp)
 
       case SCTAG_BACK_REFERENCE_OBJECT: {
         if (data >= allObjs.length()) {
-            JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr,
+            JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
                                  JSMSG_SC_BAD_SERIALIZED_DATA,
                                  "invalid back reference in input");
             return false;
@@ -1673,7 +1697,7 @@ JSStructuredCloneReader::startRead(MutableHandleValue vp)
       case SCTAG_TRANSFER_MAP_HEADER:
       case SCTAG_TRANSFER_MAP_PENDING_ENTRY:
         // We should be past all the transfer map tags.
-        JS_ReportErrorNumber(context(), js_GetErrorMessage, NULL,
+        JS_ReportErrorNumber(context(), GetErrorMessage, NULL,
                              JSMSG_SC_BAD_SERIALIZED_DATA,
                              "invalid input");
         return false;
@@ -1731,7 +1755,7 @@ JSStructuredCloneReader::startRead(MutableHandleValue vp)
         }
 
         if (!callbacks || !callbacks->read) {
-            JS_ReportErrorNumber(context(), js_GetErrorMessage, nullptr,
+            JS_ReportErrorNumber(context(), GetErrorMessage, nullptr,
                                  JSMSG_SC_BAD_SERIALIZED_DATA, "unsupported type");
             return false;
         }
@@ -1904,7 +1928,7 @@ JS_ReadStructuredClone(JSContext* cx, uint64_t* buf, size_t nbytes,
     CHECK_REQUEST(cx);
 
     if (version > JS_STRUCTURED_CLONE_VERSION) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_SC_BAD_CLONE_VERSION);
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_SC_BAD_CLONE_VERSION);
         return false;
     }
     const JSStructuredCloneCallbacks* callbacks =
@@ -2132,7 +2156,7 @@ JS_ReadTypedArray(JSStructuredCloneReader* r, MutableHandleValue vp)
             return false;
         return r->readTypedArray(arrayType, nelems, vp);
     } else {
-        JS_ReportErrorNumber(r->context(), js_GetErrorMessage, nullptr,
+        JS_ReportErrorNumber(r->context(), GetErrorMessage, nullptr,
                              JSMSG_SC_BAD_SERIALIZED_DATA, "expected type array");
         return false;
     }

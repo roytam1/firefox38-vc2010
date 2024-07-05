@@ -151,7 +151,7 @@ LOCAL_INCLUDES += [
     '/dom/svg',
     '/dom/xul',
     '/gfx/gl',
-    '/image/src',
+    '/image',
     '/js/xpconnect/src',
     '/layout/generic',
     '/layout/style',
@@ -160,3 +160,6 @@ LOCAL_INCLUDES += [
 
 CXXFLAGS += CONFIG['MOZ_CAIRO_CFLAGS']
 CXXFLAGS += CONFIG['TK_CFLAGS']
+
+LOCAL_INCLUDES += CONFIG['SKIA_INCLUDES']
+

@@ -6772,7 +6772,7 @@ nsContentUtils::GetFullscreenAncestor(nsIDocument* aDoc)
 
 /* static */
 bool
-nsContentUtils::IsInPointerLockContext(nsIDOMWindow* aWin)
+nsContentUtils::IsInPointerLockContext(nsPIDOMWindow* aWin)
 {
   if (!aWin) {
     return false;
@@ -6784,11 +6784,8 @@ nsContentUtils::IsInPointerLockContext(nsIDOMWindow* aWin)
     return false;
   }
 
-  nsCOMPtr<nsIDOMWindow> lockTop;
-  pointerLockedDoc->GetWindow()->GetScriptableTop(getter_AddRefs(lockTop));
-
-  nsCOMPtr<nsIDOMWindow> top;
-  aWin->GetScriptableTop(getter_AddRefs(top));
+  nsCOMPtr<nsPIDOMWindow> lockTop = pointerLockedDoc->GetWindow()->GetScriptableTop();
+  nsCOMPtr<nsPIDOMWindow> top = aWin->GetScriptableTop();
 
   return top == lockTop;
 }
@@ -7122,6 +7119,22 @@ nsContentUtils::IsJavascriptMIMEType(const nsAString& aMIMEType)
     }
   }
 
+  // Workaround for Rocket Loader; current versions do not work properly.
+  // This version just relaxes the limits on the MIME type so that the
+  // browser loads the scripts for us and Rocket Loader is not involved.
+  // Old-school Rocket Loader that used text/rocketscript works OK; we don't
+  // interfere with that.
+  // (TenFourFox issue 517.)
+  if (StringEndsWith(aMIMEType, NS_LITERAL_STRING("-text/javascript"),
+                     nsCaseInsensitiveStringComparator())) {
+      // Don't use Find(). We really care just if it's at the end.
+      // If we need to look elsewhere, use FindInReadable().
+#if DEBUG
+    fprintf(stderr, "TenFourFox: Rocket Loader dependent script detected\n");
+#endif
+    return true;
+  }
+
   return false;
 }
 
@@ -7235,4 +7248,114 @@ nsContentUtils::CallOnAllRemoteChildren(nsIDOMWindow* aWindow,
     }
   }
 }
+
+/* static */
+nsContentPolicyType
+nsContentUtils::InternalContentPolicyTypeToExternal(nsContentPolicyType aType)
+{
+  switch (aType) {
+  case nsIContentPolicy::TYPE_INTERNAL_SCRIPT:
+  case nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD:
+  case nsIContentPolicy::TYPE_INTERNAL_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
+    return nsIContentPolicy::TYPE_SCRIPT;
+
+  case nsIContentPolicy::TYPE_INTERNAL_EMBED:
+  case nsIContentPolicy::TYPE_INTERNAL_OBJECT:
+    return nsIContentPolicy::TYPE_OBJECT;
+
+  case nsIContentPolicy::TYPE_INTERNAL_FRAME:
+  case nsIContentPolicy::TYPE_INTERNAL_IFRAME:
+    return nsIContentPolicy::TYPE_SUBDOCUMENT;
+
+  case nsIContentPolicy::TYPE_INTERNAL_AUDIO:
+  case nsIContentPolicy::TYPE_INTERNAL_VIDEO:
+  case nsIContentPolicy::TYPE_INTERNAL_TRACK:
+    return nsIContentPolicy::TYPE_MEDIA;
+
+  case nsIContentPolicy::TYPE_INTERNAL_XMLHTTPREQUEST:
+  case nsIContentPolicy::TYPE_INTERNAL_EVENTSOURCE:
+    return nsIContentPolicy::TYPE_XMLHTTPREQUEST;
+
+  case nsIContentPolicy::TYPE_INTERNAL_IMAGE:
+  case nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD:
+    return nsIContentPolicy::TYPE_IMAGE;
+
+  case nsIContentPolicy::TYPE_INTERNAL_STYLESHEET:
+  case nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD:
+    return nsIContentPolicy::TYPE_STYLESHEET;
+
+  default:
+    return aType;
+  }
+}
+
+/* static */
+nsContentPolicyType
+nsContentUtils::InternalContentPolicyTypeToExternalOrMCBInternal(nsContentPolicyType aType)
+{
+  switch (aType) {
+  case nsIContentPolicy::TYPE_INTERNAL_SCRIPT:
+  case nsIContentPolicy::TYPE_INTERNAL_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
+    return aType;
+
+  default:
+    return InternalContentPolicyTypeToExternalOrPreload(aType);
+  }
+}
+
+/* static */
+nsContentPolicyType
+nsContentUtils::InternalContentPolicyTypeToExternalOrPreload(nsContentPolicyType aType)
+{
+  if (aType == nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD ||
+      aType == nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD ||
+      aType == nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD) {
+    return aType;
+  }
+  return InternalContentPolicyTypeToExternal(aType);
+}
+
+
+/* static */
+nsContentPolicyType
+nsContentUtils::InternalContentPolicyTypeToExternalOrWorker(nsContentPolicyType aType)
+{
+  switch (aType) {
+  case nsIContentPolicy::TYPE_INTERNAL_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SHARED_WORKER:
+  case nsIContentPolicy::TYPE_INTERNAL_SERVICE_WORKER:
+    return aType;
+
+  default:
+    return InternalContentPolicyTypeToExternal(aType);
+  }
+}
+
+/* static */
+bool
+nsContentUtils::IsPreloadType(nsContentPolicyType aType)
+{
+  if (aType == nsIContentPolicy::TYPE_INTERNAL_SCRIPT_PRELOAD ||
+      aType == nsIContentPolicy::TYPE_INTERNAL_IMAGE_PRELOAD ||
+      aType == nsIContentPolicy::TYPE_INTERNAL_STYLESHEET_PRELOAD) {
+    return true;
+  }
+  return false;
+}
+
+/* static */
+nsContentPolicyType
+nsContentUtils::InternalContentPolicyTypeToExternalOrCSPInternal(nsContentPolicyType aType)
+{
+  if (aType == InternalContentPolicyTypeToExternalOrWorker(aType) ||
+      aType == InternalContentPolicyTypeToExternalOrPreload(aType)) {
+    return aType;
+  }
+  return InternalContentPolicyTypeToExternal(aType);
+}
+
 

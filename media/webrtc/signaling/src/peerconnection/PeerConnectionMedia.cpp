@@ -87,7 +87,7 @@ PipelineDetachTransport_s(RefPtr<MediaPipeline> pipeline,
   mainThread->Dispatch(
       // Make sure we let go of our reference before dispatching
       // If the dispatch fails, well, we're hosed anyway.
-      WrapRunnableNM(PipelineReleaseRef_m, pipeline.forget()),
+      WrapRunnableNM(PipelineReleaseRef_m, Move(pipeline)),
       NS_DISPATCH_NORMAL);
 }
 
@@ -101,7 +101,7 @@ SourceStreamInfo::RemoveTrack(const std::string& trackId)
     pipeline->ShutdownMedia_m();
     mParent->GetSTSThread()->Dispatch(
         WrapRunnableNM(PipelineDetachTransport_s,
-                       pipeline.forget(),
+                       Move(pipeline),
                        mParent->GetMainThread()),
         NS_DISPATCH_NORMAL);
   }
@@ -1203,7 +1203,7 @@ RefPtr<MediaPipeline> SourceStreamInfo::GetPipelineByTrackId_m(
   return nullptr;
 }
 
-TemporaryRef<MediaPipeline>
+already_AddRefed<MediaPipeline>
 LocalSourceStreamInfo::ForgetPipelineByTrackId_m(const std::string& trackId)
 {
   ASSERT_ON_THREAD(mParent->GetMainThread());

@@ -608,12 +608,20 @@ public:
   static KTableValue kDisplayKTable[];
   static const KTableValue kElevationKTable[];
   static const KTableValue kEmptyCellsKTable[];
+  // -- tables for the align-/justify-content/items/self properties --
+  static const KTableValue kAlignAllKeywords[];
+  static const KTableValue kAlignOverflowPosition[]; // <overflow-position>
+  static const KTableValue kAlignSelfPosition[];     // <self-position>
+  static const KTableValue kAlignLegacy[];           // 'legacy'
+  static const KTableValue kAlignLegacyPosition[];   // 'left/right/center'
+  static const KTableValue kAlignAutoStretchBaseline[]; // 'auto/stretch/baseline/last-baseline'
   static const KTableValue kAlignContentKTable[];
   static const KTableValue kAlignItemsKTable[];
   static const KTableValue kAlignSelfKTable[];
+  static const KTableValue kJustifyContentKTable[];
+  // ------------------------------------------------------------------
   static const KTableValue kFlexDirectionKTable[];
   static const KTableValue kFlexWrapKTable[];
-  static const KTableValue kJustifyContentKTable[];
   static const KTableValue kFloatKTable[];
   static const KTableValue kFloatEdgeKTable[];
   static const KTableValue kFontKTable[];
@@ -670,6 +678,7 @@ public:
   static const KTableValue kRubyAlignKTable[];
   static const KTableValue kRubyPositionKTable[];
   static const KTableValue kScrollBehaviorKTable[];
+  static const KTableValue kScrollSnapTypeKTable[];
   static const KTableValue kSpeakKTable[];
   static const KTableValue kSpeakHeaderKTable[];
   static const KTableValue kSpeakNumeralKTable[];

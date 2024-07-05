@@ -29,7 +29,7 @@ class SharedPluginTexture;
 
 #include "mozilla/TimeStamp.h"
 #include "mozilla/PluginLibrary.h"
-#include "nsRefPtr.h"
+#include "mozilla/nsRefPtr.h"
 
 class nsPluginStreamListenerPeer; // browser-initiated stream class
 class nsNPAPIPluginStreamListener; // plugin-initiated stream class
@@ -385,7 +385,7 @@ private:
 
 #ifdef MOZ_WIDGET_ANDROID
   void EnsureSharedTexture();
-  mozilla::TemporaryRef<mozilla::gl::AndroidSurfaceTexture> CreateSurfaceTexture();
+  already_AddRefed<mozilla::gl::AndroidSurfaceTexture> CreateSurfaceTexture();
 
   std::map<void*, VideoInfo*> mVideos;
   bool mOnScreen;

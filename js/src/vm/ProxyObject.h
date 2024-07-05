@@ -28,8 +28,7 @@ class ProxyObject : public JSObject
 
   public:
     static ProxyObject* New(JSContext* cx, const BaseProxyHandler* handler, HandleValue priv,
-                            TaggedProto proto_, JSObject* parent_,
-                            const ProxyOptions& options);
+                            TaggedProto proto_, const ProxyOptions& options);
 
     const Value& private_() {
         return GetProxyPrivate(this);
@@ -102,7 +101,7 @@ class ProxyObject : public JSObject
 
     static void trace(JSTracer* trc, JSObject* obj);
 
-    void nuke(const BaseProxyHandler* handler);
+    void nuke();
 
     static const Class class_;
 };

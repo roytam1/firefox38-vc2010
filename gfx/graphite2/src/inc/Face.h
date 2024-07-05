@@ -26,7 +26,8 @@ of the License or (at your option) any later version.
 */
 #pragma once
 
-#include <stdio.h>
+#include <memory>
+#include <cstdio>
 
 #include "graphite2/Font.h"
 

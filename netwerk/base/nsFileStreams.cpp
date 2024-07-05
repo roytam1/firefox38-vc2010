@@ -887,6 +887,9 @@ nsAtomicFileOutputStream::DoOpen()
     nsCOMPtr<nsIFile> file;
     file.swap(mOpenParams.localFile);
 
+    if (!file) {
+        return NS_ERROR_NOT_INITIALIZED;
+    }
     nsresult rv = file->Exists(&mTargetFileExists);
     if (NS_FAILED(rv)) {
         NS_ERROR("Can't tell if target file exists");
@@ -907,11 +910,18 @@ nsAtomicFileOutputStream::DoOpen()
     }
 
     if (NS_SUCCEEDED(rv) && mTargetFileExists) {
+        // Abort if |file| is not writable; it won't work as an output stream.
+        bool isWritable;
+        if (NS_SUCCEEDED(file->IsWritable(&isWritable)) && !isWritable) {
+            return NS_ERROR_FILE_ACCESS_DENIED;
+        }
+
         uint32_t origPerm;
         if (NS_FAILED(file->GetPermissions(&origPerm))) {
             NS_ERROR("Can't get permissions of target file");
             origPerm = mOpenParams.perm;
         }
+
         // XXX What if |perm| is more restrictive then |origPerm|?
         // This leaves the user supplied permissions as they were.
         rv = tempResult->CreateUnique(nsIFile::NORMAL_FILE_TYPE, origPerm);

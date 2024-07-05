@@ -386,7 +386,7 @@ CompositorD3D11::Initialize()
   return true;
 }
 
-TemporaryRef<DataTextureSource>
+already_AddRefed<DataTextureSource>
 CompositorD3D11::CreateDataTextureSource(TextureFlags aFlags)
 {
   RefPtr<DataTextureSource> result = new DataTextureSourceD3D11(gfx::SurfaceFormat::UNKNOWN,
@@ -429,7 +429,7 @@ CompositorD3D11::GetMaxTextureSize() const
   return GetMaxTextureSizeForFeatureLevel(mFeatureLevel);
 }
 
-TemporaryRef<CompositingRenderTarget>
+already_AddRefed<CompositingRenderTarget>
 CompositorD3D11::CreateRenderTarget(const gfx::IntRect& aRect,
                                     SurfaceInitMode aInit)
 {
@@ -456,10 +456,10 @@ CompositorD3D11::CreateRenderTarget(const gfx::IntRect& aRect,
     mContext->ClearRenderTargetView(rt->mRTView, clear);
   }
 
-  return rt;
+  return rt.forget();
 }
 
-TemporaryRef<CompositingRenderTarget>
+already_AddRefed<CompositingRenderTarget>
 CompositorD3D11::CreateRenderTargetFromSource(const gfx::IntRect &aRect,
                                               const CompositingRenderTarget* aSource,
                                               const gfx::IntPoint &aSourcePoint)
@@ -515,7 +515,7 @@ CompositorD3D11::CreateRenderTargetFromSource(const gfx::IntRect &aRect,
     new CompositingRenderTargetD3D11(texture, aRect.TopLeft());
   rt->SetSize(aRect.Size());
 
-  return rt;
+  return rt.forget();
 }
 
 void
@@ -1275,16 +1275,20 @@ CompositorD3D11::UpdateConstantBuffers()
 {
   HRESULT hr;
   D3D11_MAPPED_SUBRESOURCE resource;
+  resource.pData = nullptr;
 
   hr = mContext->Map(mAttachments->mVSConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-  if (Failed(hr)) {
+  if (Failed(hr) || !resource.pData) {
+    gfxCriticalError() << "Failed to map VSConstantBuffer. Result: " << hr;
     return false;
   }
   *(VertexShaderConstants*)resource.pData = mVSConstants;
   mContext->Unmap(mAttachments->mVSConstantBuffer, 0);
+  resource.pData = nullptr;
 
   hr = mContext->Map(mAttachments->mPSConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &resource);
-  if (Failed(hr)) {
+  if (Failed(hr) || !resource.pData) {
+    gfxCriticalError() << "Failed to map PSConstantBuffer. Result: " << hr;
     return false;
   }
   *(PixelShaderConstants*)resource.pData = mPSConstants;

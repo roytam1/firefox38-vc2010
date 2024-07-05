@@ -39,7 +39,7 @@ public:
    * All clients retrieved by this method should be returned using the return
    * functions, or reported lost so that the pool can manage its size correctly.
    */
-  TemporaryRef<TextureClient> GetTextureClient();
+  already_AddRefed<TextureClient> GetTextureClient();
 
   /**
    * Return a TextureClient that is no longer being used and is ready for
@@ -75,10 +75,7 @@ public:
    * Report that a client retrieved via GetTextureClient() has become
    * unusable, so that it will no longer be tracked.
    */
-  void ReportClientLost() {
-    MOZ_ASSERT(mOutstandingClients > mTextureClientsDeferred.size());
-    mOutstandingClients--;
-  }
+  void ReportClientLost();
 
   /**
    * Calling this will cause the pool to attempt to relinquish any unused

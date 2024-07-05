@@ -135,7 +135,7 @@ AudioSinkInputPin::Receive(IMediaSample* aSample )
   return S_OK;
 }
 
-TemporaryRef<IMediaSeeking>
+already_AddRefed<IMediaSeeking>
 AudioSinkInputPin::GetConnectedPinSeeking()
 {
   RefPtr<IPin> peer = GetConnected();
@@ -143,7 +143,7 @@ AudioSinkInputPin::GetConnectedPinSeeking()
     return nullptr;
   RefPtr<IMediaSeeking> seeking;
   peer->QueryInterface(static_cast<IMediaSeeking**>(byRef(seeking)));
-  return seeking;
+  return seeking.forget();
 }
 
 HRESULT

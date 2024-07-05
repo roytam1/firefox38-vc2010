@@ -74,7 +74,7 @@ IsWhitelistedH264Codec(const nsAString& aCodec)
     return false;
   }
 
-#ifdef XP_WIN
+#if 0
   if (!Preferences::GetBool("media.use-blank-decoder") &&
       !WMFDecoderModule::HasH264()) {
     return false;
@@ -255,10 +255,10 @@ HavePlatformMPEGDecoders()
   return Preferences::GetBool("media.use-blank-decoder") ||
 #ifdef XP_WIN
          // We have H.264/AAC platform decoders on Windows Vista and up.
+         IsFFmpegAvailable() ||
          IsVistaOrLater() ||
 #endif
          IsAndroidAvailable() ||
-         IsFFmpegAvailable() ||
          IsAppleAvailable() ||
          IsGonkMP4DecoderAvailable() ||
          IsGMPDecoderAvailable() ||

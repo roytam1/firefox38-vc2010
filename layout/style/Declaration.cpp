@@ -371,7 +371,7 @@ Declaration::GetValue(nsCSSProperty aProperty, nsAString& aValue,
     case eCSSProperty_border_end:
     case eCSSProperty_border_block_start:
     case eCSSProperty_border_block_end:
-    case eCSSProperty__moz_column_rule:
+    case eCSSProperty_column_rule:
     case eCSSProperty_outline: {
       const nsCSSProperty* subprops =
         nsCSSProps::SubpropertyEntryFor(aProperty);
@@ -872,7 +872,7 @@ Declaration::GetValue(nsCSSProperty aProperty, nsAString& aValue,
         AppendValueToString(eCSSProperty_marker_end, aValue, aSerialization);
       break;
     }
-    case eCSSProperty__moz_columns: {
+    case eCSSProperty_columns: {
       // Two values, column-count and column-width, separated by a space.
       const nsCSSProperty* subprops =
         nsCSSProps::SubpropertyEntryFor(aProperty);
@@ -1078,6 +1078,19 @@ Declaration::GetValue(nsCSSProperty aProperty, nsAString& aValue,
       MOZ_ASSERT(subprops[1] == eCSSProperty_UNKNOWN,
                  "must have exactly one subproperty");
       AppendValueToString(subprops[0], aValue, aSerialization);
+      break;
+    }
+    case eCSSProperty_scroll_snap_type: {
+      const nsCSSValue& xValue =
+        *data->ValueFor(eCSSProperty_scroll_snap_type_x);
+      const nsCSSValue& yValue =
+        *data->ValueFor(eCSSProperty_scroll_snap_type_y);
+      if (xValue == yValue) {
+        AppendValueToString(eCSSProperty_scroll_snap_type_x, aValue,
+                            aSerialization);
+      }
+      // If scroll-snap-type-x and scroll-snap-type-y are not equal,
+      // we don't have a shorthand that can express. Bail.
       break;
     }
     case eCSSProperty_all:

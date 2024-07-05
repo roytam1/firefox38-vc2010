@@ -5,10 +5,10 @@
 
 #include "nsAuth.h"
 #include "nsAuthSambaNTLM.h"
+#include "nspr.h"
 #include "prenv.h"
 #include "plbase64.h"
 #include "prerror.h"
-#include "mozilla/Telemetry.h"
 
 #include <stdlib.h>
 
@@ -23,7 +23,7 @@ nsAuthSambaNTLM::~nsAuthSambaNTLM()
     // ntlm_auth reads from stdin regularly so closing our file handles
     // should cause it to exit.
     Shutdown();
-    free(mInitialMessage);
+    PR_Free(mInitialMessage);
 }
 
 void
@@ -212,16 +212,6 @@ nsAuthSambaNTLM::Init(const char *serviceName,
 {
     NS_ASSERTION(!username && !domain && !password, "unexpected credentials");
 
-    static bool sTelemetrySent = false;
-    if (!sTelemetrySent) {
-        mozilla::Telemetry::Accumulate(
-            mozilla::Telemetry::NTLM_MODULE_USED_2,
-            serviceFlags & nsIAuthModule::REQ_PROXY_AUTH
-                ? NTLM_MODULE_SAMBA_AUTH_PROXY
-                : NTLM_MODULE_SAMBA_AUTH_DIRECT);
-        sTelemetrySent = true;
-    }
-
     return NS_OK;
 }
 
@@ -248,7 +238,7 @@ nsAuthSambaNTLM::GetNextToken(const void *inToken,
     nsCString request;
     request.AssignLiteral("TT ");
     request.Append(encoded);
-    free(encoded);
+    PR_Free(encoded);
     request.Append('\n');
 
     if (!WriteString(mToChildFD, request))
@@ -265,7 +255,7 @@ nsAuthSambaNTLM::GetNextToken(const void *inToken,
         return NS_ERROR_FAILURE;
     // *outToken has to be freed by nsMemory::Free, which may not be free() 
     *outToken = nsMemory::Clone(buf, *outTokenLen);
-    free(buf);
+    PR_Free(buf);
     if (!*outToken) {
         return NS_ERROR_OUT_OF_MEMORY;
     }

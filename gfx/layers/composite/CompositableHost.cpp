@@ -173,7 +173,7 @@ CompositableHost::RemoveMaskEffect()
   }
 }
 
-/* static */ TemporaryRef<CompositableHost>
+/* static */ already_AddRefed<CompositableHost>
 CompositableHost::Create(const TextureInfo& aTextureInfo)
 {
   RefPtr<CompositableHost> result;
@@ -204,7 +204,7 @@ CompositableHost::Create(const TextureInfo& aTextureInfo)
   default:
     NS_ERROR("Unknown CompositableType");
   }
-  return result;
+  return result.forget();
 }
 
 void

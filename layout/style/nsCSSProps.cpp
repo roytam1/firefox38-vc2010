@@ -1137,6 +1137,68 @@ const KTableValue nsCSSProps::kEmptyCellsKTable[] = {
   eCSSKeyword_UNKNOWN,-1
 };
 
+const KTableValue nsCSSProps::kAlignAllKeywords[] = {
+  eCSSKeyword_auto,          NS_STYLE_ALIGN_AUTO,
+  eCSSKeyword_start,         NS_STYLE_ALIGN_START,
+  eCSSKeyword_end,           NS_STYLE_ALIGN_END,
+  eCSSKeyword_flex_start,    NS_STYLE_ALIGN_FLEX_START,
+  eCSSKeyword_flex_end,      NS_STYLE_ALIGN_FLEX_END,
+  eCSSKeyword_center,        NS_STYLE_ALIGN_CENTER,
+  eCSSKeyword_left,          NS_STYLE_ALIGN_LEFT,
+  eCSSKeyword_right,         NS_STYLE_ALIGN_RIGHT,
+  eCSSKeyword_baseline,      NS_STYLE_ALIGN_BASELINE,
+  eCSSKeyword_last_baseline, NS_STYLE_ALIGN_LAST_BASELINE,
+  eCSSKeyword_stretch,       NS_STYLE_ALIGN_STRETCH,
+  eCSSKeyword_self_start,    NS_STYLE_ALIGN_SELF_START,
+  eCSSKeyword_self_end,      NS_STYLE_ALIGN_SELF_END,
+  eCSSKeyword_space_between, NS_STYLE_ALIGN_SPACE_BETWEEN,
+  eCSSKeyword_space_around,  NS_STYLE_ALIGN_SPACE_AROUND,
+  eCSSKeyword_space_evenly,  NS_STYLE_ALIGN_SPACE_EVENLY,
+  eCSSKeyword_legacy,        NS_STYLE_ALIGN_LEGACY,
+  eCSSKeyword_safe,          NS_STYLE_ALIGN_SAFE,
+  eCSSKeyword_unsafe,        NS_STYLE_ALIGN_UNSAFE,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kAlignOverflowPosition[] = {
+  eCSSKeyword_unsafe,          NS_STYLE_ALIGN_UNSAFE,
+  eCSSKeyword_safe,          NS_STYLE_ALIGN_SAFE,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kAlignSelfPosition[] = {
+  eCSSKeyword_start,         NS_STYLE_ALIGN_START,
+  eCSSKeyword_end,           NS_STYLE_ALIGN_END,
+  eCSSKeyword_flex_start,    NS_STYLE_ALIGN_FLEX_START,
+  eCSSKeyword_flex_end,      NS_STYLE_ALIGN_FLEX_END,
+  eCSSKeyword_center,        NS_STYLE_ALIGN_CENTER,
+  eCSSKeyword_left,          NS_STYLE_ALIGN_LEFT,
+  eCSSKeyword_right,         NS_STYLE_ALIGN_RIGHT,
+  eCSSKeyword_self_start,    NS_STYLE_ALIGN_SELF_START,
+  eCSSKeyword_self_end,      NS_STYLE_ALIGN_SELF_END,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kAlignLegacy[] = {
+  eCSSKeyword_legacy,        NS_STYLE_ALIGN_LEGACY,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kAlignLegacyPosition[] = {
+  eCSSKeyword_center,        NS_STYLE_ALIGN_CENTER,
+  eCSSKeyword_left,          NS_STYLE_ALIGN_LEFT,
+  eCSSKeyword_right,         NS_STYLE_ALIGN_RIGHT,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kAlignAutoStretchBaseline[] = {
+  eCSSKeyword_auto,          NS_STYLE_ALIGN_AUTO,
+  eCSSKeyword_stretch,       NS_STYLE_ALIGN_STRETCH,
+  eCSSKeyword_baseline,      NS_STYLE_ALIGN_BASELINE,
+  eCSSKeyword_last_baseline, NS_STYLE_ALIGN_LAST_BASELINE,
+  eCSSKeyword_UNKNOWN,-1
+};
+
 const KTableValue nsCSSProps::kAlignContentKTable[] = {
   eCSSKeyword_flex_start,    NS_STYLE_ALIGN_CONTENT_FLEX_START,
   eCSSKeyword_flex_end,      NS_STYLE_ALIGN_CONTENT_FLEX_END,
@@ -1648,6 +1710,13 @@ const KTableValue nsCSSProps::kRubyPositionKTable[] = {
 const KTableValue nsCSSProps::kScrollBehaviorKTable[] = {
   eCSSKeyword_auto,       NS_STYLE_SCROLL_BEHAVIOR_AUTO,
   eCSSKeyword_smooth,     NS_STYLE_SCROLL_BEHAVIOR_SMOOTH,
+  eCSSKeyword_UNKNOWN,-1
+};
+
+const KTableValue nsCSSProps::kScrollSnapTypeKTable[] = {
+  eCSSKeyword_none,      NS_STYLE_SCROLL_SNAP_TYPE_NONE,
+  eCSSKeyword_mandatory, NS_STYLE_SCROLL_SNAP_TYPE_MANDATORY,
+  eCSSKeyword_proximity, NS_STYLE_SCROLL_SNAP_TYPE_PROXIMITY,
   eCSSKeyword_UNKNOWN,-1
 };
 
@@ -2468,17 +2537,17 @@ static const nsCSSProperty gOutlineSubpropTable[] = {
 };
 
 static const nsCSSProperty gColumnsSubpropTable[] = {
-  eCSSProperty__moz_column_count,
-  eCSSProperty__moz_column_width,
+  eCSSProperty_column_count,
+  eCSSProperty_column_width,
   eCSSProperty_UNKNOWN
 };
 
 static const nsCSSProperty gColumnRuleSubpropTable[] = {
   // nsCSSDeclaration.cpp outputs the subproperties in this order.
   // It also depends on the color being third.
-  eCSSProperty__moz_column_rule_width,
-  eCSSProperty__moz_column_rule_style,
-  eCSSProperty__moz_column_rule_color,
+  eCSSProperty_column_rule_width,
+  eCSSProperty_column_rule_style,
+  eCSSProperty_column_rule_color,
   eCSSProperty_UNKNOWN
 };
 
@@ -2582,6 +2651,12 @@ static const nsCSSProperty gMarkerSubpropTable[] = {
 // different parsing rules.
 static const nsCSSProperty gMozTransformSubpropTable[] = {
   eCSSProperty_transform,
+  eCSSProperty_UNKNOWN
+};
+
+static const nsCSSProperty gScrollSnapTypeSubpropTable[] = {
+  eCSSProperty_scroll_snap_type_x,
+  eCSSProperty_scroll_snap_type_y,
   eCSSProperty_UNKNOWN
 };
 

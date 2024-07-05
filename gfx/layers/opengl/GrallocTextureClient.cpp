@@ -44,7 +44,7 @@ GrallocTextureClientOGL::~GrallocTextureClientOGL()
   }
 }
 
-TemporaryRef<TextureClient>
+already_AddRefed<TextureClient>
 GrallocTextureClientOGL::CreateSimilar(TextureFlags aFlags,
                                        TextureAllocationFlags aAllocFlags) const
 {
@@ -56,17 +56,7 @@ GrallocTextureClientOGL::CreateSimilar(TextureFlags aFlags,
     return nullptr;
   }
 
-  return tex;
-}
-
-void
-GrallocTextureClientOGL::InitWith(MaybeMagicGrallocBufferHandle aHandle, gfx::IntSize aSize)
-{
-  MOZ_ASSERT(!IsAllocated());
-  MOZ_ASSERT(IsValid());
-  mGrallocHandle = aHandle;
-  mGraphicBuffer = GetGraphicBufferFrom(aHandle);
-  mSize = aSize;
+  return tex.forget();
 }
 
 bool
@@ -360,7 +350,7 @@ GrallocTextureClientOGL::GetBufferSize() const
   return 0;
 }
 
-/*static*/ TemporaryRef<TextureClient>
+/*static*/ already_AddRefed<TextureClient>
 GrallocTextureClientOGL::FromSharedSurface(gl::SharedSurface* abstractSurf,
                                            TextureFlags flags)
 {

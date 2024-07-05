@@ -220,6 +220,8 @@ class JSFunction : public js::NativeObject
 
     void initAtom(JSAtom* atom) { atom_.init(atom); }
 
+    void setAtom(JSAtom* atom) { atom_ = atom; }
+
     JSAtom* displayAtom() const {
         return atom_;
     }
@@ -316,6 +318,19 @@ class JSFunction : public js::NativeObject
             initScript(script);
         }
         return nonLazyScript();
+    }
+
+    // If this is a scripted function, returns its canonical function (the
+    // original function allocated by the frontend). Note that lazy self-hosted
+    // builtins don't have a lazy script so in that case we also return nullptr.
+    JSFunction* maybeCanonicalFunction() const {
+        if (hasScript()) {
+            return nonLazyScript()->functionNonDelazifying();
+        }
+        if (isInterpretedLazy() && !isSelfHostedBuiltin()) {
+            return lazyScript()->functionNonDelazifying();
+        }
+        return nullptr;
     }
 
     // The state of a JSFunction whose script errored out during bytecode
@@ -551,6 +566,17 @@ fun_toString(JSContext* cx, unsigned argc, Value* vp);
 extern bool
 fun_bind(JSContext* cx, unsigned argc, Value* vp);
 
+struct WellKnownSymbols;
+
+extern bool
+FunctionHasDefaultHasInstance(JSFunction* fun, const WellKnownSymbols& symbols);
+
+extern bool
+fun_symbolHasInstance(JSContext* cx, unsigned argc, Value* vp);
+
+extern bool
+OrdinaryHasInstance(JSContext* cx, HandleObject objArg, MutableHandleValue v, bool* bp);
+
 /*
  * Function extended with reserved slots for use by various kinds of functions.
  * Most functions do not have these extensions, but enough do that efficient
@@ -670,17 +696,17 @@ CallOrConstructBoundFunction(JSContext*, unsigned, js::Value*);
 
 extern const JSFunctionSpec function_methods[];
 
-} /* namespace js */
+extern bool
+fun_apply(JSContext* cx, unsigned argc, Value* vp);
 
 extern bool
-js_fun_apply(JSContext* cx, unsigned argc, js::Value* vp);
-
-extern bool
-js_fun_call(JSContext* cx, unsigned argc, js::Value* vp);
+fun_call(JSContext* cx, unsigned argc, Value* vp);
 
 extern JSObject*
-js_fun_bind(JSContext* cx, js::HandleObject target, js::HandleValue thisArg,
-            js::Value* boundArgs, unsigned argslen);
+fun_bind(JSContext* cx, HandleObject target, HandleValue thisArg,
+         Value* boundArgs, unsigned argslen);
+
+} /* namespace js */
 
 #ifdef DEBUG
 namespace JS {

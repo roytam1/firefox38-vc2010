@@ -61,9 +61,12 @@
 #include "gc/GCInternals.h"
 #include "jit/arm/Simulator-arm.h"
 #include "jit/Ion.h"
+#include "jit/JitcodeMap.h"
+#include "jit/OptimizationTracking.h"
 #include "js/Debug.h"
 #include "js/GCAPI.h"
 #include "js/StructuredClone.h"
+#include "js/TrackedOptimizationInfo.h"
 #include "perf/jsperf.h"
 #include "shell/jsheaptools.h"
 #include "shell/jsoptparse.h"
@@ -731,7 +734,7 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
             return false;
         sizeGiven = true;
         if (offset > size) {
-            JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr,
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                                  JSMSG_ARG_INDEX_OUT_OF_RANGE, "2");
             return false;
         }
@@ -752,7 +755,7 @@ CreateMappedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
             return false;
         }
         if (st.st_size < off_t(offset)) {
-            JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr,
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr,
                                  JSMSG_ARG_INDEX_OUT_OF_RANGE, "2");
             return false;
         }
@@ -1199,7 +1202,7 @@ Evaluate(JSContext* cx, unsigned argc, jsval* vp)
                     return false;
             }
             if (!global || !(JS_GetClass(global)->flags & JSCLASS_IS_GLOBAL)) {
-                JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_UNEXPECTED_TYPE,
+                JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNEXPECTED_TYPE,
                                      "\"global\" passed to evaluate()", "not a global object");
                 return false;
             }
@@ -1999,7 +2002,7 @@ LineToPC(JSContext* cx, unsigned argc, jsval* vp)
     if (!ToUint32(cx, args.get(lineArg), &lineno))
          return false;
 
-    jsbytecode* pc = js_LineNumberToPC(script, lineno);
+    jsbytecode* pc = LineNumberToPC(script, lineno);
     if (!pc)
         return false;
     args.rval().setInt32(script->pcToOffset(pc));
@@ -2087,12 +2090,12 @@ SrcNotes(JSContext* cx, HandleScript script, Sprinter* sp)
             break;
 
           case SRC_COLSPAN:
-            colspan = SN_OFFSET_TO_COLSPAN(js_GetSrcNoteOffset(sn, 0));
+            colspan = SN_OFFSET_TO_COLSPAN(GetSrcNoteOffset(sn, 0));
             Sprint(sp, "%d", colspan);
             break;
 
           case SRC_SETLINE:
-            lineno = js_GetSrcNoteOffset(sn, 0);
+            lineno = GetSrcNoteOffset(sn, 0);
             Sprint(sp, " lineno %u", lineno);
             break;
 
@@ -2102,30 +2105,30 @@ SrcNotes(JSContext* cx, HandleScript script, Sprinter* sp)
 
           case SRC_FOR:
             Sprint(sp, " cond %u update %u tail %u",
-                   unsigned(js_GetSrcNoteOffset(sn, 0)),
-                   unsigned(js_GetSrcNoteOffset(sn, 1)),
-                   unsigned(js_GetSrcNoteOffset(sn, 2)));
+                   unsigned(GetSrcNoteOffset(sn, 0)),
+                   unsigned(GetSrcNoteOffset(sn, 1)),
+                   unsigned(GetSrcNoteOffset(sn, 2)));
             break;
 
           case SRC_IF_ELSE:
-            Sprint(sp, " else %u", unsigned(js_GetSrcNoteOffset(sn, 0)));
+            Sprint(sp, " else %u", unsigned(GetSrcNoteOffset(sn, 0)));
             break;
 
           case SRC_FOR_IN:
           case SRC_FOR_OF:
-            Sprint(sp, " closingjump %u", unsigned(js_GetSrcNoteOffset(sn, 0)));
+            Sprint(sp, " closingjump %u", unsigned(GetSrcNoteOffset(sn, 0)));
             break;
 
           case SRC_COND:
           case SRC_WHILE:
           case SRC_NEXTCASE:
-            Sprint(sp, " offset %u", unsigned(js_GetSrcNoteOffset(sn, 0)));
+            Sprint(sp, " offset %u", unsigned(GetSrcNoteOffset(sn, 0)));
             break;
 
           case SRC_TABLESWITCH: {
             JSOp op = JSOp(script->code()[offset]);
             MOZ_ASSERT(op == JSOP_TABLESWITCH);
-            Sprint(sp, " length %u", unsigned(js_GetSrcNoteOffset(sn, 0)));
+            Sprint(sp, " length %u", unsigned(GetSrcNoteOffset(sn, 0)));
             UpdateSwitchTableBounds(cx, script, offset,
                                     &switchTableStart, &switchTableEnd);
             break;
@@ -2133,8 +2136,8 @@ SrcNotes(JSContext* cx, HandleScript script, Sprinter* sp)
           case SRC_CONDSWITCH: {
             JSOp op = JSOp(script->code()[offset]);
             MOZ_ASSERT(op == JSOP_CONDSWITCH);
-            Sprint(sp, " length %u", unsigned(js_GetSrcNoteOffset(sn, 0)));
-            unsigned caseOff = (unsigned) js_GetSrcNoteOffset(sn, 1);
+            Sprint(sp, " length %u", unsigned(GetSrcNoteOffset(sn, 0)));
+            unsigned caseOff = (unsigned) GetSrcNoteOffset(sn, 1);
             if (caseOff)
                 Sprint(sp, " first case offset %u", caseOff);
             UpdateSwitchTableBounds(cx, script, offset,
@@ -2144,7 +2147,7 @@ SrcNotes(JSContext* cx, HandleScript script, Sprinter* sp)
 
           case SRC_TRY:
             MOZ_ASSERT(JSOp(script->code()[offset]) == JSOP_TRY);
-            Sprint(sp, " offset to jump %u", unsigned(js_GetSrcNoteOffset(sn, 0)));
+            Sprint(sp, " offset to jump %u", unsigned(GetSrcNoteOffset(sn, 0)));
             break;
 
           default:
@@ -2227,7 +2230,7 @@ DisassembleScript(JSContext* cx, HandleScript script, HandleFunction fun, bool l
         Sprint(sp, "\n");
     }
 
-    if (!js_Disassemble(cx, script, lines, sp))
+    if (!Disassemble(cx, script, lines, sp))
         return false;
     SrcNotes(cx, script, sp);
     TryNotes(cx, script, sp);
@@ -2297,7 +2300,7 @@ DisassembleToSprinter(JSContext* cx, unsigned argc, jsval* vp, Sprinter* sprinte
         RootedScript script(cx, GetTopScript(cx));
         if (script) {
             JSAutoCompartment ac(cx, script);
-            if (!js_Disassemble(cx, script, p.lines, sprinter))
+            if (!Disassemble(cx, script, p.lines, sprinter))
                 return false;
             SrcNotes(cx, script, sprinter);
             TryNotes(cx, script, sprinter);
@@ -2479,7 +2482,7 @@ DisassWithSrc(JSContext* cx, unsigned argc, jsval* vp)
                 }
             }
 
-            len = js_Disassemble1(cx, script, pc, script->pcToOffset(pc), true, &sprinter);
+            len = Disassemble1(cx, script, pc, script->pcToOffset(pc), true, &sprinter);
             if (!len) {
                 ok = false;
                 goto bail;
@@ -2562,7 +2565,7 @@ Clone(JSContext* cx, unsigned argc, jsval* vp)
     if (funobj->compartment() != cx->compartment()) {
         JSFunction* fun = &funobj->as<JSFunction>();
         if (fun->hasScript() && fun->nonLazyScript()->compileAndGo()) {
-            JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_UNEXPECTED_TYPE,
+            JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_UNEXPECTED_TYPE,
                                  "function", "compile-and-go");
             return false;
         }
@@ -2596,7 +2599,7 @@ GetSLX(JSContext* cx, unsigned argc, jsval* vp)
     script = ValueToScript(cx, args.get(0));
     if (!script)
         return false;
-    args.rval().setInt32(js_GetScriptLineExtent(script));
+    args.rval().setInt32(GetScriptLineExtent(script));
     return true;
 }
 
@@ -3235,7 +3238,7 @@ Compile(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (args.length() < 1) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
                              "compile", "0", "s");
         return false;
     }
@@ -3275,7 +3278,7 @@ Parse(JSContext* cx, unsigned argc, jsval* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() < 1) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
                              "parse", "0", "s");
         return false;
     }
@@ -3324,7 +3327,7 @@ SyntaxParse(JSContext* cx, unsigned argc, jsval* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() < 1) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
                              "parse", "0", "s");
         return false;
     }
@@ -3463,7 +3466,7 @@ OffThreadCompileScript(JSContext* cx, unsigned argc, jsval* vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     if (args.length() < 1) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_MORE_ARGS_NEEDED,
                              "offThreadCompileScript", "0", "s");
         return false;
     }
@@ -3950,7 +3953,7 @@ WrapWithProto(JSContext* cx, unsigned argc, jsval* vp)
 
     WrapperOptions options(cx);
     options.setProto(proto.toObjectOrNull());
-    JSObject* wrapped = Wrapper::New(cx, &obj.toObject(), &obj.toObject().global(),
+    JSObject* wrapped = Wrapper::New(cx, &obj.toObject(),
                                      &Wrapper::singletonWithPrototype, options);
     if (!wrapped)
         return false;
@@ -4337,6 +4340,175 @@ SetSharedArrayBuffer(JSContext* cx, unsigned argc, Value* vp)
     return true;
 }
 
+using namespace JS;
+
+class SprintOptimizationTypeInfoOp : public ForEachTrackedOptimizationTypeInfoOp
+{
+    Sprinter *sp;
+    bool startedTypes_;
+
+  public:
+    explicit SprintOptimizationTypeInfoOp(Sprinter *sp)
+      : sp(sp),
+        startedTypes_(false)
+    { }
+
+    void readType(const char *keyedBy, const char *name,
+                  const char *location, unsigned lineno) MOZ_OVERRIDE
+    {
+        if (!startedTypes_) {
+            startedTypes_ = true;
+            Sprint(sp, "{\"typeset\": [");
+        }
+        Sprint(sp, "{\"keyedBy\":\"%s\"", keyedBy);
+        if (name)
+            Sprint(sp, ",\"name\":\"%s\"", name);
+        if (location) {
+            char buf[512];
+            PutEscapedString(buf, mozilla::ArrayLength(buf), location, strlen(location), '"');
+            Sprint(sp, ",\"location\":%s", buf);
+        }
+        if (lineno != UINT32_MAX)
+            Sprint(sp, ",\"line\":%u", lineno);
+        Sprint(sp, "},");
+    }
+
+    void operator()(TrackedTypeSite site, const char *mirType) MOZ_OVERRIDE {
+        if (startedTypes_) {
+            // Clear trailing ,
+            if ((*sp)[sp->getOffset() - 1] == ',')
+                (*sp)[sp->getOffset() - 1] = ' ';
+            Sprint(sp, "],");
+            startedTypes_ = false;
+        } else {
+            Sprint(sp, "{");
+        }
+
+        Sprint(sp, "\"site\":\"%s\",\"mirType\":\"%s\"},",
+               TrackedTypeSiteString(site), mirType);
+    }
+};
+
+class SprintOptimizationAttemptsOp : public ForEachTrackedOptimizationAttemptOp
+{
+    Sprinter *sp;
+
+  public:
+    explicit SprintOptimizationAttemptsOp(Sprinter *sp)
+      : sp(sp)
+    { }
+
+    void operator()(TrackedStrategy strategy, TrackedOutcome outcome) MOZ_OVERRIDE {
+        Sprint(sp, "{\"strategy\":\"%s\",\"outcome\":\"%s\"},",
+               TrackedStrategyString(strategy), TrackedOutcomeString(outcome));
+    }
+};
+
+static bool
+ReflectTrackedOptimizations(JSContext *cx, unsigned argc, Value *vp)
+{
+    CallArgs args = CallArgsFromVp(argc, vp);
+    RootedObject callee(cx, &args.callee());
+    JSRuntime *rt = cx->runtime();
+
+    if (!rt->hasJitRuntime() || !rt->jitRuntime()->isOptimizationTrackingEnabled(rt)) {
+        JS_ReportError(cx, "Optimization tracking is off.");
+        return false;
+    }
+
+    if (args.length() != 1) {
+        ReportUsageError(cx, callee, "Wrong number of arguments");
+        return false;
+    }
+
+    if (!args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
+        ReportUsageError(cx, callee, "Argument must be a function");
+        return false;
+    }
+
+    RootedFunction fun(cx, &args[0].toObject().as<JSFunction>());
+    if (!fun->hasScript() || !fun->nonLazyScript()->hasIonScript()) {
+        args.rval().setNull();
+        return true;
+    }
+
+    jit::JitcodeGlobalTable *table = rt->jitRuntime()->getJitcodeGlobalTable();
+    jit::JitcodeGlobalEntry entry;
+    jit::IonScript *ion = fun->nonLazyScript()->ionScript();
+    table->lookupInfallible(ion->method()->raw(), &entry, rt);
+
+    if (!entry.hasTrackedOptimizations()) {
+        JSObject *obj = JS_NewPlainObject(cx);
+        if (!obj)
+            return false;
+        args.rval().setObject(*obj);
+        return true;
+    }
+
+    Sprinter sp(cx);
+    if (!sp.init())
+        return false;
+
+    const jit::IonTrackedOptimizationsRegionTable *regions =
+        entry.ionEntry().trackedOptimizationsRegionTable();
+
+    Sprint(&sp, "{\"regions\": [");
+    for (uint32_t i = 0; i < regions->numEntries(); i++) {
+        jit::IonTrackedOptimizationsRegion region = regions->entry(i);
+        jit::IonTrackedOptimizationsRegion::RangeIterator iter = region.ranges();
+        while (iter.more()) {
+            uint32_t startOffset, endOffset;
+            uint8_t index;
+            iter.readNext(&startOffset, &endOffset, &index);
+            JSScript *script;
+            jsbytecode *pc;
+            // Use endOffset, as startOffset may be associated with a
+            // previous, adjacent region ending exactly at startOffset. That
+            // is, suppose we have two regions [0, startOffset], [startOffset,
+            // endOffset]. Since we are not querying a return address, we want
+            // the second region and not the first.
+            uint8_t *addr = ion->method()->raw() + endOffset;
+            entry.youngestFrameLocationAtAddr(rt, addr, &script, &pc);
+            Sprint(&sp, "{\"location\":\"%s:%u\",\"offset\":%u,\"index\":%u}%s",
+                   script->filename(), script->lineno(), script->pcToOffset(pc), index,
+                   iter.more() ? "," : "");
+        }
+    }
+    Sprint(&sp, "],");
+
+    Sprint(&sp, "\"opts\": [");
+    for (uint8_t i = 0; i < entry.ionEntry().numOptimizationAttempts(); i++) {
+        Sprint(&sp, "%s{\"typeinfo\":[", i == 0 ? "" : ",");
+        SprintOptimizationTypeInfoOp top(&sp);
+        jit::IonTrackedOptimizationsTypeInfo::ForEachOpAdapter adapter(top);
+        entry.trackedOptimizationTypeInfo(i).forEach(adapter, entry.allTrackedTypes());
+        // Clear the trailing ,
+        if (sp[sp.getOffset() - 1] == ',')
+            sp[sp.getOffset() - 1] = ' ';
+        Sprint(&sp, "],\"attempts\":[");
+        SprintOptimizationAttemptsOp aop(&sp);
+        entry.trackedOptimizationAttempts(i).forEach(aop);
+        // Clear the trailing ,
+        if (sp[sp.getOffset() - 1] == ',')
+            sp[sp.getOffset() - 1] = ' ';
+        Sprint(&sp, "]}");
+    }
+    Sprint(&sp, "]}");
+
+    if (sp.hadOutOfMemory())
+        return false;
+
+    RootedString str(cx, JS_NewStringCopyZ(cx, sp.string()));
+    if (!str)
+        return false;
+    RootedValue jsonVal(cx);
+    if (!JS_ParseJSON(cx, str, &jsonVal))
+        return false;
+
+    args.rval().set(jsonVal);
+    return true;
+}
+
 static const JSFunctionSpecWithHelp shell_functions[] = {
     JS_FN_HELP("version", Version, 0, 0,
 "version([number])",
@@ -4547,7 +4719,7 @@ static const JSFunctionSpecWithHelp shell_functions[] = {
 "  Get the shape of obj (an implementation detail)."),
 
 #ifdef DEBUG
-    JS_FN_HELP("arrayInfo", js_ArrayInfo, 1, 0,
+    JS_FN_HELP("arrayInfo", ArrayInfo, 1, 0,
 "arrayInfo(a1, a2, ...)",
 "  Report statistics about arrays."),
 #endif
@@ -4780,6 +4952,12 @@ static const JSFunctionSpecWithHelp fuzzing_unsafe_functions[] = {
 "  Wrap an object into a noop wrapper with prototype semantics.\n"
 "  Note: This is not fuzzing safe because it can be used to construct\n"
 "        deeply nested wrapper chains that cannot exist in the wild."),
+
+    JS_FN_HELP("trackedOpts", ReflectTrackedOptimizations, 1, 0,
+"trackedOpts(fun)",
+"  Returns an object describing the tracked optimizations of |fun|, if\n"
+"  any. If |fun| is not a scripted function or has not been compiled by\n"
+"  Ion, null is returned."),
 
     JS_FS_HELP_END
 };
@@ -5174,7 +5352,7 @@ dom_constructor(JSContext* cx, unsigned argc, JS::Value* vp)
         return false;
 
     if (!protov.isObject()) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_BAD_PROTOTYPE, "FakeDOMObject");
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_BAD_PROTOTYPE, "FakeDOMObject");
         return false;
     }
 

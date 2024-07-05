@@ -27,7 +27,7 @@ DIBTextureClient::~DIBTextureClient()
   MOZ_COUNT_DTOR(DIBTextureClient);
 }
 
-TemporaryRef<TextureClient>
+already_AddRefed<TextureClient>
 DIBTextureClient::CreateSimilar(TextureFlags aFlags,
                                 TextureAllocationFlags aAllocFlags) const
 {
@@ -38,7 +38,7 @@ DIBTextureClient::CreateSimilar(TextureFlags aFlags,
     return nullptr;
   }
 
-  return tex;
+  return tex.forget();
 }
 
 bool

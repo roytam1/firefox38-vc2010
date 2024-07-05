@@ -7,6 +7,7 @@
 #include "mozilla/LoadInfo.h"
 
 #include "mozilla/Assertions.h"
+#include "nsContentUtils.h"
 #include "nsIDocument.h"
 #include "nsIDOMDocument.h"
 #include "nsISupportsImpl.h"
@@ -26,10 +27,11 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
                            aTriggeringPrincipal : mLoadingPrincipal.get())
   , mLoadingContext(do_GetWeakReference(aLoadingContext))
   , mSecurityFlags(aSecurityFlags)
-  , mContentPolicyType(aContentPolicyType)
+  , mInternalContentPolicyType(aContentPolicyType)
   , mBaseURI(aBaseURI)
   , mInnerWindowID(aLoadingContext ?
                      aLoadingContext->OwnerDoc()->InnerWindowID() : 0)
+  , mIsFromProcessingFrameAttributes(false)
 {
   MOZ_ASSERT(mLoadingPrincipal);
   MOZ_ASSERT(mTriggeringPrincipal);
@@ -53,8 +55,9 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
   : mLoadingPrincipal(aLoadingPrincipal)
   , mTriggeringPrincipal(aTriggeringPrincipal)
   , mSecurityFlags(aSecurityFlags)
-  , mContentPolicyType(aContentPolicyType)
+  , mInternalContentPolicyType(aContentPolicyType)
   , mInnerWindowID(aInnerWindowID)
+  , mIsFromProcessingFrameAttributes(false)
 {
   MOZ_ASSERT(mLoadingPrincipal);
   MOZ_ASSERT(mTriggeringPrincipal);
@@ -62,6 +65,14 @@ LoadInfo::LoadInfo(nsIPrincipal* aLoadingPrincipal,
 
 LoadInfo::~LoadInfo()
 {
+}
+
+already_AddRefed<nsILoadInfo>
+LoadInfo::CloneWithNewSecFlags(nsSecurityFlags aSecurityFlags) const
+{
+  nsRefPtr<LoadInfo> copy(new LoadInfo(*this));
+  copy->mSecurityFlags = aSecurityFlags;
+  return copy.forget();
 }
 
 NS_IMPL_ISUPPORTS(LoadInfo, nsILoadInfo)
@@ -133,10 +144,16 @@ LoadInfo::GetLoadingSandboxed(bool* aLoadingSandboxed)
 }
 
 NS_IMETHODIMP
-LoadInfo::GetContentPolicyType(nsContentPolicyType* aResult)
+LoadInfo::GetExternalContentPolicyType(nsContentPolicyType* aResult)
 {
-  *aResult = mContentPolicyType;
+  *aResult = nsContentUtils::InternalContentPolicyTypeToExternal(mInternalContentPolicyType);
   return NS_OK;
+}
+
+nsContentPolicyType
+LoadInfo::InternalContentPolicyType()
+{
+  return mInternalContentPolicyType;
 }
 
 NS_IMETHODIMP
@@ -157,6 +174,20 @@ NS_IMETHODIMP
 LoadInfo::GetInnerWindowID(uint32_t* aResult)
 {
   *aResult = mInnerWindowID;
+  return NS_OK;
+}
+
+void
+LoadInfo::SetIsFromProcessingFrameAttributes()
+{
+  mIsFromProcessingFrameAttributes = true;
+}
+
+NS_IMETHODIMP
+LoadInfo::GetIsFromProcessingFrameAttributes(bool *aIsFromProcessingFrameAttributes)
+{
+  MOZ_ASSERT(aIsFromProcessingFrameAttributes);
+  *aIsFromProcessingFrameAttributes = mIsFromProcessingFrameAttributes;
   return NS_OK;
 }
 

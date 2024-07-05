@@ -50,10 +50,10 @@ DrawTargetTiled::Init(const TileSet& aTiles)
   return true;
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 DrawTargetTiled::Snapshot()
 {
-  return new SnapshotTiled(mTiles, mRect);
+  return MakeAndAddRef<SnapshotTiled>(mTiles, mRect);
 }
 
 // Skip the mClippedOut check since this is only used for Flush() which

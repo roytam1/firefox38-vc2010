@@ -71,10 +71,18 @@ class UnboxedLayout : public mozilla::LinkedListElement<UnboxedLayout>
     HeapPtrObjectGroup nativeGroup_;
     HeapPtrShape nativeShape_;
 
+    // If nativeGroup is set and this object originally had a TypeNewScript,
+    // this points to the default 'new' group which replaced this one (and
+    // which might itself have been cleared since). This link is only needed to
+    // keep the replacement group from being GC'ed. If it were GC'ed and a new
+    // one regenerated later, that new group might have a different allocation
+    // kind from this group.
+    HeapPtrObjectGroup replacementNewGroup_;
+
   public:
     UnboxedLayout(const PropertyVector& properties, size_t size)
       : size_(size), newScript_(nullptr), traceList_(nullptr),
-        nativeGroup_(nullptr), nativeShape_(nullptr)
+        nativeGroup_(nullptr), nativeShape_(nullptr), replacementNewGroup_(nullptr)
     {
         properties_.appendAll(properties);
     }
@@ -154,7 +162,8 @@ class UnboxedPlainObject : public JSObject
                                    MutableHandleShape propp);
 
     static bool obj_defineProperty(JSContext* cx, HandleObject obj, HandleId id, HandleValue v,
-                                   PropertyOp getter, StrictPropertyOp setter, unsigned attrs);
+                                   PropertyOp getter, StrictPropertyOp setter, unsigned attrs,
+                                   ObjectOpResult &result);
 
     static bool obj_hasProperty(JSContext* cx, HandleObject obj, HandleId id, bool* foundp);
 
@@ -162,12 +171,13 @@ class UnboxedPlainObject : public JSObject
                                 HandleId id, MutableHandleValue vp);
 
     static bool obj_setProperty(JSContext* cx, HandleObject obj, HandleObject receiver,
-                                HandleId id, MutableHandleValue vp, bool strict);
+                                HandleId id, MutableHandleValue vp, ObjectOpResult &result);
 
     static bool obj_getOwnPropertyDescriptor(JSContext* cx, HandleObject obj, HandleId id,
                                              MutableHandle<JSPropertyDescriptor> desc);
 
-    static bool obj_deleteProperty(JSContext* cx, HandleObject obj, HandleId id, bool* succeeded);
+    static bool obj_deleteProperty(JSContext *cx, HandleObject obj, HandleId id,
+                                   ObjectOpResult &result);
 
     static bool obj_enumerate(JSContext* cx, HandleObject obj, AutoIdVector& properties);
     static bool obj_watch(JSContext* cx, HandleObject obj, HandleId id, HandleObject callable);

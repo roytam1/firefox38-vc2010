@@ -443,7 +443,7 @@ MaybeMoveToMidPoint(Point& aP0, Point& aP1, const Point& aMidPoint)
   }
 }
 
-TemporaryRef<Path>
+already_AddRefed<Path>
 nsCSSBorderRenderer::GetSideClipSubPath(mozilla::css::Side aSide)
 {
   // the clip proceeds clockwise from the top left corner;
@@ -1032,7 +1032,7 @@ bool IsVisible(int aStyle)
   return false;
 }
 
-TemporaryRef<GradientStops>
+already_AddRefed<GradientStops>
 nsCSSBorderRenderer::CreateCornerGradient(mozilla::css::Corner aCorner,
                                           nscolor aFirstColor,
                                           nscolor aSecondColor,
@@ -1092,7 +1092,7 @@ nsCSSBorderRenderer::CreateCornerGradient(mozilla::css::Corner aCorner,
     aPoint2 = tmp;
     gs = gfxGradientCache::GetOrCreateGradientStops(aDT, rawStops, ExtendMode::CLAMP);
   }
-  return gs;
+  return gs.forget();
 }
 
 typedef struct { Float a, b; } twoFloats;

@@ -659,7 +659,8 @@ static const JSFunctionSpec glob_functions[] = {
 };
 
 static bool
-env_setProperty(JSContext* cx, HandleObject obj, HandleId id, bool strict, MutableHandleValue vp)
+env_setProperty(JSContext *cx, HandleObject obj, HandleId id, MutableHandleValue vp,
+                ObjectOpResult &result)
 {
 /* XXX porting may be easy, but these don't seem to supply setenv by default */
 #if !defined SOLARIS
@@ -709,7 +710,7 @@ env_setProperty(JSContext* cx, HandleObject obj, HandleId id, bool strict, Mutab
     }
     vp.set(STRING_TO_JSVAL(valstr));
 #endif /* !defined SOLARIS */
-    return true;
+    return result.succeed();
 }
 
 static bool
@@ -1239,11 +1240,6 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
 
     NS_LogInit();
 
-    // A initializer to initialize histogram collection
-    // used by telemetry.
-    UniquePtr<base::StatisticsRecorder> telStats =
-       MakeUnique<base::StatisticsRecorder>();
-
     nsCOMPtr<nsIFile> appFile;
     rv = XRE_GetBinaryPath(argv[0], getter_AddRefs(appFile));
     if (NS_FAILED(rv)) {
@@ -1522,7 +1518,6 @@ XRE_XPCShellMain(int argc, char** argv, char** envp)
     bogus = nullptr;
 #endif
 
-    telStats = nullptr;
     appDir = nullptr;
     appFile = nullptr;
     dirprovider.ClearGREDirs();

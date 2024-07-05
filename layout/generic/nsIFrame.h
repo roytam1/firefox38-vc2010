@@ -864,6 +864,12 @@ public:
 
   NS_DECLARE_FRAME_PROPERTY(LineBaselineOffset, nullptr)
 
+  // Temporary override for a flex item's main-size property (either width
+  // or height), imposed by its flex container.
+  // XXX: We don't have bug 1064843, so use the previous declaration system
+  // (see bug 1030952 part 3 and TenFourFox issue 493).
+  NS_DECLARE_FRAME_PROPERTY(FlexItemMainSizeOverride, nullptr)
+
   NS_DECLARE_FRAME_PROPERTY(CachedBackgroundImage, ReleaseValue<gfxASurface>)
   NS_DECLARE_FRAME_PROPERTY(CachedBackgroundImageDT,
                             ReleaseValue<mozilla::gfx::DrawTarget>)
@@ -1386,6 +1392,13 @@ public:
   {
     return mState & aBits;
   }
+
+  /**
+   * Return true if this frame is the primary frame for mContent.
+   */
+  bool IsPrimaryFrame() const { return mIsPrimaryFrame; }
+
+  void SetIsPrimaryFrame(bool aIsPrimary) { mIsPrimaryFrame = aIsPrimary; }
 
   /**
    * This call is invoked on the primary frame for a character data content
@@ -3066,6 +3079,31 @@ protected:
     uint32_t     mType;
     VisualDeltas mVisualDeltas;
   } mOverflow;
+
+  /**
+   * This bit is used in nsTextFrame::CharacterDataChanged() as an optimization
+   * to skip redundant reflow-requests when the character data changes multiple
+   * times between reflows. If this flag is set, then it implies that the
+   * NS_FRAME_IS_DIRTY state bit is also set (and that intrinsic sizes have
+   * been marked as dirty on our ancestor chain).
+   *
+   * XXXdholbert This bit is *only* used on nsTextFrame, but it lives here on
+   * nsIFrame simply because this is where we've got unused state bits
+   * available in a gap. If bits become more scarce, we should perhaps consider
+   * expanding the range of frame-specific state bits in nsFrameStateBits.h and
+   * moving this to be one of those (e.g. by swapping one of the adjacent
+   * general-purpose bits to take the place of this bool:1 here, so we can grow
+   * that range of frame-specific bits by 1).
+   */
+  bool mReflowRequestedForCharDataChange : 1;
+
+private:
+  /**
+   * True if this is the primary frame for mContent.
+   */
+  bool mIsPrimaryFrame : 1;
+
+protected:
 
   // Helpers
   /**

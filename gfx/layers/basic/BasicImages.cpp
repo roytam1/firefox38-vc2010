@@ -52,7 +52,7 @@ public:
   virtual void SetData(const Data& aData) override;
   virtual void SetDelayedConversion(bool aDelayed) override { mDelayedConversion = aDelayed; }
 
-  TemporaryRef<gfx::SourceSurface> GetAsSourceSurface() override;
+  already_AddRefed<gfx::SourceSurface> GetAsSourceSurface() override;
 
   virtual size_t SizeOfIncludingThis(MallocSizeOf aMallocSizeOf) const override
   {
@@ -137,13 +137,14 @@ BasicPlanarYCbCrImage::SetData(const Data& aData)
   mSize = size;
 }
 
-TemporaryRef<gfx::SourceSurface>
+already_AddRefed<gfx::SourceSurface>
 BasicPlanarYCbCrImage::GetAsSourceSurface()
 {
   NS_ASSERTION(NS_IsMainThread(), "Must be main thread");
 
   if (mSourceSurface) {
-    return mSourceSurface.get();
+    RefPtr<gfx::SourceSurface> surface(mSourceSurface);
+    return surface.forget();
   }
 
   if (!mDecodedBuffer) {
@@ -172,7 +173,7 @@ BasicPlanarYCbCrImage::GetAsSourceSurface()
   mRecycleBin->RecycleBuffer(mDecodedBuffer.forget(), mSize.height * mStride);
 
   mSourceSurface = surface;
-  return mSourceSurface.get();
+  return surface.forget();
 }
 
 

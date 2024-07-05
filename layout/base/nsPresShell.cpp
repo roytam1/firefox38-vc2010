@@ -1822,6 +1822,24 @@ PresShell::EndObservingDocument()
 char* nsPresShell_ReflowStackPointerTop;
 #endif
 
+class XBLConstructorRunner : public nsRunnable
+{
+public:
+  explicit XBLConstructorRunner(nsIDocument* aDocument)
+    : mDocument(aDocument)
+  {
+  }
+
+  NS_IMETHOD Run() override
+  {
+    mDocument->BindingManager()->ProcessAttachedQueue();
+    return NS_OK;
+  }
+
+private:
+  nsCOMPtr<nsIDocument> mDocument;
+};
+
 nsresult
 PresShell::Initialize(nscoord aWidth, nscoord aHeight)
 {
@@ -1919,24 +1937,14 @@ PresShell::Initialize(nscoord aWidth, nscoord aHeight)
       mFrameConstructor->EndUpdate();
     }
 
-    // nsAutoScriptBlocker going out of scope may have killed us too
+    // nsAutoCauseReflowNotifier (which sets up a script blocker) going out of
+    // scope may have killed us too
     NS_ENSURE_STATE(!mHaveShutDown);
 
-    // Run the XBL binding constructors for any new frames we've constructed
-    mDocument->BindingManager()->ProcessAttachedQueue();
-
-    // Constructors may have killed us too
-    NS_ENSURE_STATE(!mHaveShutDown);
-
-    // Now flush out pending restyles before we actually reflow, in
-    // case XBL constructors changed styles somewhere.
-    {
-      nsAutoScriptBlocker scriptBlocker;
-      mPresContext->RestyleManager()->ProcessPendingRestyles();
-    }
-
-    // And that might have run _more_ XBL constructors
-    NS_ENSURE_STATE(!mHaveShutDown);
+    // Run the XBL binding constructors for any new frames we've constructed.
+    // (Do this in a script runner, since our caller might have a script
+    // blocker on the stack.)
+    nsContentUtils::AddScriptRunner(new XBLConstructorRunner(mDocument));
   }
 
   NS_ASSERTION(rootFrame, "How did that happen?");
@@ -2391,7 +2399,10 @@ PresShell::ScrollPage(bool aForward)
   if (scrollFrame) {
     scrollFrame->ScrollBy(nsIntPoint(0, aForward ? 1 : -1),
                           nsIScrollableFrame::PAGES,
-                          nsIScrollableFrame::SMOOTH);
+                          nsIScrollableFrame::SMOOTH,
+                          nullptr, nullptr,
+                          nsIScrollableFrame::NOT_MOMENTUM,
+                          nsIScrollableFrame::ENABLE_SNAP);
   }
   return NS_OK;
 }
@@ -2406,7 +2417,10 @@ PresShell::ScrollLine(bool aForward)
                                             NS_DEFAULT_VERTICAL_SCROLL_DISTANCE);
     scrollFrame->ScrollBy(nsIntPoint(0, aForward ? lineCount : -lineCount),
                           nsIScrollableFrame::LINES,
-                          nsIScrollableFrame::SMOOTH);
+                          nsIScrollableFrame::SMOOTH,
+                          nullptr, nullptr,
+                          nsIScrollableFrame::NOT_MOMENTUM,
+                          nsIScrollableFrame::ENABLE_SNAP);
   }
   return NS_OK;
 }
@@ -2421,7 +2435,10 @@ PresShell::ScrollCharacter(bool aRight)
                                     NS_DEFAULT_HORIZONTAL_SCROLL_DISTANCE);
     scrollFrame->ScrollBy(nsIntPoint(aRight ? h : -h, 0),
                           nsIScrollableFrame::LINES,
-                          nsIScrollableFrame::SMOOTH);
+                          nsIScrollableFrame::SMOOTH,
+                          nullptr, nullptr,
+                          nsIScrollableFrame::NOT_MOMENTUM,
+                          nsIScrollableFrame::ENABLE_SNAP);
   }
   return NS_OK;
 }
@@ -2434,7 +2451,10 @@ PresShell::CompleteScroll(bool aForward)
   if (scrollFrame) {
     scrollFrame->ScrollBy(nsIntPoint(0, aForward ? 1 : -1),
                           nsIScrollableFrame::WHOLE,
-                          nsIScrollableFrame::SMOOTH);
+                          nsIScrollableFrame::SMOOTH,
+                          nullptr, nullptr,
+                          nsIScrollableFrame::NOT_MOMENTUM,
+                          nsIScrollableFrame::ENABLE_SNAP);
   }
   return NS_OK;
 }
@@ -5183,7 +5203,7 @@ PresShell::CreateRangePaintInfo(nsIDOMRange* aRange,
   return info;
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 PresShell::PaintRangePaintInfo(nsTArray<nsAutoPtr<RangePaintInfo> >* aItems,
                                nsISelection* aSelection,
                                nsIntRegion* aRegion,
@@ -5308,7 +5328,7 @@ PresShell::PaintRangePaintInfo(nsTArray<nsAutoPtr<RangePaintInfo> >* aItems,
   return dt->Snapshot();
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 PresShell::RenderNode(nsIDOMNode* aNode,
                       nsIntRegion* aRegion,
                       nsIntPoint& aPoint,
@@ -5354,7 +5374,7 @@ PresShell::RenderNode(nsIDOMNode* aNode,
                              aScreenRect);
 }
 
-TemporaryRef<SourceSurface>
+already_AddRefed<SourceSurface>
 PresShell::RenderSelection(nsISelection* aSelection,
                            nsIntPoint& aPoint,
                            nsIntRect* aScreenRect)

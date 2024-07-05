@@ -8,7 +8,6 @@
 
 #include "ExtendedValidation.h"
 #include "NSSCertDBTrustDomain.h"
-#include "mozilla/Telemetry.h"
 #include "nsAppDirectoryServiceDefs.h"
 #include "nsCertVerificationThread.h"
 #include "nsAppDirectoryServiceDefs.h"
@@ -904,13 +903,6 @@ void nsNSSComponent::setValidationOptions(bool isInitialSetting,
   bool ocspRequired = ocspEnabled &&
     Preferences::GetBool("security.OCSP.require", false);
 
-  // We measure the setting of the pref at startup only to minimize noise by
-  // addons that may muck with the settings, though it probably doesn't matter.
-  if (isInitialSetting) {
-    Telemetry::Accumulate(Telemetry::CERT_OCSP_ENABLED, ocspEnabled);
-    Telemetry::Accumulate(Telemetry::CERT_OCSP_REQUIRED, ocspRequired);
-  }
-
   bool ocspStaplingEnabled = Preferences::GetBool("security.ssl.enable_ocsp_stapling",
                                                   true);
   PublicSSLState()->SetOCSPStaplingEnabled(ocspStaplingEnabled);
@@ -1603,17 +1595,18 @@ nsNSSComponent::IsNSSInitialized(bool* initialized)
 
 SharedCertVerifier::~SharedCertVerifier() { }
 
-TemporaryRef<SharedCertVerifier>
+already_AddRefed<SharedCertVerifier>
 nsNSSComponent::GetDefaultCertVerifier()
 {
   MutexAutoLock lock(mutex);
   MOZ_ASSERT(mNSSInitialized);
-  return mDefaultCertVerifier;
+  RefPtr<SharedCertVerifier> certVerifier(mDefaultCertVerifier);
+  return certVerifier.forget();
 }
 
 namespace mozilla { namespace psm {
 
-TemporaryRef<SharedCertVerifier>
+already_AddRefed<SharedCertVerifier>
 GetDefaultCertVerifier()
 {
   static NS_DEFINE_CID(kNSSComponentCID, NS_NSSCOMPONENT_CID);

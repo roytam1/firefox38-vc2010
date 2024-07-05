@@ -4,6 +4,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "mozilla/dom/HTMLOptGroupElement.h"
 #include "mozilla/dom/HTMLOptionElement.h"
 #include "mozilla/dom/HTMLOptionElementBinding.h"
 #include "mozilla/dom/HTMLSelectElement.h"
@@ -81,6 +82,39 @@ HTMLOptionElement::SetSelectedInternal(bool aValue, bool aNotify)
   // SetAttr/UnsetAttr.
   if (!mIsInSetDefaultSelected) {
     UpdateState(aNotify);
+  }
+}
+
+void
+HTMLOptionElement::OptGroupDisabledChanged(bool aNotify)
+{
+  UpdateDisabledState(aNotify);
+}
+
+void
+HTMLOptionElement::UpdateDisabledState(bool aNotify)
+{
+  bool isDisabled = HasAttr(kNameSpaceID_None, nsGkAtoms::disabled);
+
+  if (!isDisabled) {
+    nsIContent* parent = GetParent();
+    if (auto optGroupElement = HTMLOptGroupElement::FromContentOrNull(parent)) {
+      isDisabled = optGroupElement->IsDisabled();
+    }
+  }
+
+  EventStates disabledStates;
+  if (isDisabled) {
+    disabledStates |= NS_EVENT_STATE_DISABLED;
+  } else {
+    disabledStates |= NS_EVENT_STATE_ENABLED;
+  }
+
+  EventStates oldDisabledStates = State() & DISABLED_STATES;
+  EventStates changedStates = disabledStates ^ oldDisabledStates;
+
+  if (!changedStates.IsEmpty()) {
+    ToggleStates(changedStates, aNotify);
   }
 }
 
@@ -247,14 +281,19 @@ nsresult
 HTMLOptionElement::AfterSetAttr(int32_t aNameSpaceID, nsIAtom* aName,
                                 const nsAttrValue* aValue, bool aNotify)
 {
-  if (aNameSpaceID == kNameSpaceID_None &&
-      aName == nsGkAtoms::value && Selected()) {
-    // Since this option is selected, changing value
-    // may have changed missing validity state of the
-    // Select element
-    HTMLSelectElement* select = GetSelect();
-    if (select) {
-      select->UpdateValueMissingValidityState();
+  if (aNameSpaceID == kNameSpaceID_None) {
+    if (aName == nsGkAtoms::disabled) {
+      UpdateDisabledState(aNotify);
+    }
+
+    if (aName == nsGkAtoms::value && Selected()) {
+      // Since this option is selected, changing value
+      // may have changed missing validity state of the
+      // Select element
+      HTMLSelectElement* select = GetSelect();
+      if (select) {
+        select->UpdateValueMissingValidityState();
+      }
     }
   }
 
@@ -304,7 +343,7 @@ HTMLOptionElement::BindToTree(nsIDocument* aDocument, nsIContent* aParent,
   NS_ENSURE_SUCCESS(rv, rv);
 
   // Our new parent might change :disabled/:enabled state.
-  UpdateState(false);
+  UpdateDisabledState(false);
 
   return NS_OK;
 }
@@ -315,7 +354,7 @@ HTMLOptionElement::UnbindFromTree(bool aDeep, bool aNullParent)
   nsGenericHTMLElement::UnbindFromTree(aDeep, aNullParent);
 
   // Our previous parent could have been involved in :disabled/:enabled state.
-  UpdateState(false);
+  UpdateDisabledState(false);
 }
 
 EventStates
@@ -327,23 +366,6 @@ HTMLOptionElement::IntrinsicState() const
   }
   if (DefaultSelected()) {
     state |= NS_EVENT_STATE_DEFAULT;
-  }
-
-  // An <option> is disabled if it has @disabled set or if it's <optgroup> has
-  // @disabled set.
-  if (HasAttr(kNameSpaceID_None, nsGkAtoms::disabled)) {
-    state |= NS_EVENT_STATE_DISABLED;
-    state &= ~NS_EVENT_STATE_ENABLED;
-  } else {
-    nsIContent* parent = GetParent();
-    if (parent && parent->IsHTML(nsGkAtoms::optgroup) &&
-        parent->HasAttr(kNameSpaceID_None, nsGkAtoms::disabled)) {
-      state |= NS_EVENT_STATE_DISABLED;
-      state &= ~NS_EVENT_STATE_ENABLED;
-    } else {
-      state &= ~NS_EVENT_STATE_DISABLED;
-      state |= NS_EVENT_STATE_ENABLED;
-    }
   }
 
   return state;

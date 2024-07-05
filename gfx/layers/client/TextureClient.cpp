@@ -284,7 +284,7 @@ DisableGralloc(SurfaceFormat aFormat, const gfx::IntSize& aSizeHint)
 #endif
 
 static
-TemporaryRef<BufferTextureClient>
+already_AddRefed<BufferTextureClient>
 CreateBufferTextureClient(ISurfaceAllocator* aAllocator,
                           SurfaceFormat aFormat,
                           TextureFlags aTextureFlags,
@@ -303,7 +303,7 @@ CreateBufferTextureClient(ISurfaceAllocator* aAllocator,
 }
 
 // static
-TemporaryRef<TextureClient>
+already_AddRefed<TextureClient>
 TextureClient::CreateForDrawing(ISurfaceAllocator* aAllocator,
                                 gfx::SurfaceFormat aFormat,
                                 gfx::IntSize aSize,
@@ -389,7 +389,7 @@ TextureClient::CreateForDrawing(ISurfaceAllocator* aAllocator,
   MOZ_ASSERT(!texture || texture->CanExposeDrawTarget(), "texture cannot expose a DrawTarget?");
 
   if (texture && texture->AllocateForSurface(aSize, aAllocFlags)) {
-    return texture;
+    return texture.forget();
   }
 
   if (aAllocFlags & ALLOC_DISALLOW_BUFFERTEXTURECLIENT) {
@@ -407,11 +407,11 @@ TextureClient::CreateForDrawing(ISurfaceAllocator* aAllocator,
     return nullptr;
   }
 
-  return texture;
+  return texture.forget();
 }
 
 // static
-TemporaryRef<BufferTextureClient>
+already_AddRefed<BufferTextureClient>
 TextureClient::CreateForRawBufferAccess(ISurfaceAllocator* aAllocator,
                                         gfx::SurfaceFormat aFormat,
                                         gfx::IntSize aSize,
@@ -431,11 +431,11 @@ TextureClient::CreateForRawBufferAccess(ISurfaceAllocator* aAllocator,
       return nullptr;
     }
   }
-  return texture;
+  return texture.forget();
 }
 
 // static
-TemporaryRef<BufferTextureClient>
+already_AddRefed<BufferTextureClient>
 TextureClient::CreateForYCbCr(ISurfaceAllocator* aAllocator,
                               gfx::IntSize aYSize,
                               gfx::IntSize aCbCrSize,
@@ -461,11 +461,11 @@ TextureClient::CreateForYCbCr(ISurfaceAllocator* aAllocator,
     return nullptr;
   }
 
-  return texture;
+  return texture.forget();
 }
 
 // static
-TemporaryRef<BufferTextureClient>
+already_AddRefed<BufferTextureClient>
 TextureClient::CreateWithBufferSize(ISurfaceAllocator* aAllocator,
                      gfx::SurfaceFormat aFormat,
                      size_t aSize,
@@ -486,7 +486,7 @@ TextureClient::CreateWithBufferSize(ISurfaceAllocator* aAllocator,
     return nullptr;
   }
 
-  return texture;
+  return texture.forget();
 }
 
 TextureClient::TextureClient(ISurfaceAllocator* aAllocator, TextureFlags aFlags)
@@ -731,7 +731,7 @@ BufferTextureClient::BufferTextureClient(ISurfaceAllocator* aAllocator,
 BufferTextureClient::~BufferTextureClient()
 {}
 
-TemporaryRef<TextureClient>
+already_AddRefed<TextureClient>
 BufferTextureClient::CreateSimilar(TextureFlags aFlags,
                                    TextureAllocationFlags aAllocFlags) const
 {
@@ -740,8 +740,7 @@ BufferTextureClient::CreateSimilar(TextureFlags aFlags,
     mAllocator, mFormat, mSize, mBackend, mFlags | aFlags, aAllocFlags
   );
 
-  RefPtr<TextureClient> newTex = newBufferTex.get();
-  return newTex;
+  return newBufferTex.forget();
 }
 
 bool
@@ -920,7 +919,7 @@ SharedSurfaceTextureClient::ToSurfaceDescriptor(SurfaceDescriptor& aOutDescripto
   return true;
 }
 
-TemporaryRef<SyncObject>
+already_AddRefed<SyncObject>
 SyncObject::CreateSyncObject(SyncHandle aHandle)
 {
   if (!aHandle) {
@@ -928,8 +927,7 @@ SyncObject::CreateSyncObject(SyncHandle aHandle)
   }
 
 #ifdef XP_WIN
-  RefPtr<SyncObject> syncObject = new SyncObjectD3D11(aHandle);
-  return syncObject;
+  return MakeAndAddRef<SyncObjectD3D11>(aHandle);
 #else
   MOZ_ASSERT_UNREACHABLE();
   return nullptr;

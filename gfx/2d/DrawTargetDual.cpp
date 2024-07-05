@@ -181,7 +181,7 @@ DrawTargetDual::Mask(const Pattern &aSource, const Pattern &aMask, const DrawOpt
   mB->Mask(*source.mB, *mask.mB, aOptions);
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 DrawTargetDual::CreateSimilarDrawTarget(const IntSize &aSize, SurfaceFormat aFormat) const
 {
   RefPtr<DrawTarget> dtA = mA->CreateSimilarDrawTarget(aSize, aFormat);
@@ -192,7 +192,7 @@ DrawTargetDual::CreateSimilarDrawTarget(const IntSize &aSize, SurfaceFormat aFor
     return nullptr;
   }
 
-  return new DrawTargetDual(dtA, dtB);
+  return MakeAndAddRef<DrawTargetDual>(dtA, dtB);
 }
 
 }

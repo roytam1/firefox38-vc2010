@@ -116,6 +116,7 @@ NS_IMPL_CYCLE_COLLECTION_TRAVERSE_BEGIN_INHERITED(DocAccessible, Accessible)
   tmp->mDependentIDsHash.EnumerateRead(CycleCollectorTraverseDepIDsEntry, &cb);
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mAccessibleCache)
   NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mAnchorJumpElm)
+  NS_IMPL_CYCLE_COLLECTION_TRAVERSE(mInvalidationList)
 NS_IMPL_CYCLE_COLLECTION_TRAVERSE_END
 
 NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(DocAccessible, Accessible)
@@ -126,6 +127,7 @@ NS_IMPL_CYCLE_COLLECTION_UNLINK_BEGIN_INHERITED(DocAccessible, Accessible)
   tmp->mNodeToAccessibleMap.Clear();
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mAccessibleCache)
   NS_IMPL_CYCLE_COLLECTION_UNLINK(mAnchorJumpElm)
+  NS_IMPL_CYCLE_COLLECTION_UNLINK(mInvalidationList)
 NS_IMPL_CYCLE_COLLECTION_UNLINK_END
 
 NS_INTERFACE_MAP_BEGIN_CYCLE_COLLECTION_INHERITED(DocAccessible)
@@ -1262,6 +1264,8 @@ DocAccessible::UnbindFromDocument(Accessible* aAccessible)
   if (aAccessible->IsNodeMapEntry() &&
       mNodeToAccessibleMap.Get(aAccessible->GetNode()) == aAccessible)
     mNodeToAccessibleMap.Remove(aAccessible->GetNode());
+
+  aAccessible->mStateFlags |= eIsNotInDocument;
 
   // Update XPCOM part.
   xpcAccessibleDocument* xpcDoc = GetAccService()->GetCachedXPCDocument(this);

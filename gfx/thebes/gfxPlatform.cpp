@@ -83,7 +83,7 @@
 
 #include "mozilla/Hal.h"
 #ifdef USE_SKIA
-#include "skia/SkGraphics.h"
+#include "skia/include/core/SkGraphics.h"
 # ifdef USE_SKIA_GPU
 #  include "SkiaGLGlue.h"
 # endif
@@ -125,6 +125,7 @@ static Mutex* gGfxPlatformPrefsLock = nullptr;
 static qcms_profile *gCMSOutputProfile = nullptr;
 static qcms_profile *gCMSsRGBProfile = nullptr;
 
+static bool gCMSRGBTransformFailed = false;
 static qcms_transform *gCMSRGBTransform = nullptr;
 static qcms_transform *gCMSInverseRGBTransform = nullptr;
 static qcms_transform *gCMSRGBATransform = nullptr;
@@ -723,7 +724,7 @@ gfxPlatform::~gfxPlatform()
 
 cairo_user_data_key_t kDrawTarget;
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 gfxPlatform::CreateDrawTargetForSurface(gfxASurface *aSurface, const IntSize& aSize)
 {
   SurfaceFormat format = Optimal2DFormatForContent(aSurface->GetContentType());
@@ -735,7 +736,7 @@ gfxPlatform::CreateDrawTargetForSurface(gfxASurface *aSurface, const IntSize& aS
 // This is a temporary function used by ContentClient to build a DrawTarget
 // around the gfxASurface. This should eventually be replaced by plumbing
 // the DrawTarget through directly
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 gfxPlatform::CreateDrawTargetForUpdateSurface(gfxASurface *aSurface, const IntSize& aSize)
 {
 #ifdef XP_MACOSX
@@ -788,7 +789,7 @@ gfxPlatform::ClearSourceSurfaceForSurface(gfxASurface *aSurface)
   aSurface->SetData(&kSourceSurface, nullptr, nullptr);
 }
 
-/* static */ TemporaryRef<SourceSurface>
+/* static */ already_AddRefed<SourceSurface>
 gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurface)
 {
   if (!aSurface->CairoSurface() || aSurface->CairoStatus()) {
@@ -808,7 +809,8 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
     SourceSurfaceUserData *surf = static_cast<SourceSurfaceUserData*>(userData);
 
     if (surf->mSrcSurface->IsValid() && surf->mBackendType == aTarget->GetBackendType()) {
-      return surf->mSrcSurface;
+      RefPtr<SourceSurface> srcSurface(surf->mSrcSurface);
+      return srcSurface.forget();
     }
     // We can just continue here as when setting new user data the destroy
     // function will be called for the old user data.
@@ -939,7 +941,7 @@ gfxPlatform::GetSourceSurfaceForSurface(DrawTarget *aTarget, gfxASurface *aSurfa
   return srcBuffer.forget();
 }
 
-TemporaryRef<DataSourceSurface>
+already_AddRefed<DataSourceSurface>
 gfxPlatform::GetWrappedDataSourceSurface(gfxASurface* aSurface)
 {
   nsRefPtr<gfxImageSurface> image = aSurface->GetAsImageSurface();
@@ -965,16 +967,14 @@ gfxPlatform::GetWrappedDataSourceSurface(gfxASurface* aSurface)
   return result.forget();
 }
 
-TemporaryRef<ScaledFont>
+already_AddRefed<ScaledFont>
 gfxPlatform::GetScaledFontForFont(DrawTarget* aTarget, gfxFont *aFont)
 {
   NativeFont nativeFont;
   nativeFont.mType = NativeFontType::CAIRO_FONT_FACE;
   nativeFont.mFont = aFont->GetCairoScaledFont();
-  RefPtr<ScaledFont> scaledFont =
-    Factory::CreateScaledFontForNativeFont(nativeFont,
-                                           aFont->GetAdjustedSize());
-  return scaledFont;
+  return Factory::CreateScaledFontForNativeFont(nativeFont,
+                                                aFont->GetAdjustedSize());
 }
 
 int
@@ -1140,7 +1140,7 @@ gfxPlatform::HasEnoughTotalSystemMemoryForSkiaGL()
   return true;
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 gfxPlatform::CreateDrawTargetForBackend(BackendType aBackend, const IntSize& aSize, SurfaceFormat aFormat)
 {
   // There is a bunch of knowledge in the gfxPlatform heirarchy about how to
@@ -1164,7 +1164,7 @@ gfxPlatform::CreateDrawTargetForBackend(BackendType aBackend, const IntSize& aSi
   }
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 gfxPlatform::CreateOffscreenCanvasDrawTarget(const IntSize& aSize, SurfaceFormat aFormat)
 {
   NS_ASSERTION(mPreferredCanvasBackend != BackendType::NONE, "No backend.");
@@ -1182,14 +1182,14 @@ gfxPlatform::CreateOffscreenCanvasDrawTarget(const IntSize& aSize, SurfaceFormat
 #endif
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 gfxPlatform::CreateOffscreenContentDrawTarget(const IntSize& aSize, SurfaceFormat aFormat)
 {
   NS_ASSERTION(mPreferredCanvasBackend != BackendType::NONE, "No backend.");
   return CreateDrawTargetForBackend(mContentBackend, aSize, aFormat);
 }
 
-TemporaryRef<DrawTarget>
+already_AddRefed<DrawTarget>
 gfxPlatform::CreateDrawTargetForData(unsigned char* aData, const IntSize& aSize, int32_t aStride, SurfaceFormat aFormat)
 {
   NS_ASSERTION(mContentBackend != BackendType::NONE, "No backend.");
@@ -1902,7 +1902,7 @@ gfxPlatform::GetCMSsRGBProfile()
 qcms_transform *
 gfxPlatform::GetCMSRGBTransform()
 {
-    if (!gCMSRGBTransform) {
+    if (!gCMSRGBTransform && !gCMSRGBTransformFailed) {
         qcms_profile *inProfile, *outProfile;
         outProfile = GetCMSOutputProfile();
         inProfile = GetCMSsRGBProfile();
@@ -1913,6 +1913,9 @@ gfxPlatform::GetCMSRGBTransform()
         gCMSRGBTransform = qcms_transform_create(inProfile, QCMS_DATA_RGB_8,
                                               outProfile, QCMS_DATA_RGB_8,
                                              QCMS_INTENT_PERCEPTUAL);
+        if (!gCMSRGBTransform) {
+            gCMSRGBTransformFailed = true;
+        }
     }
 
     return gCMSRGBTransform;
@@ -2274,7 +2277,7 @@ gfxPlatform::DisableBufferRotation()
   sBufferRotationCheckPref = false;
 }
 
-TemporaryRef<ScaledFont>
+already_AddRefed<ScaledFont>
 gfxPlatform::GetScaledFontForFontWithCairoSkia(DrawTarget* aTarget, gfxFont* aFont)
 {
     NativeFont nativeFont;

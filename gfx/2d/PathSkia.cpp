@@ -102,10 +102,10 @@ PathBuilderSkia::CurrentPoint() const
   return Point(SkScalarToFloat(point.fX), SkScalarToFloat(point.fY));
 }
 
-TemporaryRef<Path>
+already_AddRefed<Path>
 PathBuilderSkia::Finish()
 {
-  return new PathSkia(mPath, mFillRule);
+  return MakeAndAddRef<PathSkia>(mPath, mFillRule);
 }
 
 void
@@ -114,16 +114,16 @@ PathBuilderSkia::AppendPath(const SkPath &aPath)
   mPath.addPath(aPath);
 }
 
-TemporaryRef<PathBuilder>
+already_AddRefed<PathBuilder>
 PathSkia::CopyToBuilder(FillRule aFillRule) const
 {
   return TransformedCopyToBuilder(Matrix(), aFillRule);
 }
 
-TemporaryRef<PathBuilder>
+already_AddRefed<PathBuilder>
 PathSkia::TransformedCopyToBuilder(const Matrix &aTransform, FillRule aFillRule) const
 {
-  return new PathBuilderSkia(aTransform, mPath, aFillRule);
+  return MakeAndAddRef<PathBuilderSkia>(aTransform, mPath, aFillRule);
 }
 
 bool

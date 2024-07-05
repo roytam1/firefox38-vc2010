@@ -27,7 +27,7 @@ MIRGenerator::MIRGenerator(CompileCompartment* compartment, const JitCompileOpti
     graph_(graph),
     abortReason_(AbortReason_NoAbort),
     shouldForceAbort_(false),
-    abortedNewScriptPropertiesGroups_(*alloc_),
+    abortedPreliminaryGroups_(*alloc_),
     error_(false),
     pauseBuild_(nullptr),
     cancelBuild_(false),
@@ -93,14 +93,14 @@ MIRGenerator::abort(const char* message, ...)
 }
 
 void
-MIRGenerator::addAbortedNewScriptPropertiesGroup(ObjectGroup* group)
+MIRGenerator::addAbortedPreliminaryGroup(ObjectGroup *group)
 {
-    for (size_t i = 0; i < abortedNewScriptPropertiesGroups_.length(); i++) {
-        if (group == abortedNewScriptPropertiesGroups_[i])
+    for (size_t i = 0; i < abortedPreliminaryGroups_.length(); i++) {
+        if (group == abortedPreliminaryGroups_[i])
             return;
     }
-    if (!abortedNewScriptPropertiesGroups_.append(group))
-        CrashAtUnhandlableOOM("addAbortedNewScriptPropertiesGroup");
+    if (!abortedPreliminaryGroups_.append(group))
+        CrashAtUnhandlableOOM("addAbortedPreliminaryGroup");
 }
 
 void
@@ -406,11 +406,10 @@ MBasicBlock::inherit(TempAllocator& alloc, BytecodeAnalysis* analysis, MBasicBlo
     MOZ_ASSERT(!entryResumePoint_);
 
     // Propagate the caller resume point from the inherited block.
-    MResumePoint* callerResumePoint = pred ? pred->callerResumePoint() : nullptr;
+    callerResumePoint_ = pred ? pred->callerResumePoint() : nullptr;
 
     // Create a resume point using our initial stack state.
-    entryResumePoint_ = new(alloc) MResumePoint(this, pc(), callerResumePoint,
-                                                MResumePoint::ResumeAt);
+    entryResumePoint_ = new(alloc) MResumePoint(this, pc(), MResumePoint::ResumeAt);
     if (!entryResumePoint_->init(alloc))
         return false;
 
@@ -475,6 +474,8 @@ MBasicBlock::inheritResumePoint(MBasicBlock* pred)
     MOZ_ASSERT(kind_ != PENDING_LOOP_HEADER);
     MOZ_ASSERT(pred != nullptr);
 
+    callerResumePoint_ = pred->callerResumePoint();
+
     if (!predecessors_.append(pred))
         return false;
 
@@ -495,8 +496,7 @@ MBasicBlock::initEntrySlots(TempAllocator& alloc)
     discardResumePoint(entryResumePoint_);
 
     // Create a resume point using our initial stack state.
-    entryResumePoint_ = MResumePoint::New(alloc, this, pc(), callerResumePoint(),
-                                          MResumePoint::ResumeAt);
+    entryResumePoint_ = MResumePoint::New(alloc, this, pc(), MResumePoint::ResumeAt);
     if (!entryResumePoint_)
         return false;
     return true;

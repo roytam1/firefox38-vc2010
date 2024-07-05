@@ -55,7 +55,7 @@ public:
   // nsSVGPathGeometryElement methods:
   virtual bool GetGeometryBounds(Rect* aBounds, const StrokeOptions& aStrokeOptions,
                                  const Matrix& aTransform) override;
-  virtual TemporaryRef<Path> BuildPath(PathBuilder* aBuilder) override;
+  virtual already_AddRefed<Path> BuildPath(PathBuilder* aBuilder) override;
 
   // nsSVGSVGElement methods:
   virtual bool HasValidDimensions() const override;
@@ -82,6 +82,9 @@ protected:
   virtual LengthAttributesInfo GetLengthInfo() override;
   virtual SVGAnimatedPreserveAspectRatio *GetPreserveAspectRatio() override;
   virtual StringAttributesInfo GetStringInfo() override;
+
+  // Override for nsImageLoadingContent.
+  nsIContent* AsContent() override { return this; }
 
   enum { ATTR_X, ATTR_Y, ATTR_WIDTH, ATTR_HEIGHT };
   nsSVGLength2 mLengthAttributes[4];

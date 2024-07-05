@@ -287,7 +287,7 @@ MatchUnconnectedPin(IPin* aPin,
 }
 
 // Return the first unconnected input pin or output pin.
-TemporaryRef<IPin>
+already_AddRefed<IPin>
 GetUnconnectedPin(IBaseFilter* aFilter, PIN_DIRECTION aPinDir)
 {
   RefPtr<IEnumPins> enumPins;
@@ -301,7 +301,7 @@ GetUnconnectedPin(IBaseFilter* aFilter, PIN_DIRECTION aPinDir)
     bool matches = FALSE;
     if (SUCCEEDED(MatchUnconnectedPin(pin, aPinDir, &matches)) &&
         matches) {
-      return pin;
+      return pin.forget();
     }
   }
 

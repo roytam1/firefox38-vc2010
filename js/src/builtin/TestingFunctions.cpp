@@ -747,7 +747,7 @@ NondeterministicGetWeakMapKeys(JSContext* cx, unsigned argc, jsval* vp)
         return false;
     }
     if (!args[0].isObject()) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_NOT_EXPECTED_TYPE,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_EXPECTED_TYPE,
                              "nondeterministicGetWeakMapKeys", "WeakMap",
                              InformalValueTypeName(args[0]));
         return false;
@@ -757,7 +757,7 @@ NondeterministicGetWeakMapKeys(JSContext* cx, unsigned argc, jsval* vp)
     if (!JS_NondeterministicGetWeakMapKeys(cx, mapObj, &arr))
         return false;
     if (!arr) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_NOT_EXPECTED_TYPE,
+        JS_ReportErrorNumber(cx, GetErrorMessage, nullptr, JSMSG_NOT_EXPECTED_TYPE,
                              "nondeterministicGetWeakMapKeys", "WeakMap",
                              args[0].toObject().getClass()->name);
         return false;
@@ -971,9 +971,9 @@ SaveStack(JSContext* cx, unsigned argc, jsval* vp)
         if (!ToNumber(cx, args[0], &d))
             return false;
         if (d < 0) {
-            js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                                     JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
-                                     "not a valid maximum frame count", NULL);
+            ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
+                                  JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
+                                  "not a valid maximum frame count", NULL);
             return false;
         }
         maxFrameCount = d;
@@ -982,9 +982,9 @@ SaveStack(JSContext* cx, unsigned argc, jsval* vp)
     JSCompartment* targetCompartment = cx->compartment();
     if (args.length() >= 2) {
         if (!args[1].isObject()) {
-            js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                                     JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
-                                     "not an object", NULL);
+            ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
+                                  JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
+                                  "not an object", NULL);
             return false;
         }
         RootedObject obj(cx, UncheckedUnwrap(&args[1].toObject()));
@@ -1858,8 +1858,10 @@ EnableTraceLogger(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     TraceLoggerThread* logger = TraceLoggerForMainThread(cx->runtime());
-    args.rval().setBoolean(TraceLoggerEnable(logger, cx));
+    if (!TraceLoggerEnable(logger, cx))
+        return false;
 
+    args.rval().setUndefined();
     return true;
 }
 
@@ -1882,7 +1884,7 @@ DumpObject(JSContext* cx, unsigned argc, jsval* vp)
     if (!JS_ConvertArguments(cx, args, "o", obj.address()))
         return false;
 
-    js_DumpObject(obj);
+    DumpObject(obj);
 
     args.rval().setUndefined();
     return true;
@@ -1927,7 +1929,7 @@ static bool
 DumpBacktrace(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
-    js_DumpBacktrace(cx);
+    DumpBacktrace(cx);
     args.rval().setUndefined();
     return true;
 }
@@ -2114,7 +2116,7 @@ FindPath(JSContext* cx, unsigned argc, jsval* vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     if (argc < 2) {
-        JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_MORE_ARGS_NEEDED,
+        JS_ReportErrorNumber(cx, GetErrorMessage, NULL, JSMSG_MORE_ARGS_NEEDED,
                              "findPath", "1", "");
         return false;
     }
@@ -2123,16 +2125,16 @@ FindPath(JSContext* cx, unsigned argc, jsval* vp)
     // test is all about object identity, and ToString doesn't preserve that.
     // Non-GCThing endpoints don't make much sense.
     if (!args[0].isObject() && !args[0].isString() && !args[0].isSymbol()) {
-        js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                                 JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
-                                 "not an object, string, or symbol", NULL);
+        ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
+                              JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
+                              "not an object, string, or symbol", NULL);
         return false;
     }
 
     if (!args[1].isObject() && !args[1].isString() && !args[1].isSymbol()) {
-        js_ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
-                                 JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
-                                 "not an object, string, or symbol", NULL);
+        ReportValueErrorFlags(cx, JSREPORT_ERROR, JSMSG_UNEXPECTED_TYPE,
+                              JSDVG_SEARCH_STACK, args[0], JS::NullPtr(),
+                              "not an object, string, or symbol", NULL);
         return false;
     }
 

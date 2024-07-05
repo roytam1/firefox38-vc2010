@@ -22,6 +22,8 @@
 #include "nsString.h"
 #include "nscore.h"
 
+using mozilla::dom::Element;
+
 // Uncomment the following line if you want to disable
 // table deletion when the only column/row is removed
 // #define DISABLE_TABLE_DELETION 1
@@ -46,8 +48,13 @@ nsHTMLEditor::ShowInlineTableEditingUI(nsIDOMElement * aCell)
   NS_ENSURE_ARG_POINTER(aCell);
 
   // do nothing if aCell is not a table cell...
-  if (!nsHTMLEditUtils::IsTableCell(aCell))
+  nsCOMPtr<Element> cell = do_QueryInterface(aCell);
+  if (!cell || !nsHTMLEditUtils::IsTableCell(cell))
     return NS_OK;
+
+  if (NS_WARN_IF(!IsDescendantOfEditorRoot(cell))) {
+    return NS_ERROR_UNEXPECTED;
+  }
 
   if (mInlineEditedCell) {
     NS_ERROR("call HideInlineTableEditingUI first");

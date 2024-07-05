@@ -173,27 +173,27 @@ TextureHost::GetAndResetReleaseFenceHandle()
 }
 
 // implemented in TextureHostOGL.cpp
-TemporaryRef<TextureHost> CreateTextureHostOGL(const SurfaceDescriptor& aDesc,
+already_AddRefed<TextureHost> CreateTextureHostOGL(const SurfaceDescriptor& aDesc,
                                                ISurfaceAllocator* aDeallocator,
                                                TextureFlags aFlags);
 
 // implemented in TextureHostBasic.cpp
-TemporaryRef<TextureHost> CreateTextureHostBasic(const SurfaceDescriptor& aDesc,
+already_AddRefed<TextureHost> CreateTextureHostBasic(const SurfaceDescriptor& aDesc,
                                                  ISurfaceAllocator* aDeallocator,
                                                  TextureFlags aFlags);
 
 // implemented in TextureD3D11.cpp
-TemporaryRef<TextureHost> CreateTextureHostD3D11(const SurfaceDescriptor& aDesc,
+already_AddRefed<TextureHost> CreateTextureHostD3D11(const SurfaceDescriptor& aDesc,
                                                  ISurfaceAllocator* aDeallocator,
                                                  TextureFlags aFlags);
 
 // implemented in TextureD3D9.cpp
-TemporaryRef<TextureHost> CreateTextureHostD3D9(const SurfaceDescriptor& aDesc,
+already_AddRefed<TextureHost> CreateTextureHostD3D9(const SurfaceDescriptor& aDesc,
                                                 ISurfaceAllocator* aDeallocator,
                                                 TextureFlags aFlags);
 
 // static
-TemporaryRef<TextureHost>
+already_AddRefed<TextureHost>
 TextureHost::Create(const SurfaceDescriptor& aDesc,
                     ISurfaceAllocator* aDeallocator,
                     TextureFlags aFlags)
@@ -210,7 +210,7 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
       return CreateTextureHostOGL(aDesc, aDeallocator, aFlags);
 
     case SurfaceDescriptor::TSharedSurfaceDescriptor:
-      return new SharedSurfaceTextureHost(aFlags, aDesc.get_SharedSurfaceDescriptor());
+      return MakeAndAddRef<SharedSurfaceTextureHost>(aFlags, aDesc.get_SharedSurfaceDescriptor());
 
     case SurfaceDescriptor::TSurfaceDescriptorMacIOSurface:
       if (Compositor::GetBackend() == LayersBackend::LAYERS_OPENGL) {
@@ -222,8 +222,7 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
 #ifdef MOZ_X11
     case SurfaceDescriptor::TSurfaceDescriptorX11: {
       const SurfaceDescriptorX11& desc = aDesc.get_SurfaceDescriptorX11();
-      RefPtr<TextureHost> result = new X11TextureHost(aFlags, desc);
-      return result;
+      return MakeAndAddRef<X11TextureHost>(aFlags, desc);
     }
 #endif
 
@@ -232,6 +231,7 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
       return CreateTextureHostD3D9(aDesc, aDeallocator, aFlags);
 
     case SurfaceDescriptor::TSurfaceDescriptorD3D10:
+    case SurfaceDescriptor::TSurfaceDescriptorDXGIYCbCr:
       if (Compositor::GetBackend() == LayersBackend::LAYERS_D3D9) {
         return CreateTextureHostD3D9(aDesc, aDeallocator, aFlags);
       } else {
@@ -243,7 +243,7 @@ TextureHost::Create(const SurfaceDescriptor& aDesc,
   }
 }
 
-TemporaryRef<TextureHost>
+already_AddRefed<TextureHost>
 CreateBackendIndependentTextureHost(const SurfaceDescriptor& aDesc,
                                     ISurfaceAllocator* aDeallocator,
                                     TextureFlags aFlags)
@@ -275,7 +275,7 @@ CreateBackendIndependentTextureHost(const SurfaceDescriptor& aDesc,
       NS_WARNING("No backend independent TextureHost for this descriptor type");
     }
   }
-  return result;
+  return result.forget();
 }
 
 void
@@ -599,7 +599,7 @@ BufferTextureHost::Upload(nsIntRegion *aRegion)
   return true;
 }
 
-TemporaryRef<gfx::DataSourceSurface>
+already_AddRefed<gfx::DataSourceSurface>
 BufferTextureHost::GetAsSurface()
 {
   RefPtr<gfx::DataSourceSurface> result;

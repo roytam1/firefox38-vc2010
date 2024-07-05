@@ -308,9 +308,8 @@ MediaKeys::Init(ErrorResult& aRv)
     promise->MaybeReject(NS_ERROR_DOM_INVALID_STATE_ERR);
     return promise.forget();
   }
-  nsCOMPtr<nsIDOMWindow> topWindow;
-  window->GetTop(getter_AddRefs(topWindow));
-  nsCOMPtr<nsPIDOMWindow> top = do_QueryInterface(topWindow);
+  window = window->GetOuterWindow();
+  nsCOMPtr<nsPIDOMWindow> top = window->GetTop();
   if (!top || !top->GetExtantDoc()) {
     promise->MaybeReject(NS_ERROR_DOM_INVALID_STATE_ERR);
     return promise.forget();
