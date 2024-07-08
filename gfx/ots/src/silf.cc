@@ -9,10 +9,13 @@
 #include <cmath>
 #include <math.h>
 
+#ifndef __log2i__
+#define __log2i__
 static inline double log2i(int n)
 {
     return log(n + 0.0) / log(2.0);
 }
+#endif
 
 namespace ots {
 
