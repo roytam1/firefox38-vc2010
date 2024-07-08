@@ -23,6 +23,7 @@
 #ifdef JS_ION_PERF
 # include "jit/PerfSpewer.h"
 #endif
+#include "jit/MIR.h"
 #include "jit/RegisterSets.h"
 
 namespace js {
