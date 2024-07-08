@@ -861,6 +861,21 @@ sftk_updateMacs(PLArenaPool *arena, SFTKDBHandle *handle,
 {
     SFTKDBHandle *keyHandle = handle;
     SDB *keyTarget = NULL;
+    CK_ATTRIBUTE_TYPE authAttrTypes[] = {
+        CKA_MODULUS,
+        CKA_PUBLIC_EXPONENT,
+        CKA_CERT_SHA1_HASH,
+        CKA_CERT_MD5_HASH,
+        CKA_TRUST_SERVER_AUTH,
+        CKA_TRUST_CLIENT_AUTH,
+        CKA_TRUST_EMAIL_PROTECTION,
+        CKA_TRUST_CODE_SIGNING,
+        CKA_TRUST_STEP_UP_APPROVED,
+        CKA_NSS_OVERRIDE_EXTENSIONS,
+    };
+    const CK_ULONG authAttrTypeCount = sizeof(authAttrTypes) / sizeof(authAttrTypes[0]);
+    unsigned int i;
+
     if (handle->type != SFTK_KEYDB_TYPE) {
         keyHandle = handle->peerDB;
     }
@@ -875,24 +890,11 @@ sftk_updateMacs(PLArenaPool *arena, SFTKDBHandle *handle,
 
     id &= SFTK_OBJ_ID_MASK;
 
-    CK_ATTRIBUTE_TYPE authAttrTypes[] = {
-        CKA_MODULUS,
-        CKA_PUBLIC_EXPONENT,
-        CKA_CERT_SHA1_HASH,
-        CKA_CERT_MD5_HASH,
-        CKA_TRUST_SERVER_AUTH,
-        CKA_TRUST_CLIENT_AUTH,
-        CKA_TRUST_EMAIL_PROTECTION,
-        CKA_TRUST_CODE_SIGNING,
-        CKA_TRUST_STEP_UP_APPROVED,
-        CKA_NSS_OVERRIDE_EXTENSIONS,
-    };
-    const CK_ULONG authAttrTypeCount = sizeof(authAttrTypes) / sizeof(authAttrTypes[0]);
-
     // We don't know what attributes this object has, so we update them one at a
     // time.
-    unsigned int i;
     for (i = 0; i < authAttrTypeCount; i++) {
+        SECItem *signText;
+        SECItem plainText;
         CK_ATTRIBUTE authAttr = { authAttrTypes[i], NULL, 0 };
         CK_RV rv = sftkdb_GetAttributeValue(handle, id, &authAttr, 1);
         if (rv != CKR_OK) {
@@ -920,8 +922,6 @@ sftk_updateMacs(PLArenaPool *arena, SFTKDBHandle *handle,
             sftk_ULong2SDBULong(authAttr.pValue, value);
             authAttr.ulValueLen = SDB_ULONG_SIZE;
         }
-        SECItem *signText;
-        SECItem plainText;
         plainText.data = authAttr.pValue;
         plainText.len = authAttr.ulValueLen;
         if (sftkdb_SignAttribute(arena, newKey, id, authAttr.type, &plainText,
@@ -956,6 +956,9 @@ sftk_updateEncrypted(PLArenaPool *arena, SFTKDBHandle *keydb,
     // time.
     unsigned int i;
     for (i = 0; i < privAttrCount; i++) {
+        SECItem plainText;
+        SECItem *result;
+        CK_OBJECT_HANDLE newId;
         // Read the old attribute in the clear.
         CK_ATTRIBUTE privAttr = { privAttrTypes[i], NULL, 0 };
         CK_RV crv = sftkdb_GetAttributeValue(keydb, id, &privAttr, 1);
@@ -976,8 +979,6 @@ sftk_updateEncrypted(PLArenaPool *arena, SFTKDBHandle *keydb,
         if ((privAttr.ulValueLen == -1) || (privAttr.ulValueLen == 0)) {
             return CKR_GENERAL_ERROR;
         }
-        SECItem plainText;
-        SECItem *result;
         plainText.data = privAttr.pValue;
         plainText.len = privAttr.ulValueLen;
         if (sftkdb_EncryptAttribute(arena, newKey, &plainText, &result) != SECSuccess) {
@@ -989,7 +990,7 @@ sftk_updateEncrypted(PLArenaPool *arena, SFTKDBHandle *keydb,
         PORT_Memset(plainText.data, 0, plainText.len);
 
         // Write the newly encrypted attributes out directly.
-        CK_OBJECT_HANDLE newId = id & SFTK_OBJ_ID_MASK;
+        newId = id & SFTK_OBJ_ID_MASK;
         keydb->newKey = newKey;
         crv = (*keydb->db->sdb_SetAttributeValue)(keydb->db, newId, &privAttr, 1);
         keydb->newKey = NULL;

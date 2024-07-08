@@ -1174,7 +1174,10 @@ sftk_CryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
             context->destroy = (SFTKDestroy)sftk_ChaCha20Poly1305_DestroyContext;
             break;
 
-        case CKM_NSS_CHACHA20_CTR:
+        case CKM_NSS_CHACHA20_CTR: {
+            SFTKChaCha20CtrInfo *ctx;
+            PRUint8 *param;
+            int i;
             if (key_type != CKK_NSS_CHACHA20) {
                 crv = CKR_KEY_TYPE_INCONSISTENT;
                 break;
@@ -1189,7 +1192,7 @@ sftk_CryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
                 crv = CKR_KEY_HANDLE_INVALID;
                 break;
             }
-            SFTKChaCha20CtrInfo *ctx = PORT_ZNew(SFTKChaCha20CtrInfo);
+            ctx = PORT_ZNew(SFTKChaCha20CtrInfo);
             if (!ctx) {
                 sftk_FreeAttribute(att);
                 crv = CKR_HOST_MEMORY;
@@ -1205,8 +1208,8 @@ sftk_CryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
             sftk_FreeAttribute(att);
 
             /* The counter is little endian. */
-            PRUint8 *param = pMechanism->pParameter;
-            int i = 0;
+            param = pMechanism->pParameter;
+            i = 0;
             for (; i < 4; ++i) {
                 ctx->counter |= param[i] << (i * 8);
             }
@@ -1215,7 +1218,7 @@ sftk_CryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
             context->update = (SFTKCipher)sftk_ChaCha20Ctr;
             context->destroy = (SFTKDestroy)sftk_ChaCha20Ctr_DestroyContext;
             break;
-
+        }
         case CKM_NSS_AES_KEY_WRAP_PAD:
             context->doPad = PR_TRUE;
         /* fall thru */

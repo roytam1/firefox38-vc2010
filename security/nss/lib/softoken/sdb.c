@@ -872,6 +872,8 @@ sdb_GetAttributeValueNoLock(SDB *sdb, CK_OBJECT_HANDLE object_id,
     int found = 0;
     int retry = 0;
     unsigned int i;
+    char *columns = NULL;
+    char *statement;
 
     if (count == 0) {
         error = CKR_OBJECT_HANDLE_INVALID;
@@ -884,7 +886,6 @@ sdb_GetAttributeValueNoLock(SDB *sdb, CK_OBJECT_HANDLE object_id,
         goto loser;
     }
 
-    char *columns = NULL;
     for (i = 0; i < count; i++) {
         char *newColumns;
         if (columns) {
@@ -903,7 +904,7 @@ sdb_GetAttributeValueNoLock(SDB *sdb, CK_OBJECT_HANDLE object_id,
 
     PORT_Assert(columns);
 
-    char *statement = sqlite3_mprintf("SELECT DISTINCT %s FROM %s where id=$ID LIMIT 1;",
+    statement = sqlite3_mprintf("SELECT DISTINCT %s FROM %s where id=$ID LIMIT 1;",
                                       columns, table);
     sqlite3_free(columns);
     columns = NULL;
