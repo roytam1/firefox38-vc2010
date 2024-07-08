@@ -4248,9 +4248,10 @@ tls13_HandleCertificateVerify(sslSocket *ss, PRUint8 *b, PRUint32 length)
 
     /* Set the auth type and verify it is what we captured in ssl3_AuthCertificate */
     if (!ss->sec.isServer) {
+        uint32_t prelimAuthKeyBits;
         ss->sec.authType = ssl_SignatureSchemeToAuthType(sigScheme);
 
-        uint32_t prelimAuthKeyBits = ss->sec.authKeyBits;
+        prelimAuthKeyBits = ss->sec.authKeyBits;
         rv = ssl_SetAuthKeyBits(ss, pubKey);
         if (rv != SECSuccess) {
             goto loser; /* Alert sent and code set. */
@@ -5831,6 +5832,8 @@ tls13_NegotiateVersion(sslSocket *ss, const TLSExtension *supportedVersions)
         return SECFailure;
     }
     for (version = ss->vrange.max; version >= ss->vrange.min; --version) {
+        PRUint16 wire;
+        unsigned long offset;
         if (ss->ssl3.hs.helloRetry && version < SSL_LIBRARY_VERSION_TLS_1_3) {
             /* Prevent negotiating to a lower version in response to a TLS 1.3 HRR.
              * Since we check in descending (local) order, this will only fail if
@@ -5840,8 +5843,7 @@ tls13_NegotiateVersion(sslSocket *ss, const TLSExtension *supportedVersions)
             return SECFailure;
         }
 
-        PRUint16 wire = tls13_EncodeDraftVersion(version, ss->protocolVariant);
-        unsigned long offset;
+        wire = tls13_EncodeDraftVersion(version, ss->protocolVariant);
 
         for (offset = 0; offset < versions.len; offset += 2) {
             PRUint16 supported =

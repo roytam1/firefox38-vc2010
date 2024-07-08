@@ -1454,6 +1454,7 @@ tls13_ClientHandleDelegatedCredentialsXtn(const sslSocket *ss,
                                           TLSExtensionData *xtnData,
                                           SECItem *data)
 {
+    SECStatus rv;
     if (!ss->opt.enableDelegatedCredentials ||
         ss->version < SSL_LIBRARY_VERSION_TLS_1_3) {
         ssl3_ExtSendAlert(ss, alert_fatal, illegal_parameter);
@@ -1461,7 +1462,7 @@ tls13_ClientHandleDelegatedCredentialsXtn(const sslSocket *ss,
         return SECFailure;
     }
 
-    SECStatus rv = tls13_ReadDelegatedCredential(data->data, data->len,
+    rv = tls13_ReadDelegatedCredential(data->data, data->len,
                                                  &xtnData->peerDelegCred);
     if (rv != SECSuccess) {
         return SECFailure; /* code already set */

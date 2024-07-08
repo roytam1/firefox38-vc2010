@@ -122,6 +122,7 @@ cmac_GenerateSubkeys(CMACContext *ctx)
 static SECStatus
 cmac_UpdateState(CMACContext *ctx)
 {
+    unsigned int index;
     if (ctx == NULL || ctx->partialIndex != ctx->blockSize) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
@@ -130,7 +131,7 @@ cmac_UpdateState(CMACContext *ctx)
     /* Step 6: C_i = CIPHER(key, C_{i-1} ^ M_i)  for 1 <= i <= n, and
      *         C_0 is defined as the empty string. */
 
-    for (unsigned int index = 0; index < ctx->blockSize; index++) {
+    for (index = 0; index < ctx->blockSize; index++) {
         ctx->partialBlock[index] ^= ctx->lastBlock[index];
     }
 
@@ -229,6 +230,7 @@ CMAC_Update(CMACContext *ctx, const unsigned char *data,
      * that it is the last until CMAC_Finish is called (and by then, CMAC_Update
      * has already returned). */
     while (data_index < data_len) {
+        unsigned int copy_len;
         if (ctx->partialIndex == ctx->blockSize) {
             if (cmac_UpdateState(ctx) != SECSuccess) {
                 return SECFailure;
@@ -237,7 +239,7 @@ CMAC_Update(CMACContext *ctx, const unsigned char *data,
             ctx->partialIndex = 0;
         }
 
-        unsigned int copy_len = data_len - data_index;
+        copy_len = data_len - data_index;
         if (copy_len > (ctx->blockSize - ctx->partialIndex)) {
             copy_len = ctx->blockSize - ctx->partialIndex;
         }
@@ -256,6 +258,7 @@ CMAC_Finish(CMACContext *ctx, unsigned char *result,
             unsigned int *result_len,
             unsigned int max_result_len)
 {
+    unsigned int index;
     if (ctx == NULL || result == NULL || max_result_len == 0) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
@@ -272,7 +275,7 @@ CMAC_Finish(CMACContext *ctx, unsigned char *result,
      * M_n = K2 ^ (M_n* || 10^j). */
     if (ctx->partialIndex == ctx->blockSize) {
         /* XOR in K1. */
-        for (unsigned int index = 0; index < ctx->blockSize; index++) {
+        for (index = 0; index < ctx->blockSize; index++) {
             ctx->partialBlock[index] ^= ctx->k1[index];
         }
     } else {
@@ -283,7 +286,7 @@ CMAC_Finish(CMACContext *ctx, unsigned char *result,
         ctx->partialIndex = ctx->blockSize;
 
         /* XOR in K2. */
-        for (unsigned int index = 0; index < ctx->blockSize; index++) {
+        for (index = 0; index < ctx->blockSize; index++) {
             ctx->partialBlock[index] ^= ctx->k2[index];
         }
     }

@@ -128,7 +128,7 @@ SEC_END_PROTOS
 /* This is a variation of PORT_Assert where the arguments will be always
  * used either in Debug or not. But, in optimized mode the result will be
  * ignored. See more details in Bug 1588015. */
-#define PORT_AssertArg PR_ASSERT_ARG
+#define PORT_AssertArg(expr) ((void)(0 && (expr)))
 
 /* This runs a function that should return SECSuccess.
  * Intended for NSS internal use only.

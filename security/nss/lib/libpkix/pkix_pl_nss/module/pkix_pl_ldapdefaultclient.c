@@ -354,12 +354,12 @@ pkix_pl_LdapDefaultClient_VerifyBindResponse(
         LDAPMessage msg;
         LDAPBindResponse *ldapBindResponse = &msg.protocolOp.op.bindResponseMsg;
 
-        ldapBindResponse->resultCode.data = NULL;
-
         PKIX_ENTER
                 (LDAPDEFAULTCLIENT,
                 "pkix_pl_LdapDefaultClient_VerifyBindResponse");
         PKIX_NULLCHECK_TWO(client, client->rcvBuf);
+
+        ldapBindResponse->resultCode.data = NULL;
 
         decode.data = (unsigned char *)(client->rcvBuf);
         decode.len = bufLen;

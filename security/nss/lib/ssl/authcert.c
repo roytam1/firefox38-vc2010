@@ -34,13 +34,15 @@ NSS_GetClientAuthData(void *arg,
     SECKEYPrivateKey *privkey = NULL;
     char *chosenNickName = (char *)arg; /* CONST */
     SECStatus rv = SECFailure;
+    void *proto_win;
+    PRTime now;
 
     sslSocket *ss = ssl_FindSocket(fd);
     if (!ss) {
         return SECFailure;
     }
-    void *proto_win = SSL_RevealPinArg(fd);
-    PRTime now = ssl_Time(ss);
+    proto_win = SSL_RevealPinArg(fd);
+    now = ssl_Time(ss);
 
     if (chosenNickName) {
         cert = CERT_FindUserCertByUsage(CERT_GetDefaultCertDB(),

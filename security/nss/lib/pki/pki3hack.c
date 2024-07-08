@@ -832,18 +832,19 @@ fill_CERTCertificateFields(NSSCertificate *c, CERTCertificate *cc, PRBool forced
             /* The values are hard-coded and readonly. Read just once. */
             if (cc->distrust == NULL) {
                 CERTCertDistrust distrustModel;
+                SECStatus rServer, rEmail;
+                const unsigned int kDistrustFieldSize = 13;
                 SECItem model = { siUTCTime, NULL, 0 };
                 distrustModel.serverDistrustAfter = model;
                 distrustModel.emailDistrustAfter = model;
-                SECStatus rServer = PK11_ReadAttribute(
+                rServer = PK11_ReadAttribute(
                     cc->slot, cc->pkcs11ID, CKA_NSS_SERVER_DISTRUST_AFTER,
                     cc->arena, &distrustModel.serverDistrustAfter);
-                SECStatus rEmail = PK11_ReadAttribute(
+                rEmail = PK11_ReadAttribute(
                     cc->slot, cc->pkcs11ID, CKA_NSS_EMAIL_DISTRUST_AFTER,
                     cc->arena, &distrustModel.emailDistrustAfter);
                 /* Only allocate the Distrust structure if a valid date is found.
                  * The result length of a encoded valid timestamp is exactly 13 */
-                const unsigned int kDistrustFieldSize = 13;
                 if ((rServer == SECSuccess && rEmail == SECSuccess) &&
                     (distrustModel.serverDistrustAfter.len == kDistrustFieldSize ||
                      distrustModel.emailDistrustAfter.len == kDistrustFieldSize)) {
@@ -1004,6 +1005,8 @@ STAN_GetNSSCertificate(CERTCertificate *cc)
     nssCryptokiInstance *instance;
     nssPKIObject *pkiob;
     NSSArena *arena;
+    SECItem derSerial;
+    SECStatus secrv;
     c = cc->nssCertificate;
     if (c) {
         return c;
@@ -1035,8 +1038,6 @@ STAN_GetNSSCertificate(CERTCertificate *cc)
     /* CERTCertificate stores serial numbers decoded.  I need the DER
     * here.  sigh.
     */
-    SECItem derSerial;
-    SECStatus secrv;
     secrv = CERT_SerialNumberFromDERCert(&cc->derCert, &derSerial);
     if (secrv == SECFailure) {
         nssArena_Destroy(arena);

@@ -295,14 +295,6 @@ tls13_HashCredentialSignatureMessage(SSL3Hashes *hash,
     PK11Context *ctx = NULL;
     unsigned int hashLen;
 
-    /* Set up hash context. */
-    hash->hashAlg = ssl_SignatureSchemeToHashType(scheme);
-    ctx = PK11_CreateDigestContext(ssl3_HashTypeToOID(hash->hashAlg));
-    if (!ctx) {
-        PORT_SetError(SEC_ERROR_NO_MEMORY);
-        goto loser;
-    }
-
     static const PRUint8 kCtxStrPadding[64] = {
         0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
         0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
@@ -315,6 +307,14 @@ tls13_HashCredentialSignatureMessage(SSL3Hashes *hash,
     };
 
     static const PRUint8 kCtxStr[] = "TLS, server delegated credentials";
+
+    /* Set up hash context. */
+    hash->hashAlg = ssl_SignatureSchemeToHashType(scheme);
+    ctx = PK11_CreateDigestContext(ssl3_HashTypeToOID(hash->hashAlg));
+    if (!ctx) {
+        PORT_SetError(SEC_ERROR_NO_MEMORY);
+        goto loser;
+    }
 
     /* Hash the message signed by the peer. */
     rv = SECSuccess;
@@ -497,17 +497,20 @@ static CERTSubjectPublicKeyInfo *
 tls13_MakePssSpki(const SECKEYPublicKey *pub, SECOidTag hashOid)
 {
     SECStatus rv;
+    CERTSubjectPublicKeyInfo *spki;
+    SECKEYRSAPSSParams params = { 0 };
+    SECAlgorithmID maskHashAlg;
+    SECItem *maskHashAlgItem, *algorithmItem, *pubItem;
     PLArenaPool *arena = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
     if (!arena) {
         goto loser; /* Code already set. */
     }
-    CERTSubjectPublicKeyInfo *spki = PORT_ArenaZNew(arena, CERTSubjectPublicKeyInfo);
+    spki = PORT_ArenaZNew(arena, CERTSubjectPublicKeyInfo);
     if (!spki) {
         goto loser; /* Code already set. */
     }
     spki->arena = arena;
 
-    SECKEYRSAPSSParams params = { 0 };
     params.hashAlg = PORT_ArenaZNew(arena, SECAlgorithmID);
     rv = SECOID_SetAlgorithmID(arena, params.hashAlg, hashOid, NULL);
     if (rv != SECSuccess) {
@@ -516,13 +519,12 @@ tls13_MakePssSpki(const SECKEYPublicKey *pub, SECOidTag hashOid)
 
     /* Set the mask hash algorithm too, which is an argument to
      * a SEC_OID_PKCS1_MGF1 value. */
-    SECAlgorithmID maskHashAlg;
     memset(&maskHashAlg, 0, sizeof(maskHashAlg));
     rv = SECOID_SetAlgorithmID(arena, &maskHashAlg, hashOid, NULL);
     if (rv != SECSuccess) {
         goto loser; /* Code already set. */
     }
-    SECItem *maskHashAlgItem =
+    maskHashAlgItem =
         SEC_ASN1EncodeItem(arena, NULL, &maskHashAlg,
                            SEC_ASN1_GET(SECOID_AlgorithmIDTemplate));
     if (!maskHashAlgItem) {
@@ -538,7 +540,7 @@ tls13_MakePssSpki(const SECKEYPublicKey *pub, SECOidTag hashOid)
         goto loser; /* Code already set. */
     }
 
-    SECItem *algorithmItem =
+    algorithmItem =
         SEC_ASN1EncodeItem(arena, NULL, &params,
                            SEC_ASN1_GET(SECKEY_RSAPSSParamsTemplate));
     if (!algorithmItem) {
@@ -553,7 +555,7 @@ tls13_MakePssSpki(const SECKEYPublicKey *pub, SECOidTag hashOid)
 
     PORT_Assert(pub->u.rsa.modulus.type == siUnsignedInteger);
     PORT_Assert(pub->u.rsa.publicExponent.type == siUnsignedInteger);
-    SECItem *pubItem = SEC_ASN1EncodeItem(arena, &spki->subjectPublicKey, pub,
+    pubItem = SEC_ASN1EncodeItem(arena, &spki->subjectPublicKey, pub,
                                           SEC_ASN1_GET(SECKEY_RSAPublicKeyTemplate));
     if (!pubItem) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
@@ -602,11 +604,11 @@ tls13_MakeDcSpki(const SECKEYPublicKey *dcPub, SSLSignatureScheme dcCertVerifyAl
 
         case ecKey: {
             const sslNamedGroupDef *group = ssl_ECPubKey2NamedGroup(dcPub);
+            SSLSignatureScheme keyScheme;
             if (!group) {
                 PORT_SetError(SSL_ERROR_INCORRECT_SIGNATURE_ALGORITHM);
                 return NULL;
             }
-            SSLSignatureScheme keyScheme;
             switch (group->name) {
                 case ssl_grp_ec_secp256r1:
                     keyScheme = ssl_sig_ecdsa_secp256r1_sha256;
@@ -664,6 +666,8 @@ SSLExp_DelegateCredential(const CERTCertificate *cert,
     SECKEYPrivateKey *tmpPriv = NULL;
     sslDelegatedCredential *dc = NULL;
     sslBuffer dcBuf = SSL_BUFFER_EMPTY;
+    PRTime start;
+    SECItem *spkiDer;
 
     if (!cert || !certPriv || !dcPub || !out) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -677,7 +681,6 @@ SSLExp_DelegateCredential(const CERTCertificate *cert,
     }
 
     /* Serialize the DC parameters. */
-    PRTime start;
     rv = DER_DecodeTimeChoice(&start, &cert->validity.notBefore);
     if (rv != SECSuccess) {
         goto loser;
@@ -691,7 +694,7 @@ SSLExp_DelegateCredential(const CERTCertificate *cert,
     }
     dc->expectedCertVerifyAlg = dcCertVerifyAlg;
 
-    SECItem *spkiDer =
+    spkiDer =
         SEC_ASN1EncodeItem(NULL /*arena*/, &dc->derSpki, spki,
                            SEC_ASN1_GET(CERT_SubjectPublicKeyInfoTemplate));
     if (!spkiDer) {

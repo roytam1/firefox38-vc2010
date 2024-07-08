@@ -1644,16 +1644,16 @@ static CK_RV
 sftk_CheckCBCPadding(CK_BYTE_PTR pLastPart,
                      unsigned int blockSize, unsigned int *outPadSize)
 {
+    unsigned int i, padSize, goodPad;
     PORT_Assert(outPadSize);
 
-    unsigned int padSize = (unsigned int)pLastPart[blockSize - 1];
+    padSize = (unsigned int)pLastPart[blockSize - 1];
 
     /* If padSize <= blockSize, set goodPad to all-1s and all-0s otherwise.*/
-    unsigned int goodPad = DUPLICATE_MSB_TO_ALL(~(blockSize - padSize));
+    goodPad = DUPLICATE_MSB_TO_ALL(~(blockSize - padSize));
     /* padSize should not be 0 */
     goodPad &= CT_NOT_ZERO(padSize);
 
-    unsigned int i;
     for (i = 0; i < blockSize; i++) {
         /* If i < padSize, set loopMask to all-1s and all-0s otherwise.*/
         unsigned int loopMask = DUPLICATE_MSB_TO_ALL(~(padSize - 1 - i));
@@ -6649,6 +6649,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
     PRBool isFIPS;
     HASH_HashType hashType;
     PRBool extractValue = PR_TRUE;
+    CK_MECHANISM_TYPE mechanism;
 
     CHECK_FORK();
 
@@ -6658,7 +6659,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
     if (!pMechanism) {
         return CKR_MECHANISM_PARAM_INVALID;
     }
-    CK_MECHANISM_TYPE mechanism = pMechanism->mechanism;
+    mechanism = pMechanism->mechanism;
 
     /*
      * now lets create an object to hang the attributes off of
@@ -6833,11 +6834,12 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
 
             if ((mechanism == CKM_TLS12_MASTER_KEY_DERIVE) ||
                 (mechanism == CKM_TLS12_MASTER_KEY_DERIVE_DH)) {
+                CK_TLS12_MASTER_KEY_DERIVE_PARAMS *tls12_master;
                 if (BAD_PARAM_CAST(pMechanism, sizeof(CK_TLS12_MASTER_KEY_DERIVE_PARAMS))) {
                     crv = CKR_MECHANISM_PARAM_INVALID;
                     break;
                 }
-                CK_TLS12_MASTER_KEY_DERIVE_PARAMS *tls12_master =
+                tls12_master =
                     (CK_TLS12_MASTER_KEY_DERIVE_PARAMS *)pMechanism->pParameter;
                 tlsPrfHash = GetHashTypeFromMechanism(tls12_master->prfHashMechanism);
                 if (tlsPrfHash == HASH_AlgNULL) {
@@ -7099,6 +7101,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
             CK_SSL3_KEY_MAT_PARAMS *ssl3_keys;
             CK_SSL3_KEY_MAT_OUT *ssl3_keys_out;
             CK_ULONG effKeySize;
+            CK_TLS12_KEY_MAT_PARAMS *tls12_keys;
             unsigned int block_needed;
             unsigned char srcrdata[SSL3_RANDOM_LENGTH * 2];
             unsigned char crsrdata[SSL3_RANDOM_LENGTH * 2];
@@ -7108,7 +7111,7 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
                     crv = CKR_MECHANISM_PARAM_INVALID;
                     break;
                 }
-                CK_TLS12_KEY_MAT_PARAMS *tls12_keys =
+                tls12_keys =
                     (CK_TLS12_KEY_MAT_PARAMS *)pMechanism->pParameter;
                 tlsPrfHash = GetHashTypeFromMechanism(tls12_keys->prfHashMechanism);
                 if (tlsPrfHash == HASH_AlgNULL) {
@@ -7693,14 +7696,15 @@ NSC_DeriveKey(CK_SESSION_HANDLE hSession,
             break;
 
         case CKM_EXTRACT_KEY_FROM_KEY: {
+            CK_ULONG extract, shift, offset;
             if (BAD_PARAM_CAST(pMechanism, sizeof(CK_EXTRACT_PARAMS))) {
                 crv = CKR_MECHANISM_PARAM_INVALID;
                 break;
             }
             /* the following assumes 8 bits per byte */
-            CK_ULONG extract = *(CK_EXTRACT_PARAMS *)pMechanism->pParameter;
-            CK_ULONG shift = extract & 0x7; /* extract mod 8 the fast way */
-            CK_ULONG offset = extract >> 3; /* extract div 8 the fast way */
+            extract = *(CK_EXTRACT_PARAMS *)pMechanism->pParameter;
+            shift = extract & 0x7; /* extract mod 8 the fast way */
+            offset = extract >> 3; /* extract div 8 the fast way */
 
             crv = sftk_DeriveSensitiveCheck(sourceKey, key);
             if (crv != CKR_OK)

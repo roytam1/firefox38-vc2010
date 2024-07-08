@@ -4383,9 +4383,10 @@ CLEANUP:
 int
 s_mp_cmp(const mp_int *a, const mp_int *b)
 {
+    mp_size used_a;
     ARGMPCHK(a != NULL && b != NULL);
 
-    mp_size used_a = MP_USED(a);
+    used_a = MP_USED(a);
     {
         mp_size used_b = MP_USED(b);
 

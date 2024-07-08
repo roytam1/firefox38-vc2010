@@ -797,12 +797,13 @@ ssl_SignatureSchemeAccepted(PRUint16 minVersion,
             return PR_FALSE;
         }
     } else if (ssl_IsDsaSignatureScheme(scheme)) {
+        PRUint32 dsaPolicy;
+        SECStatus rv;
         /* DSA: not in TLS 1.3, and check policy. */
         if (minVersion >= SSL_LIBRARY_VERSION_TLS_1_3) {
             return PR_FALSE;
         }
-        PRUint32 dsaPolicy;
-        SECStatus rv = NSS_GetAlgorithmPolicy(SEC_OID_ANSIX9_DSA_SIGNATURE,
+        rv = NSS_GetAlgorithmPolicy(SEC_OID_ANSIX9_DSA_SIGNATURE,
                                               &dsaPolicy);
         if (rv == SECSuccess && (dsaPolicy & NSS_USE_ALG_IN_SSL_KX) == 0) {
             return PR_FALSE;
@@ -810,6 +811,7 @@ ssl_SignatureSchemeAccepted(PRUint16 minVersion,
     }
 
     /* Hash policy. */
+    {
     PRUint32 hashPolicy;
     SSLHashType hashType = ssl_SignatureSchemeToHashType(scheme);
     SECOidTag hashOID = ssl3_HashTypeToOID(hashType);
@@ -818,11 +820,13 @@ ssl_SignatureSchemeAccepted(PRUint16 minVersion,
         return PR_FALSE;
     }
     return PR_TRUE;
+    }
 }
 
 static SECStatus
 ssl_CheckSignatureSchemes(sslSocket *ss)
 {
+    unsigned int i;
     if (ss->vrange.max < SSL_LIBRARY_VERSION_TLS_1_2) {
         return SECSuccess;
     }
@@ -834,7 +838,7 @@ ssl_CheckSignatureSchemes(sslSocket *ss)
      * cipher suite in ssl3_config_match_init. */
     if (ss->sec.isServer && ss->vrange.max >= SSL_LIBRARY_VERSION_TLS_1_3) {
         PRBool foundCert = PR_FALSE;
-        for (unsigned int i = 0; i < ss->ssl3.signatureSchemeCount; ++i) {
+        for (i = 0; i < ss->ssl3.signatureSchemeCount; ++i) {
             SSLAuthType authType =
                 ssl_SignatureSchemeToAuthType(ss->ssl3.signatureSchemes[i]);
             if (ssl_HasCert(ss, ss->vrange.max, authType)) {
@@ -849,7 +853,7 @@ ssl_CheckSignatureSchemes(sslSocket *ss)
     }
 
     /* Ensure that there is a signature scheme that can be accepted.*/
-    for (unsigned int i = 0; i < ss->ssl3.signatureSchemeCount; ++i) {
+    for (i = 0; i < ss->ssl3.signatureSchemeCount; ++i) {
         if (ssl_SignatureSchemeAccepted(ss->vrange.min,
                                         ss->ssl3.signatureSchemes[i])) {
             return SECSuccess;
@@ -864,6 +868,7 @@ ssl_CheckSignatureSchemes(sslSocket *ss)
 static PRBool
 ssl_HasSignatureScheme(const sslSocket *ss, SSLAuthType authType)
 {
+    unsigned int i;
     PORT_Assert(ss->sec.isServer);
     PORT_Assert(ss->ssl3.hs.preliminaryInfo & ssl_preinfo_version);
     PORT_Assert(authType != ssl_auth_null);
@@ -874,7 +879,7 @@ ssl_HasSignatureScheme(const sslSocket *ss, SSLAuthType authType)
         authType == ssl_auth_ecdh_ecdsa) {
         return PR_TRUE;
     }
-    for (unsigned int i = 0; i < ss->ssl3.signatureSchemeCount; ++i) {
+    for (i = 0; i < ss->ssl3.signatureSchemeCount; ++i) {
         SSLSignatureScheme scheme = ss->ssl3.signatureSchemes[i];
         SSLAuthType schemeAuthType = ssl_SignatureSchemeToAuthType(scheme);
         PRBool acceptable = authType == schemeAuthType ||
@@ -1039,10 +1044,11 @@ count_cipher_suites(sslSocket *ss, PRUint8 policy)
 static PRBool
 tls13_ResumptionCompatible(sslSocket *ss, ssl3CipherSuite suite)
 {
+    unsigned int i;
     SSLVersionRange vrange = { SSL_LIBRARY_VERSION_TLS_1_3,
                                SSL_LIBRARY_VERSION_TLS_1_3 };
     SSLHashType hash = tls13_GetHashForCipherSuite(suite);
-    for (unsigned int i = 0; i < PR_ARRAY_SIZE(cipher_suite_defs); i++) {
+    for (i = 0; i < PR_ARRAY_SIZE(cipher_suite_defs); i++) {
         if (cipher_suite_defs[i].prf_hash == hash) {
             const ssl3CipherSuiteCfg *suiteCfg =
                 ssl_LookupCipherSuiteCfg(cipher_suite_defs[i].cipher_suite,
@@ -1437,13 +1443,14 @@ SECStatus
 ssl3_VerifySignedHashes(sslSocket *ss, SSLSignatureScheme scheme, SSL3Hashes *hash,
                         SECItem *buf)
 {
+    SECStatus rv;
     SECKEYPublicKey *pubKey =
         SECKEY_ExtractPublicKey(&ss->sec.peerCert->subjectPublicKeyInfo);
     if (pubKey == NULL) {
         ssl_MapLowLevelError(SSL_ERROR_EXTRACT_PUBLIC_KEY_FAILURE);
         return SECFailure;
     }
-    SECStatus rv = ssl_VerifySignedHashesWithPubKey(ss, pubKey, scheme,
+    rv = ssl_VerifySignedHashesWithPubKey(ss, pubKey, scheme,
                                                     hash, buf);
     SECKEY_DestroyPublicKey(pubKey);
     return rv;
@@ -9814,7 +9821,7 @@ ssl3_SendServerKeyExchange(sslSocket *ss)
 SECStatus
 ssl3_EncodeSigAlgs(const sslSocket *ss, PRUint16 minVersion, sslBuffer *buf)
 {
-    unsigned int lengthOffset;
+    unsigned int lengthOffset, i;
     PRBool found = PR_FALSE;
     SECStatus rv;
 
@@ -9823,7 +9830,7 @@ ssl3_EncodeSigAlgs(const sslSocket *ss, PRUint16 minVersion, sslBuffer *buf)
         return SECFailure;
     }
 
-    for (unsigned int i = 0; i < ss->ssl3.signatureSchemeCount; ++i) {
+    for (i = 0; i < ss->ssl3.signatureSchemeCount; ++i) {
         if (ssl_SignatureSchemeAccepted(minVersion,
                                         ss->ssl3.signatureSchemes[i])) {
             rv = sslBuffer_AppendNumber(buf, ss->ssl3.signatureSchemes[i], 2);
@@ -11090,8 +11097,10 @@ ssl_SetAuthKeyBits(sslSocket *ss, const SECKEYPublicKey *pubKey)
 SECStatus
 ssl3_HandleServerSpki(sslSocket *ss)
 {
-    PORT_Assert(!ss->sec.isServer);
     SECKEYPublicKey *pubKey;
+    SECStatus rv;
+
+    PORT_Assert(!ss->sec.isServer);
 
     if (ss->version >= SSL_LIBRARY_VERSION_TLS_1_3 &&
         tls13_IsVerifyingWithDelegatedCredential(ss)) {
@@ -11115,7 +11124,7 @@ ssl3_HandleServerSpki(sslSocket *ss)
         }
     }
 
-    SECStatus rv = ssl_SetAuthKeyBits(ss, pubKey);
+    rv = ssl_SetAuthKeyBits(ss, pubKey);
     SECKEY_DestroyPublicKey(pubKey);
     if (rv != SECSuccess) {
         return rv; /* Alert sent and code set. */

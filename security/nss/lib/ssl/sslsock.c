@@ -1546,6 +1546,8 @@ SECStatus
 SSLExp_CipherSuiteOrderGet(PRFileDesc *fd, PRUint16 *cipherOrder,
                            unsigned int *numCiphers)
 {
+    unsigned int i, enabled = 0;
+    sslSocket *ss;
     if (!fd) {
         SSL_DBG(("%d: SSL: file descriptor in CipherSuiteOrderGet is null",
                  SSL_GETPID()));
@@ -1556,17 +1558,16 @@ SSLExp_CipherSuiteOrderGet(PRFileDesc *fd, PRUint16 *cipherOrder,
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
     }
-    sslSocket *ss = ssl_FindSocket(fd);
+    ss = ssl_FindSocket(fd);
     if (!ss) {
         SSL_DBG(("%d: SSL[%d]: bad socket in CipherSuiteOrderGet", SSL_GETPID(),
                  fd));
         return SECFailure; /* Error code already set. */
     }
 
-    unsigned int enabled = 0;
     ssl_Get1stHandshakeLock(ss);
     ssl_GetSSL3HandshakeLock(ss);
-    for (unsigned int i = 0; i < ssl_V3_SUITES_IMPLEMENTED; i++) {
+    for (i = 0; i < ssl_V3_SUITES_IMPLEMENTED; i++) {
         const ssl3CipherSuiteCfg *suiteCfg = &ss->cipherSuites[i];
         if (suiteCfg && suiteCfg->enabled &&
             suiteCfg->policy != SSL_NOT_ALLOWED) {
@@ -1585,6 +1586,9 @@ SECStatus
 SSLExp_CipherSuiteOrderSet(PRFileDesc *fd, const PRUint16 *cipherOrder,
                            unsigned int numCiphers)
 {
+    sslSocket *ss;
+    unsigned int i, j, cfgIdx;
+    ssl3CipherSuiteCfg tmpSuiteCfg[ssl_V3_SUITES_IMPLEMENTED];
     if (!fd) {
         SSL_DBG(("%d: SSL: file descriptor in CipherSuiteOrderGet is null",
                  SSL_GETPID()));
@@ -1595,18 +1599,17 @@ SSLExp_CipherSuiteOrderSet(PRFileDesc *fd, const PRUint16 *cipherOrder,
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
     }
-    sslSocket *ss = ssl_FindSocket(fd);
+    ss = ssl_FindSocket(fd);
     if (!ss) {
         SSL_DBG(("%d: SSL[%d]: bad socket in CipherSuiteOrderSet", SSL_GETPID(),
                  fd));
         return SECFailure; /* Error code already set. */
     }
-    ssl3CipherSuiteCfg tmpSuiteCfg[ssl_V3_SUITES_IMPLEMENTED];
     ssl_Get1stHandshakeLock(ss);
     ssl_GetSSL3HandshakeLock(ss);
     /* For each cipherSuite given as input, verify that it is
      * known to NSS and only present in the list once. */
-    for (unsigned int i = 0; i < numCiphers; i++) {
+    for (i = 0; i < numCiphers; i++) {
         const ssl3CipherSuiteCfg *suiteCfg =
             ssl_LookupCipherSuiteCfg(cipherOrder[i], ss->cipherSuites);
         if (!suiteCfg) {
@@ -1615,7 +1618,7 @@ SSLExp_CipherSuiteOrderSet(PRFileDesc *fd, const PRUint16 *cipherOrder,
             ssl_Release1stHandshakeLock(ss);
             return SECFailure;
         }
-        for (unsigned int j = i + 1; j < numCiphers; j++) {
+        for (j = i + 1; j < numCiphers; j++) {
             /* This is a duplicate entry. */
             if (cipherOrder[i] == cipherOrder[j]) {
                 PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -1630,10 +1633,10 @@ SSLExp_CipherSuiteOrderSet(PRFileDesc *fd, const PRUint16 *cipherOrder,
     /* Find all defined ciphersuites not present in the input list and append
      * them after the preferred. This guarantees that the socket will always
      * have a complete list of size ssl_V3_SUITES_IMPLEMENTED */
-    unsigned int cfgIdx = numCiphers;
-    for (unsigned int i = 0; i < ssl_V3_SUITES_IMPLEMENTED; i++) {
+    cfgIdx = numCiphers;
+    for (i = 0; i < ssl_V3_SUITES_IMPLEMENTED; i++) {
         PRBool received = PR_FALSE;
-        for (unsigned int j = 0; j < numCiphers; j++) {
+        for (j = 0; j < numCiphers; j++) {
             if (ss->cipherSuites[i].cipher_suite ==
                 tmpSuiteCfg[j].cipher_suite) {
                 received = PR_TRUE;

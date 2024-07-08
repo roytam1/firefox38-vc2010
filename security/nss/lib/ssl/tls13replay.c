@@ -121,6 +121,7 @@ SSLExp_CreateAntiReplayContext(PRTime now, PRTime window, unsigned int k,
                                unsigned int bits, SSLAntiReplayContext **pctx)
 {
     SECStatus rv;
+    SSLAntiReplayContext *ctx;
 
     if (window <= 0 || k == 0 || bits == 0 || pctx == NULL) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
@@ -131,7 +132,7 @@ SSLExp_CreateAntiReplayContext(PRTime now, PRTime window, unsigned int k,
         return SECFailure;
     }
 
-    SSLAntiReplayContext *ctx = PORT_ZNew(SSLAntiReplayContext);
+    ctx = PORT_ZNew(SSLAntiReplayContext);
     if (!ctx) {
         return SECFailure; /* Code already set. */
     }
@@ -201,6 +202,7 @@ PRBool
 tls13_InWindow(const sslSocket *ss, const sslSessionID *sid)
 {
     PRInt32 timeDelta;
+    PRInt32 allowance;
 
     /* Calculate the difference between the client's view of the age of the
      * ticket (in |ss->xtnData.ticketAge|) and the server's view, which we now
@@ -231,7 +233,7 @@ tls13_InWindow(const sslSocket *ss, const sslSessionID *sid)
      * prevent the same 0-RTT attempt from being accepted during window 1 and
      * later window 3.
      */
-    PRInt32 allowance = ss->antiReplay->window / (PR_USEC_PER_MSEC * 2);
+    allowance = ss->antiReplay->window / (PR_USEC_PER_MSEC * 2);
     SSL_TRC(10, ("%d: TLS13[%d]: replay check time delta=%d, allow=%d",
                  SSL_GETPID(), ss->fd, timeDelta, allowance));
     return PR_ABS(timeDelta) < allowance;

@@ -4009,20 +4009,22 @@ parseExporter(const char *arg,
               secuExporter *exporter)
 {
     SECStatus rv = SECSuccess;
+    char *str, *labelEnd, *label;
 
-    char *str = PORT_Strdup(arg);
+    str = PORT_Strdup(arg);
     if (!str) {
         rv = SECFailure;
         goto done;
     }
 
-    char *labelEnd = strchr(str, ':');
+    labelEnd = strchr(str, ':');
     if (labelEnd) {
+        char *outputEnd;
         *labelEnd = '\0';
         labelEnd++;
 
         /* To extract CONTEXT, first skip OUTPUT-LENGTH */
-        char *outputEnd = strchr(labelEnd, ':');
+        outputEnd = strchr(labelEnd, ':');
         if (outputEnd) {
             *outputEnd = '\0';
             outputEnd++;
@@ -4051,7 +4053,7 @@ parseExporter(const char *arg,
         exporter->outputLength = 20;
     }
 
-    char *label = PORT_Strdup(str);
+    label = PORT_Strdup(str);
     exporter->label.data = (unsigned char *)label;
     exporter->label.len = strlen(label);
     if (PORT_Strncasecmp((char *)exporter->label.data, "0x", 2) == 0) {
@@ -4075,6 +4077,7 @@ parseExporters(const char *arg,
     secuExporter *exporters;
     unsigned int numValues = 0;
     unsigned int count = 0;
+    char *str, *p;
 
     if (countItems(arg, &numValues) != SECSuccess) {
         return SECFailure;
@@ -4085,11 +4088,11 @@ parseExporters(const char *arg,
     }
 
     /* Get exporter definitions. */
-    char *str = PORT_Strdup(arg);
+    str = PORT_Strdup(arg);
     if (!str) {
         goto done;
     }
-    char *p = strtok(str, ",");
+    p = strtok(str, ",");
     while (p) {
         SECStatus rv = parseExporter(p, &exporters[count++]);
         if (rv != SECSuccess) {
@@ -4139,9 +4142,10 @@ exportKeyingMaterial(PRFileDesc *fd, const secuExporter *exporter)
     }
     SECU_Indent(stdout, 1);
     fprintf(stdout, "Length: %u\n", exporter->outputLength);
+    {
     SECItem temp = { siBuffer, out, exporter->outputLength };
     SECU_PrintAsHex(stdout, &temp, "Keying Material", 1);
-
+    }
 done:
     PORT_Free(out);
     return rv;

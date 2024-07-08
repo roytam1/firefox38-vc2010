@@ -27,7 +27,7 @@
 #include "sslerr.h"
 #include "pk11func.h"
 #include "xconst.h" /* for  CERT_DecodeAltNameExtension */
-
+#include "secport.h"
 #include "pki.h"
 #include "pki3hack.h"
 
@@ -2888,8 +2888,9 @@ CERT_LockCertRefCount(CERTCertificate *cert)
 void
 CERT_UnlockCertRefCount(CERTCertificate *cert)
 {
+    PRStatus prstat;
     PORT_Assert(certRefCountLock != NULL);
-    PRStatus prstat = PZ_Unlock(certRefCountLock);
+    prstat = PZ_Unlock(certRefCountLock);
     PORT_AssertArg(prstat == PR_SUCCESS);
 }
 
@@ -2993,8 +2994,9 @@ cert_DestroyLocks(void)
 void
 CERT_UnlockCertTrust(const CERTCertificate *cert)
 {
+    PRStatus prstat;
     PORT_Assert(certTrustLock != NULL);
-    PRStatus prstat = PZ_Unlock(certTrustLock);
+    prstat = PZ_Unlock(certTrustLock);
     PORT_AssertArg(prstat == PR_SUCCESS);
 }
 
@@ -3004,8 +3006,9 @@ CERT_UnlockCertTrust(const CERTCertificate *cert)
 void
 CERT_UnlockCertTempPerm(const CERTCertificate *cert)
 {
+    PRStatus prstat;
     PORT_Assert(certTempPermLock != NULL);
-    PRStatus prstat = PZ_Unlock(certTempPermLock);
+    prstat = PZ_Unlock(certTempPermLock);
     PORT_AssertArg(prstat == PR_SUCCESS);
 }
 

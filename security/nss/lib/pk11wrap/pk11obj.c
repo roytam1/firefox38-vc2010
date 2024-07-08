@@ -1902,6 +1902,19 @@ SECStatus
 PK11_FindRawCertsWithSubject(PK11SlotInfo *slot, SECItem *derSubject,
                              CERTCertificateList **results)
 {
+    CK_CERTIFICATE_TYPE ckc_x_509 = CKC_X_509;
+    CK_OBJECT_CLASS cko_certificate = CKO_CERTIFICATE;
+    CK_ATTRIBUTE subjectTemplate[] = {
+        { CKA_CERTIFICATE_TYPE, &ckc_x_509, sizeof(ckc_x_509) },
+        { CKA_CLASS, &cko_certificate, sizeof(cko_certificate) },
+        { CKA_SUBJECT, derSubject->data, derSubject->len },
+    };
+    int templateCount = sizeof(subjectTemplate) / sizeof(subjectTemplate[0]);
+    int handleCount = 0;
+    CK_OBJECT_HANDLE *handles;
+    PLArenaPool *arena;
+    CERTCertificateList *rawCertificates;
+    int handleIndex;
     if (!slot || !derSubject || !results) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return SECFailure;
@@ -1914,16 +1927,7 @@ PK11_FindRawCertsWithSubject(PK11SlotInfo *slot, SECItem *derSubject,
         return SECFailure;
     }
 
-    CK_CERTIFICATE_TYPE ckc_x_509 = CKC_X_509;
-    CK_OBJECT_CLASS cko_certificate = CKO_CERTIFICATE;
-    CK_ATTRIBUTE subjectTemplate[] = {
-        { CKA_CERTIFICATE_TYPE, &ckc_x_509, sizeof(ckc_x_509) },
-        { CKA_CLASS, &cko_certificate, sizeof(cko_certificate) },
-        { CKA_SUBJECT, derSubject->data, derSubject->len },
-    };
-    int templateCount = sizeof(subjectTemplate) / sizeof(subjectTemplate[0]);
-    int handleCount = 0;
-    CK_OBJECT_HANDLE *handles =
+    handles =
         pk11_FindObjectsByTemplate(slot, subjectTemplate, templateCount,
                                    &handleCount);
     if (!handles) {
@@ -1945,12 +1949,12 @@ PK11_FindRawCertsWithSubject(PK11SlotInfo *slot, SECItem *derSubject,
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
     }
-    PLArenaPool *arena = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
+    arena = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
     if (!arena) {
         PORT_Free(handles);
         return SECFailure;
     }
-    CERTCertificateList *rawCertificates =
+    rawCertificates =
         PORT_ArenaNew(arena, CERTCertificateList);
     if (!rawCertificates) {
         PORT_Free(handles);
@@ -1965,7 +1969,6 @@ PK11_FindRawCertsWithSubject(PK11SlotInfo *slot, SECItem *derSubject,
         return SECFailure;
     }
     rawCertificates->len = handleCount;
-    int handleIndex;
     for (handleIndex = 0; handleIndex < handleCount; handleIndex++) {
         SECStatus rv =
             PK11_ReadAttribute(slot, handles[handleIndex], CKA_VALUE, arena,

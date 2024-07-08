@@ -398,11 +398,11 @@ loser:
 CERTCertificate *
 PK11_GetCertFromPrivateKey(SECKEYPrivateKey *privKey)
 {
+    CERTCertificate *cert;
     PK11SlotInfo *slot = privKey->pkcs11Slot;
     CK_OBJECT_HANDLE handle = privKey->pkcs11ID;
     CK_OBJECT_HANDLE certID =
         PK11_MatchItem(slot, handle, CKO_CERTIFICATE);
-    CERTCertificate *cert;
 
     if (certID == CK_INVALID_HANDLE) {
         PORT_SetError(SSL_ERROR_NO_CERTIFICATE);
@@ -416,18 +416,21 @@ CK_OBJECT_HANDLE *
 PK11_FindCertHandlesForKeyHandle(PK11SlotInfo *slot, CK_OBJECT_HANDLE keyHandle,
                                  int *certHandleCountOut)
 {
+    PORTCheapArenaPool arena;
+    CK_ATTRIBUTE idTemplate[] = {
+        { CKA_ID, NULL, 0 },
+    };
+    const int idAttrCount = sizeof(idTemplate) / sizeof(idTemplate[0]);
+    CK_RV crv;
+    CK_OBJECT_CLASS searchClass = CKO_CERTIFICATE;
+    CK_OBJECT_HANDLE *ids;
+    PORT_InitCheapArena(&arena, DER_DEFAULT_CHUNKSIZE);
     if (!slot || !certHandleCountOut || keyHandle == CK_INVALID_HANDLE) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return NULL;
     }
 
-    PORTCheapArenaPool arena;
-    PORT_InitCheapArena(&arena, DER_DEFAULT_CHUNKSIZE);
-    CK_ATTRIBUTE idTemplate[] = {
-        { CKA_ID, NULL, 0 },
-    };
-    const int idAttrCount = sizeof(idTemplate) / sizeof(idTemplate[0]);
-    CK_RV crv = PK11_GetAttributes(&arena.arena, slot, keyHandle, idTemplate, idAttrCount);
+    crv = PK11_GetAttributes(&arena.arena, slot, keyHandle, idTemplate, idAttrCount);
     if (crv != CKR_OK) {
         PORT_DestroyCheapArena(&arena);
         PORT_SetError(PK11_MapError(crv));
@@ -439,41 +442,46 @@ PK11_FindCertHandlesForKeyHandle(PK11SlotInfo *slot, CK_OBJECT_HANDLE keyHandle,
         PORT_SetError(SEC_ERROR_BAD_KEY);
         return NULL;
     }
-
-    CK_OBJECT_CLASS searchClass = CKO_CERTIFICATE;
+    {
     CK_ATTRIBUTE searchTemplate[] = {
-        idTemplate[0],
+        { idTemplate[0].type, idTemplate[0].pValue, idTemplate[0].ulValueLen },
         { CKA_CLASS, &searchClass, sizeof(searchClass) }
     };
     const int searchAttrCount = sizeof(searchTemplate) / sizeof(searchTemplate[0]);
-    CK_OBJECT_HANDLE *ids = pk11_FindObjectsByTemplate(slot, searchTemplate, searchAttrCount, certHandleCountOut);
+    ids = pk11_FindObjectsByTemplate(slot, searchTemplate, searchAttrCount, certHandleCountOut);
 
     PORT_DestroyCheapArena(&arena);
     return ids;
+    }
 }
 
 CERTCertList *
 PK11_GetCertsMatchingPrivateKey(SECKEYPrivateKey *privKey)
 {
+    CERTCertList *certs;
+    PK11SlotInfo *slot;
+    CK_OBJECT_HANDLE handle, certID;
+    int certHandleCount = 0;
+    CK_OBJECT_HANDLE *certHandles;
+    int i;
     if (!privKey) {
         PORT_SetError(SEC_ERROR_INVALID_ARGS);
         return NULL;
     }
-    CERTCertList *certs = CERT_NewCertList();
+    certs = CERT_NewCertList();
     if (!certs) {
         PORT_SetError(SEC_ERROR_NO_MEMORY);
         return NULL;
     }
-    PK11SlotInfo *slot = privKey->pkcs11Slot;
-    CK_OBJECT_HANDLE handle = privKey->pkcs11ID;
-    CK_OBJECT_HANDLE certID = PK11_MatchItem(slot, handle, CKO_CERTIFICATE);
+    slot = privKey->pkcs11Slot;
+    handle = privKey->pkcs11ID;
+    certID = PK11_MatchItem(slot, handle, CKO_CERTIFICATE);
     /* If we can't get a matching certID, there are no matching certificates,
      * which is not an error. */
     if (certID == CK_INVALID_HANDLE) {
         return certs;
     }
-    int certHandleCount = 0;
-    CK_OBJECT_HANDLE *certHandles = PK11_FindCertHandlesForKeyHandle(slot, handle, &certHandleCount);
+    certHandles = PK11_FindCertHandlesForKeyHandle(slot, handle, &certHandleCount);
     if (!certHandles) {
         /* If certHandleCount is 0, there are no matching certificates, which is
          * not an error. */
@@ -483,7 +491,6 @@ PK11_GetCertsMatchingPrivateKey(SECKEYPrivateKey *privKey)
         CERT_DestroyCertList(certs);
         return NULL;
     }
-    int i;
     for (i = 0; i < certHandleCount; i++) {
         CERTCertificate *cert = PK11_MakeCertFromHandle(slot, certHandles[i], NULL);
         /* If PK11_MakeCertFromHandle fails for one handle, optimistically

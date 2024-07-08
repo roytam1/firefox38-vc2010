@@ -350,6 +350,7 @@ CERT_NewTempCertificate(CERTCertDBHandle *handle, SECItem *derCert,
     nssPKIObject *pkio;
     NSSCryptoContext *gCC = STAN_GetDefaultCryptoContext();
     NSSTrustDomain *gTD = STAN_GetDefaultTrustDomain();
+    SECItem derSerial = { 0 };
     if (!isperm) {
         NSSDER encoding;
         NSSITEM_FROM_SECITEM(&encoding, derCert);
@@ -415,7 +416,6 @@ CERT_NewTempCertificate(CERTCertDBHandle *handle, SECItem *derCert,
     /* CERTCertificate stores serial numbers decoded.  I need the DER
     * here.  sigh.
     */
-    SECItem derSerial = { 0 };
     CERT_SerialNumberFromDERCert(&cc->derCert, &derSerial);
     if (!derSerial.data)
         goto loser;

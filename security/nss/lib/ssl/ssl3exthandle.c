@@ -1198,6 +1198,7 @@ ssl3_ProcessSessionTicketCommon(sslSocket *ss, const SECItem *ticket,
     SessionTicket parsedTicket;
     sslSessionID *sid = NULL;
     SECStatus rv;
+    PRTime end;
 
     if (ss->sec.ci.sid != NULL) {
         ssl_UncacheSessionID(ss);
@@ -1241,7 +1242,7 @@ ssl3_ProcessSessionTicketCommon(sslSocket *ss, const SECItem *ticket,
     }
 
     /* Use the ticket if it is valid and unexpired. */
-    PRTime end = parsedTicket.timestamp + (ssl_ticket_lifetime * PR_USEC_PER_SEC);
+    end = parsedTicket.timestamp + (ssl_ticket_lifetime * PR_USEC_PER_SEC);
     if (end > ssl_Time(ss)) {
 
         rv = ssl_CreateSIDFromTicket(ss, ticket, &parsedTicket, &sid);
@@ -1636,18 +1637,19 @@ SECStatus
 ssl3_SendSigAlgsXtn(const sslSocket *ss, TLSExtensionData *xtnData,
                     sslBuffer *buf, PRBool *added)
 {
+    PRUint16 minVersion;
+    SECStatus rv;
     if (ss->vrange.max < SSL_LIBRARY_VERSION_TLS_1_2) {
         return SECSuccess;
     }
 
-    PRUint16 minVersion;
     if (ss->sec.isServer) {
         minVersion = ss->version; /* CertificateRequest */
     } else {
         minVersion = ss->vrange.min; /* ClientHello */
     }
 
-    SECStatus rv = ssl3_EncodeSigAlgs(ss, minVersion, buf);
+    rv = ssl3_EncodeSigAlgs(ss, minVersion, buf);
     if (rv != SECSuccess) {
         return SECFailure;
     }

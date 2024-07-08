@@ -1772,15 +1772,15 @@ static SECStatus
 ssl_GetSelfEncryptKeyPair(SECKEYPublicKey **pubKey,
                           SECKEYPrivateKey **privKey)
 {
+    SECKEYPublicKey *pubKeyCopy;
+    SECKEYPrivateKey *privKeyCopy;
+    PRBool noKey = PR_FALSE;
+
     if (PR_SUCCESS != PR_CallOnce(&ssl_self_encrypt_key_pair.setup,
                                   &ssl_SelfEncryptSetup)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
         return SECFailure;
     }
-
-    SECKEYPublicKey *pubKeyCopy;
-    SECKEYPrivateKey *privKeyCopy;
-    PRBool noKey = PR_FALSE;
 
     PR_RWLock_Rlock(ssl_self_encrypt_key_pair.lock);
     if (ssl_self_encrypt_key_pair.pubKey && ssl_self_encrypt_key_pair.privKey) {
