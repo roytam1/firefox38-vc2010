@@ -543,7 +543,8 @@ typedef union {
 inline static void
 xorBlock(unsigned char *out, const unsigned char *a, const unsigned char *b)
 {
-    for (unsigned int j = 0; j < AES_BLOCK_SIZE; ++j) {
+    unsigned int j;
+    for (j = 0; j < AES_BLOCK_SIZE; ++j) {
         (out)[j] = (a)[j] ^ (b)[j];
     }
 }

@@ -891,6 +891,7 @@ stan_GetCERTCertificate(NSSCertificate *c, PRBool forceUpdate)
     nssDecodedCert *dc = NULL;
     CERTCertificate *cc = NULL;
     CERTCertTrust certTrust;
+    NSSCertificate *nssCert;
 
     /* make sure object does not go away until we finish */
     nssPKIObject_AddRef(&c->object);
@@ -926,7 +927,7 @@ stan_GetCERTCertificate(NSSCertificate *c, PRBool forceUpdate)
         goto loser;
     }
     CERT_LockCertTempPerm(cc);
-    NSSCertificate *nssCert = cc->nssCertificate;
+    nssCert = cc->nssCertificate;
     CERT_UnlockCertTempPerm(cc);
     if (!nssCert || forceUpdate) {
         fill_CERTCertificateFields(c, cc, forceUpdate);

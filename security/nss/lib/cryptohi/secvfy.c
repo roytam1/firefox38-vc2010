@@ -167,12 +167,12 @@ verifyPKCS1DigestInfo(const VFYContext *cx, const SECItem *digest)
 static unsigned int
 checkedSignatureLen(const SECKEYPublicKey *pubk)
 {
+    unsigned int maxSigLen;
     unsigned int sigLen = SECKEY_SignatureLen(pubk);
     if (sigLen == 0) {
         /* Error set by SECKEY_SignatureLen */
         return sigLen;
     }
-    unsigned int maxSigLen;
     switch (pubk->keyType) {
         case rsaKey:
         case rsaPssKey:

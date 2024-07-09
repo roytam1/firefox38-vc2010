@@ -1135,6 +1135,7 @@ PK11_ImportCert(PK11SlotInfo *slot, CERTCertificate *cert,
     nssCryptokiObject *keyobj, *certobj;
     NSSToken *token = NULL;
     char *emailAddr = NULL;
+    NSSCertificate *nssCert;
     nssCertificateStoreTrace lockTrace = { NULL, NULL, PR_FALSE, PR_FALSE };
     nssCertificateStoreTrace unlockTrace = { NULL, NULL, PR_FALSE, PR_FALSE };
     SECItem *keyID = pk11_mkcertKeyID(cert);
@@ -1153,7 +1154,7 @@ PK11_ImportCert(PK11SlotInfo *slot, CERTCertificate *cert,
 
     /* need to get the cert as a stan cert */
     CERT_LockCertTempPerm(cert);
-    NSSCertificate *nssCert = cert->nssCertificate;
+    nssCert = cert->nssCertificate;
     CERT_UnlockCertTempPerm(cert);
     if (nssCert) {
         c = nssCert;

@@ -502,6 +502,7 @@ tls13_MakePssSpki(const SECKEYPublicKey *pub, SECOidTag hashOid)
     SECKEYRSAPSSParams params = { 0 };
     SECAlgorithmID maskHashAlg;
     SECItem *maskHashAlgItem, *algorithmItem, *pubItem;
+    unsigned int saltLength;
     PLArenaPool *arena = PORT_NewArena(DER_DEFAULT_CHUNKSIZE);
     if (!arena) {
         goto loser; /* Code already set. */
@@ -542,7 +543,7 @@ tls13_MakePssSpki(const SECKEYPublicKey *pub, SECOidTag hashOid)
     }
 
     /* Always include saltLength: all hashes are larger than 20. */
-    unsigned int saltLength = HASH_ResultLenByOidTag(hashOid);
+    saltLength = HASH_ResultLenByOidTag(hashOid);
     PORT_Assert(saltLength > 20);
     if (!SEC_ASN1EncodeInteger(arena, &params.saltLength, saltLength)) {
         PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);

@@ -1599,6 +1599,7 @@ pk11_IsPresentCertLoad(PK11SlotInfo *slot, PRBool loadCerts)
     CK_SLOT_INFO slotInfo;
     CK_SESSION_INFO sessionInfo;
     CK_RV crv;
+    NSSToken *nssToken;
 
     /* disabled slots are never present */
     if (slot->disabled) {
@@ -1610,7 +1611,7 @@ pk11_IsPresentCertLoad(PK11SlotInfo *slot, PRBool loadCerts)
         return PR_TRUE;
     }
 
-    NSSToken *nssToken = PK11Slot_GetNSSToken(slot);
+    nssToken = PK11Slot_GetNSSToken(slot);
     if (nssToken) {
         PRBool present = nssToken_IsPresent(nssToken);
         (void)nssToken_Destroy(nssToken);
@@ -2619,6 +2620,7 @@ PK11_ResetToken(PK11SlotInfo *slot, char *sso_pwd)
     unsigned char tokenName[32];
     int tokenNameLen;
     CK_RV crv;
+    NSSToken *token;
 
     /* reconstruct the token name */
     tokenNameLen = PORT_Strlen(slot->token_name);
@@ -2651,7 +2653,7 @@ PK11_ResetToken(PK11SlotInfo *slot, char *sso_pwd)
         PORT_SetError(PK11_MapError(crv));
         return SECFailure;
     }
-    NSSToken *token = PK11Slot_GetNSSToken(slot);
+    token = PK11Slot_GetNSSToken(slot);
     if (token) {
         nssTrustDomain_UpdateCachedTokenCerts(token->trustDomain, token);
         (void)nssToken_Destroy(token);

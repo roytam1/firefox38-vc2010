@@ -816,6 +816,7 @@ void
 CERT_DestroyCertificate(CERTCertificate *cert)
 {
     if (cert) {
+        NSSCertificate *tmp;
         /* don't use STAN_GetNSSCertificate because we don't want to
          * go to the trouble of translating the CERTCertificate into
          * an NSSCertificate just to destroy it.  If it hasn't been done
@@ -828,7 +829,7 @@ CERT_DestroyCertificate(CERTCertificate *cert)
          * fill_CERTCertificateFields(). The longer-term goal is to refactor
          * all these global locks to be certificate-scoped. */
         CERT_MaybeLockCertTempPerm(cert);
-        NSSCertificate *tmp = cert->nssCertificate;
+        tmp = cert->nssCertificate;
         CERT_MaybeUnlockCertTempPerm(cert);
         if (tmp) {
             /* delete the NSSCertificate */

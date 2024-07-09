@@ -219,6 +219,7 @@ SECStatus
 BLAKE2B_Update(BLAKE2BContext* ctx, const unsigned char* in,
                unsigned int inlen)
 {
+    size_t left, fill;
     /* Nothing to do if there's nothing. */
     if (inlen == 0) {
         return SECSuccess;
@@ -235,9 +236,9 @@ BLAKE2B_Update(BLAKE2BContext* ctx, const unsigned char* in,
         return SECFailure;
     }
 
-    size_t left = ctx->buflen;
+    left = ctx->buflen;
     PORT_Assert(left <= BLAKE2B_BLOCK_LENGTH);
-    size_t fill = BLAKE2B_BLOCK_LENGTH - left;
+    fill = BLAKE2B_BLOCK_LENGTH - left;
 
     if (inlen > fill) {
         if (ctx->buflen) {

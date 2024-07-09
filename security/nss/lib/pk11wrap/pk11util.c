@@ -1631,6 +1631,7 @@ SECMOD_CloseUserDB(PK11SlotInfo *slot)
 {
     SECStatus rv;
     char *sendSpec;
+    NSSToken *nssToken;
 
     sendSpec = PR_smprintf("tokens=[0x%x=<>]", slot->slotID);
     if (sendSpec == NULL) {
@@ -1642,7 +1643,7 @@ SECMOD_CloseUserDB(PK11SlotInfo *slot)
     PR_smprintf_free(sendSpec);
     /* if we are in the delay period for the "isPresent" call, reset
      * the delay since we know things have probably changed... */
-    NSSToken *nssToken = PK11Slot_GetNSSToken(slot);
+    nssToken = PK11Slot_GetNSSToken(slot);
     if (nssToken) {
         if (nssToken->slot) {
             nssSlot_ResetDelay(nssToken->slot);
