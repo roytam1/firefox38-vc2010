@@ -30,10 +30,6 @@
 #endif /* NSS_DISABLE_SSE2 */
 #endif
 
-typedef void AESBlockFunc(AESContext *cx,
-                          unsigned char *output,
-                          const unsigned char *input);
-
 /* RIJNDAEL_NUM_ROUNDS
  *
  * Number of rounds per execution

@@ -13,6 +13,7 @@
 #include "pki3hack.h"
 #include "secerr.h"
 #include "dev.h"
+#include "dev3hack.h"
 #include "utilpars.h"
 #include "pkcs11uri.h"
 
@@ -99,6 +100,7 @@ int
 secmod_GetSystemFIPSEnabled(void)
 {
 #ifdef LINUX
+#ifndef NSS_FIPS_DISABLED
     FILE *f;
     char d;
     size_t size;
@@ -116,6 +118,7 @@ secmod_GetSystemFIPSEnabled(void)
     if (d == '1') {
         return 1;
     }
+#endif
 #endif
     return 0;
 }
@@ -1264,8 +1267,14 @@ SECMOD_WaitForAnyTokenEvent(SECMODModule *mod, unsigned long flags,
     }
     /* if we are in the delay period for the "isPresent" call, reset
      * the delay since we know things have probably changed... */
-    if (slot && slot->nssToken && slot->nssToken->slot) {
-        nssSlot_ResetDelay(slot->nssToken->slot);
+    if (slot) {
+        NSSToken *nssToken = PK11Slot_GetNSSToken(slot);
+        if (nssToken) {
+            if (nssToken->slot) {
+                nssSlot_ResetDelay(nssToken->slot);
+            }
+            (void)nssToken_Destroy(nssToken);
+        }
     }
     return slot;
 
@@ -1498,8 +1507,12 @@ SECMOD_OpenNewSlot(SECMODModule *mod, const char *moduleSpec)
     if (slot) {
         /* if we are in the delay period for the "isPresent" call, reset
          * the delay since we know things have probably changed... */
-        if (slot->nssToken && slot->nssToken->slot) {
-            nssSlot_ResetDelay(slot->nssToken->slot);
+        NSSToken *nssToken = PK11Slot_GetNSSToken(slot);
+        if (nssToken) {
+            if (nssToken->slot) {
+                nssSlot_ResetDelay(nssToken->slot);
+            }
+            (void)nssToken_Destroy(nssToken);
         }
         /* force the slot info structures to properly reset */
         (void)PK11_IsPresent(slot);
@@ -1629,8 +1642,12 @@ SECMOD_CloseUserDB(PK11SlotInfo *slot)
     PR_smprintf_free(sendSpec);
     /* if we are in the delay period for the "isPresent" call, reset
      * the delay since we know things have probably changed... */
-    if (slot->nssToken && slot->nssToken->slot) {
-        nssSlot_ResetDelay(slot->nssToken->slot);
+    NSSToken *nssToken = PK11Slot_GetNSSToken(slot);
+    if (nssToken) {
+        if (nssToken->slot) {
+            nssSlot_ResetDelay(nssToken->slot);
+        }
+        (void)nssToken_Destroy(nssToken);
         /* force the slot info structures to properly reset */
         (void)PK11_IsPresent(slot);
     }

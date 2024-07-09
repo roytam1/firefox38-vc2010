@@ -7,6 +7,7 @@
 #include "nss.h"
 #include "pk11func.h"
 #include "secder.h"
+#include "sechash.h"
 #include "ssl.h"
 #include "sslproto.h"
 #include "sslimpl.h"
@@ -220,7 +221,7 @@ tls13_MaybeSetDelegatedCredential(sslSocket *ss)
     }
 
     priv = ss->sec.serverCert->delegCredKeyPair->privKey;
-    rv = ssl_PrivateKeySupportsRsaPss(priv, &doesRsaPss);
+    rv = ssl_PrivateKeySupportsRsaPss(priv, NULL, NULL, &doesRsaPss);
     if (rv != SECSuccess) {
         return SECFailure;
     }
@@ -540,6 +541,15 @@ tls13_MakePssSpki(const SECKEYPublicKey *pub, SECOidTag hashOid)
         goto loser; /* Code already set. */
     }
 
+    /* Always include saltLength: all hashes are larger than 20. */
+    unsigned int saltLength = HASH_ResultLenByOidTag(hashOid);
+    PORT_Assert(saltLength > 20);
+    if (!SEC_ASN1EncodeInteger(arena, &params.saltLength, saltLength)) {
+        PORT_SetError(SEC_ERROR_LIBRARY_FAILURE);
+        goto loser;
+    }
+    /* Omit the trailerField always. */
+
     algorithmItem =
         SEC_ASN1EncodeItem(arena, NULL, &params,
                            SEC_ASN1_GET(SECKEY_RSAPSSParamsTemplate));
@@ -754,6 +764,8 @@ SSLExp_DelegateCredential(const CERTCertificate *cert,
     if (rv != SECSuccess) {
         goto loser;
     }
+
+    PRINT_BUF(20, (NULL, "delegated credential", dcBuf.buf, dcBuf.len));
 
     SECKEY_DestroySubjectPublicKeyInfo(spki);
     SECKEY_DestroyPrivateKey(tmpPriv);

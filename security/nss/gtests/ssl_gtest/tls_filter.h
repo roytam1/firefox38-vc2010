@@ -1,5 +1,4 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -661,6 +660,21 @@ class TlsClientHelloVersionSetter : public TlsHandshakeFilter {
   TlsClientHelloVersionSetter(const std::shared_ptr<TlsAgent>& a,
                               uint16_t version)
       : TlsHandshakeFilter(a, {kTlsHandshakeClientHello}), version_(version) {}
+
+  virtual PacketFilter::Action FilterHandshake(const HandshakeHeader& header,
+                                               const DataBuffer& input,
+                                               DataBuffer* output);
+
+ private:
+  uint16_t version_;
+};
+
+// Set the version number in the ServerHello.
+class TlsServerHelloVersionSetter : public TlsHandshakeFilter {
+ public:
+  TlsServerHelloVersionSetter(const std::shared_ptr<TlsAgent>& a,
+                              uint16_t version)
+      : TlsHandshakeFilter(a, {kTlsHandshakeServerHello}), version_(version) {}
 
   virtual PacketFilter::Action FilterHandshake(const HandshakeHeader& header,
                                                const DataBuffer& input,

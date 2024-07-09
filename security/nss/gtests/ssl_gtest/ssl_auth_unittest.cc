@@ -1,5 +1,4 @@
 /* -*- Mode: C++; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
-/* vim: set ts=2 et sw=2 tw=80: */
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
@@ -267,6 +266,126 @@ static SECStatus GetClientAuthDataHook(void* self, PRFileDesc* fd,
   *clientCert = cert.release();
   *clientKey = priv.release();
   return SECSuccess;
+}
+
+typedef struct AutoClientTestStr {
+  SECStatus result;
+  const std::string cert;
+} AutoClientTest;
+
+typedef struct AutoClientResultsStr {
+  AutoClientTest isRsa2048;
+  AutoClientTest isClient;
+  AutoClientTest isNull;
+  bool hookCalled;
+} AutoClientResults;
+
+void VerifyClientCertMatch(CERTCertificate* clientCert,
+                           const std::string expectedName) {
+  const char* name = clientCert->nickname;
+  std::cout << "Match name=\"" << name << "\" expected=\"" << expectedName
+            << "\"" << std::endl;
+  EXPECT_TRUE(PORT_Strcmp(name, expectedName.c_str()) == 0)
+      << " Certmismatch: \"" << name << "\" != \"" << expectedName << "\"";
+}
+
+static SECStatus GetAutoClientAuthDataHook(void* expectResults, PRFileDesc* fd,
+                                           CERTDistNames* caNames,
+                                           CERTCertificate** clientCert,
+                                           SECKEYPrivateKey** clientKey) {
+  AutoClientResults& results = *(AutoClientResults*)expectResults;
+  SECStatus rv;
+
+  results.hookCalled = true;
+  *clientCert = NULL;
+  *clientKey = NULL;
+  rv = NSS_GetClientAuthData((void*)TlsAgent::kRsa2048.c_str(), fd, caNames,
+                             clientCert, clientKey);
+  if (rv == SECSuccess) {
+    VerifyClientCertMatch(*clientCert, results.isRsa2048.cert);
+    CERT_DestroyCertificate(*clientCert);
+    SECKEY_DestroyPrivateKey(*clientKey);
+    *clientCert = NULL;
+    *clientKey = NULL;
+  }
+  EXPECT_EQ(results.isRsa2048.result, rv);
+
+  rv = NSS_GetClientAuthData((void*)TlsAgent::kClient.c_str(), fd, caNames,
+                             clientCert, clientKey);
+  if (rv == SECSuccess) {
+    VerifyClientCertMatch(*clientCert, results.isClient.cert);
+    CERT_DestroyCertificate(*clientCert);
+    SECKEY_DestroyPrivateKey(*clientKey);
+    *clientCert = NULL;
+    *clientKey = NULL;
+  }
+  EXPECT_EQ(results.isClient.result, rv);
+  EXPECT_EQ(*clientCert, nullptr);
+  EXPECT_EQ(*clientKey, nullptr);
+  rv = NSS_GetClientAuthData(NULL, fd, caNames, clientCert, clientKey);
+  if (rv == SECSuccess) {
+    VerifyClientCertMatch(*clientCert, results.isNull.cert);
+    // return this result
+  }
+  EXPECT_EQ(results.isNull.result, rv);
+  return rv;
+}
+
+// while I would have liked to use a new INSTANTIATE macro the
+// generates the following three tests, figuring out how to make that
+// work on top of the existing TlsConnect* plumbing hurts my head.
+TEST_P(TlsConnectTls12, AutoClientSelectRsaPss) {
+  AutoClientResults rsa = {{SECSuccess, TlsAgent::kRsa2048},
+                           {SECSuccess, TlsAgent::kClient},
+                           {SECSuccess, TlsAgent::kDelegatorRsaPss2048},
+                           false};
+  static const SSLSignatureScheme kSchemes[] = {ssl_sig_rsa_pss_pss_sha256,
+                                                ssl_sig_rsa_pkcs1_sha256,
+                                                ssl_sig_rsa_pkcs1_sha1};
+  Reset("rsa_pss_noparam");
+  client_->SetupClientAuth();
+  server_->RequestClientAuth(true);
+  EXPECT_EQ(SECSuccess,
+            SSL_GetClientAuthDataHook(client_->ssl_fd(),
+                                      GetAutoClientAuthDataHook, (void*)&rsa));
+  server_->SetSignatureSchemes(kSchemes, PR_ARRAY_SIZE(kSchemes));
+  client_->SetSignatureSchemes(kSchemes, PR_ARRAY_SIZE(kSchemes));
+  Connect();
+  EXPECT_TRUE(rsa.hookCalled);
+}
+
+TEST_P(TlsConnectTls12, AutoClientSelectEcc) {
+  AutoClientResults ecc = {{SECFailure, TlsAgent::kClient},
+                           {SECFailure, TlsAgent::kClient},
+                           {SECSuccess, TlsAgent::kDelegatorEcdsa256},
+                           false};
+  static const SSLSignatureScheme kSchemes[] = {ssl_sig_ecdsa_secp256r1_sha256};
+  client_->SetupClientAuth();
+  server_->RequestClientAuth(true);
+  EXPECT_EQ(SECSuccess,
+            SSL_GetClientAuthDataHook(client_->ssl_fd(),
+                                      GetAutoClientAuthDataHook, (void*)&ecc));
+  server_->SetSignatureSchemes(kSchemes, PR_ARRAY_SIZE(kSchemes));
+  client_->SetSignatureSchemes(kSchemes, PR_ARRAY_SIZE(kSchemes));
+  Connect();
+  EXPECT_TRUE(ecc.hookCalled);
+}
+
+TEST_P(TlsConnectTls12, AutoClientSelectDsa) {
+  AutoClientResults dsa = {{SECFailure, TlsAgent::kClient},
+                           {SECFailure, TlsAgent::kClient},
+                           {SECSuccess, TlsAgent::kServerDsa},
+                           false};
+  static const SSLSignatureScheme kSchemes[] = {ssl_sig_dsa_sha256};
+  client_->SetupClientAuth();
+  server_->RequestClientAuth(true);
+  EXPECT_EQ(SECSuccess,
+            SSL_GetClientAuthDataHook(client_->ssl_fd(),
+                                      GetAutoClientAuthDataHook, (void*)&dsa));
+  server_->SetSignatureSchemes(kSchemes, PR_ARRAY_SIZE(kSchemes));
+  client_->SetSignatureSchemes(kSchemes, PR_ARRAY_SIZE(kSchemes));
+  Connect();
+  EXPECT_TRUE(dsa.hookCalled);
 }
 
 TEST_F(TlsConnectStreamTls13, PostHandshakeAuthMultiple) {

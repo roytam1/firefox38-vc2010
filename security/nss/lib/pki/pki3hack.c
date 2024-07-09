@@ -72,12 +72,16 @@ STAN_InitTokenForSlotInfo(NSSTrustDomain *td, PK11SlotInfo *slot)
         }
     }
     token = nssToken_CreateFromPK11SlotInfo(td, slot);
-    PK11Slot_SetNSSToken(slot, token);
-    /* Don't add nonexistent token to TD's token list */
     if (token) {
+        /* PK11Slot_SetNSSToken increments the refcount on |token| to 2 */
+        PK11Slot_SetNSSToken(slot, token);
+
+        /* we give our reference to |td->tokenList| */
         NSSRWLock_LockWrite(td->tokensLock);
         nssList_Add(td->tokenList, token);
         NSSRWLock_UnlockWrite(td->tokensLock);
+    } else {
+        PK11Slot_SetNSSToken(slot, NULL);
     }
     return PR_SUCCESS;
 }
@@ -188,7 +192,8 @@ STAN_RemoveModuleFromDefaultTrustDomain(
             nssList_Remove(td->tokenList, token);
             NSSRWLock_UnlockWrite(td->tokensLock);
             PK11Slot_SetNSSToken(module->slots[i], NULL);
-            nssToken_Destroy(token);
+            (void)nssToken_Destroy(token); /* for the |td->tokenList| reference */
+            (void)nssToken_Destroy(token); /* for our PK11Slot_GetNSSToken reference */
         }
     }
     NSSRWLock_LockWrite(td->tokensLock);
@@ -867,9 +872,9 @@ fill_CERTCertificateFields(NSSCertificate *c, CERTCertificate *cc, PRBool forced
     CERT_LockCertTempPerm(cc);
     cc->istemp = PR_FALSE; /* CERT_NewTemp will override this */
     cc->isperm = PR_TRUE;  /* by default */
-    CERT_UnlockCertTempPerm(cc);
     /* pointer back */
     cc->nssCertificate = c;
+    CERT_UnlockCertTempPerm(cc);
     if (trust) {
         /* force the cert type to be recomputed to include trust info */
         PRUint32 nsCertType = cert_ComputeCertType(cc);
@@ -920,16 +925,33 @@ stan_GetCERTCertificate(NSSCertificate *c, PRBool forceUpdate)
         nss_SetError(NSS_ERROR_INTERNAL_ERROR);
         goto loser;
     }
-    if (!cc->nssCertificate || forceUpdate) {
+    CERT_LockCertTempPerm(cc);
+    NSSCertificate *nssCert = cc->nssCertificate;
+    CERT_UnlockCertTempPerm(cc);
+    if (!nssCert || forceUpdate) {
         fill_CERTCertificateFields(c, cc, forceUpdate);
-    } else if (CERT_GetCertTrust(cc, &certTrust) != SECSuccess &&
-               !c->object.cryptoContext) {
-        /* if it's a perm cert, it might have been stored before the
-         * trust, so look for the trust again.  But a temp cert can be
-         * ignored.
-         */
-        CERTCertTrust *trust = NULL;
-        trust = nssTrust_GetCERTCertTrustForCert(c, cc);
+    } else if (CERT_GetCertTrust(cc, &certTrust) != SECSuccess) {
+        CERTCertTrust *trust;
+        if (!c->object.cryptoContext) {
+            /* If it's a perm cert, it might have been stored before the
+             * trust, so look for the trust again.
+             */
+            trust = nssTrust_GetCERTCertTrustForCert(c, cc);
+        } else {
+            /* If it's a temp cert, it might have been stored before the
+             * builtin trust module is loaded, so look for the trust
+             * again, but don't set the empty trust if it is not found.
+             */
+            NSSTrust *t = nssTrustDomain_FindTrustForCertificate(c->object.cryptoContext->td, c);
+            if (!t) {
+                goto loser;
+            }
+            trust = cert_trust_from_stan_trust(t, cc->arena);
+            nssTrust_Destroy(t);
+            if (!trust) {
+                goto loser;
+            }
+        }
 
         CERT_LockCertTrust(cc);
         cc->trust = trust;
@@ -1007,7 +1029,9 @@ STAN_GetNSSCertificate(CERTCertificate *cc)
     NSSArena *arena;
     SECItem derSerial;
     SECStatus secrv;
+    CERT_LockCertTempPerm(cc);
     c = cc->nssCertificate;
+    CERT_UnlockCertTempPerm(cc);
     if (c) {
         return c;
     }
@@ -1058,7 +1082,11 @@ STAN_GetNSSCertificate(CERTCertificate *cc)
             nssArena_Destroy(arena);
             return NULL;
         }
-        instance->token = nssToken_AddRef(PK11Slot_GetNSSToken(cc->slot));
+        instance->token = PK11Slot_GetNSSToken(cc->slot);
+        if (!instance->token) {
+            nssArena_Destroy(arena);
+            return NULL;
+        }
         instance->handle = cc->pkcs11ID;
         instance->isTokenObject = PR_TRUE;
         if (cc->nickname) {
@@ -1070,7 +1098,9 @@ STAN_GetNSSCertificate(CERTCertificate *cc)
         nssPKIObject_AddInstance(&c->object, instance);
     }
     c->decoding = create_decoded_pkix_cert_from_nss3cert(NULL, cc);
+    CERT_LockCertTempPerm(cc);
     cc->nssCertificate = c;
+    CERT_UnlockCertTempPerm(cc);
     return c;
 }
 
@@ -1249,6 +1279,10 @@ STAN_ChangeCertTrust(CERTCertificate *cc, CERTCertTrust *trust)
             NSSASCII7 *email = c->email;
             tok = PK11Slot_GetNSSToken(slot);
             PK11_FreeSlot(slot);
+            if (!tok) {
+                nssrv = PR_FAILURE;
+                goto done;
+            }
 
             newInstance = nssToken_ImportCertificate(tok, NULL,
                                                      NSSCertificateType_PKIX,
@@ -1263,6 +1297,7 @@ STAN_ChangeCertTrust(CERTCertificate *cc, CERTCertTrust *trust)
             nss_ZFreeIf(nickname);
             nickname = NULL;
             if (!newInstance) {
+                (void)nssToken_Destroy(tok);
                 nssrv = PR_FAILURE;
                 goto done;
             }
@@ -1274,6 +1309,7 @@ STAN_ChangeCertTrust(CERTCertificate *cc, CERTCertTrust *trust)
                                                nssTrust->codeSigning,
                                                nssTrust->emailProtection,
                                                nssTrust->stepUpApproved, PR_TRUE);
+            (void)nssToken_Destroy(tok);
         }
         if (newInstance) {
             nssCryptokiObject_Destroy(newInstance);
